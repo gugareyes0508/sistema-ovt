@@ -1,416 +1,392 @@
-// ============================================
-// BACKEND: SISTEMA DE CONTROL OVT
-// Node.js + Express + Firebase
-// ============================================
-
-require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcrypt');
-const admin = require('firebase-admin');
-const os = require('os');
+require('dotenv').config();
 
-// Inicializar Firebase
-const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT || '{}');
-admin.initializeApp({
-  credential: admin.credential.cert(serviceAccount),
+const admin = require('firebase-admin');
+
+// Inicializar Firebase con variables de entorno
+const firebaseConfig = {
+  projectId: process.env.FIREBASE_PROJECT_ID,
+  privateKey: process.env.FIREBASE_PRIVATE_KEY ? 
+    process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n') : undefined,
+  clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
   databaseURL: process.env.FIREBASE_DATABASE_URL
+};
+
+console.log('Firebase Config:', {
+  projectId: firebaseConfig.projectId,
+  clientEmail: firebaseConfig.clientEmail,
+  databaseURL: firebaseConfig.databaseURL
+});
+
+if (!firebaseConfig.projectId || !firebaseConfig.privateKey || !firebaseConfig.clientEmail) {
+  console.error('❌ Variables de Firebase no configuradas correctamente');
+  process.exit(1);
+}
+
+admin.initializeApp({
+  credential: admin.credential.cert(firebaseConfig),
+  databaseURL: firebaseConfig.databaseURL
 });
 
 const db = admin.firestore();
 const app = express();
 
 // Middleware
-app.use(cors());
+app.use(cors({
+  origin: process.env.CORS_ORIGIN || '*',
+  credentials: true
+}));
 app.use(express.json());
 
-// Variables globales
-const JWT_SECRET = process.env.JWT_SECRET || 'tu-secreto-super-seguro-aqui';
-const USUARIOS_DEMO = {
-  'jorge.maureira': { password: 'demo123', nombre: 'Jorge Maureira', rol: 'especialista' },
-  'jhon.estrada': { password: 'demo123', nombre: 'Jhon Estrada', rol: 'especialista' },
-  'luis.vasquez': { password: 'demo123', nombre: 'Luis Vasquez', rol: 'especialista' },
-  'moises.junco': { password: 'demo123', nombre: 'Moises Junco', rol: 'especialista' },
-  'manuel.urbina': { password: 'demo123', nombre: 'Manuel Urbina Hernández', rol: 'especialista' },
-  'benjamin.fierro': { password: 'demo123', nombre: 'Benjamín Fierro', rol: 'especialista' },
-  'mauricio.serrano': { password: 'demo123', nombre: 'Mauricio Antonio Serrano Gonzalez', rol: 'especialista' },
-  'ricardo.rojas': { password: 'demo123', nombre: 'Ricardo Andrés Rojas Ramos', rol: 'especialista' },
-  'ariel.garate': { password: 'demo123', nombre: 'Ariel Garate', rol: 'especialista' },
-  'najeeb.escobar': { password: 'demo123', nombre: 'Najeeb Ency Escobar Perez', rol: 'especialista' },
-  'rodrigo.sanhueza': { password: 'demo123', nombre: 'Rodrigo Alejandro Sanhueza', rol: 'especialista' },
-  'sebastian.arroyo': { password: 'demo123', nombre: 'Sebastian Arroyo Vigouroux', rol: 'especialista' },
-  'cristian.madariaga': { password: 'demo123', nombre: 'Cristian Madariaga', rol: 'especialista' },
-  'miguel.martinez': { password: 'demo123', nombre: 'Miguel Martinez', rol: 'especialista' },
-  'fabian.tobar': { password: 'demo123', nombre: 'Fabian Tobar', rol: 'especialista' },
-  'gustavo.perolo': { password: 'demo123', nombre: 'Gustavo Perolo', rol: 'especialista' },
-  'leonardo.silva': { password: 'demo123', nombre: 'Leonardo Silva', rol: 'especialista' },
-  'cristian.lecaros': { password: 'demo123', nombre: 'Cristian Lecaros', rol: 'especialista' },
-  'rodrigo.escobedo': { password: 'demo123', nombre: 'Rodrigo Escobedo', rol: 'especialista' },
-  'alexis.alfonzo': { password: 'demo123', nombre: 'Alexis José Alfonzo', rol: 'especialista' },
-  'danilo.isla': { password: 'demo123', nombre: 'Danilo Isla', rol: 'especialista' },
-  'gustavo.reyes': { password: 'demo123', nombre: 'Gustavo Reyes', rol: 'especialista' },
-  'maria.admin': { password: 'demo123', nombre: 'María González', rol: 'coordinador' },
-  'admin': { password: 'demo123', nombre: 'Administrador', rol: 'admin' }
+const PORT = process.env.PORT || 3001;
+const JWT_SECRET = process.env.JWT_SECRET || 'secreto-temporal-cambiar-en-produccion';
+
+// ============================================
+// ESPECIALISTAS (22)
+// ============================================
+const especialistas = [
+  'Jorge Maureira', 'Jhon Estrada', 'Luis Vasquez', 'Moises Junco',
+  'Manuel Urbina Hernández', 'Benjamín Fierro', 'Mauricio Antonio Serrano Gonzalez',
+  'Ricardo Andrés Rojas Ramos', 'Ariel Garate', 'Najeeb Ency Escobar Perez',
+  'Rodrigo Alejandro Sanhueza', 'Sebastian Arroyo Vigouroux', 'Cristian Madariaga',
+  'Miguel Martinez', 'Fabian Tobar', 'Gustavo Perolo', 'Leonardo Silva',
+  'Cristian Lecaros', 'Rodrigo Escobedo', 'Alexis José Alfonzo', 'Danilo Isla',
+  'Gustavo Reyes'
+];
+
+// ============================================
+// USUARIOS DE PRUEBA
+// ============================================
+const usuarios = {
+  'jorge.maureira': { rol: 'especialista', nombre: 'Jorge Maureira', contrasena: 'demo123' },
+  'jhon.estrada': { rol: 'especialista', nombre: 'Jhon Estrada', contrasena: 'demo123' },
+  'luis.vasquez': { rol: 'especialista', nombre: 'Luis Vasquez', contrasena: 'demo123' },
+  'moises.junco': { rol: 'especialista', nombre: 'Moises Junco', contrasena: 'demo123' },
+  'manuel.urbina': { rol: 'especialista', nombre: 'Manuel Urbina Hernández', contrasena: 'demo123' },
+  'benjamin.fierro': { rol: 'especialista', nombre: 'Benjamín Fierro', contrasena: 'demo123' },
+  'mauricio.serrano': { rol: 'especialista', nombre: 'Mauricio Antonio Serrano Gonzalez', contrasena: 'demo123' },
+  'ricardo.rojas': { rol: 'especialista', nombre: 'Ricardo Andrés Rojas Ramos', contrasena: 'demo123' },
+  'ariel.garate': { rol: 'especialista', nombre: 'Ariel Garate', contrasena: 'demo123' },
+  'najeeb.escobar': { rol: 'especialista', nombre: 'Najeeb Ency Escobar Perez', contrasena: 'demo123' },
+  'rodrigo.sanhueza': { rol: 'especialista', nombre: 'Rodrigo Alejandro Sanhueza', contrasena: 'demo123' },
+  'sebastian.arroyo': { rol: 'especialista', nombre: 'Sebastian Arroyo Vigouroux', contrasena: 'demo123' },
+  'cristian.madariaga': { rol: 'especialista', nombre: 'Cristian Madariaga', contrasena: 'demo123' },
+  'miguel.martinez': { rol: 'especialista', nombre: 'Miguel Martinez', contrasena: 'demo123' },
+  'fabian.tobar': { rol: 'especialista', nombre: 'Fabian Tobar', contrasena: 'demo123' },
+  'gustavo.perolo': { rol: 'especialista', nombre: 'Gustavo Perolo', contrasena: 'demo123' },
+  'leonardo.silva': { rol: 'especialista', nombre: 'Leonardo Silva', contrasena: 'demo123' },
+  'cristian.lecaros': { rol: 'especialista', nombre: 'Cristian Lecaros', contrasena: 'demo123' },
+  'rodrigo.escobedo': { rol: 'especialista', nombre: 'Rodrigo Escobedo', contrasena: 'demo123' },
+  'alexis.alfonzo': { rol: 'especialista', nombre: 'Alexis José Alfonzo', contrasena: 'demo123' },
+  'danilo.isla': { rol: 'especialista', nombre: 'Danilo Isla', contrasena: 'demo123' },
+  'gustavo.reyes': { rol: 'especialista', nombre: 'Gustavo Reyes', contrasena: 'demo123' },
+  'maria.admin': { rol: 'coordinador', nombre: 'Maria Admin', contrasena: 'demo123' },
+  'admin': { rol: 'admin', nombre: 'Administrador', contrasena: 'demo123' }
 };
 
-// ============ FUNCIONES AUXILIARES ============
-
-// Obtener IP del cliente
-function obtenerIP(req) {
-  return req.headers['x-forwarded-for']?.split(',')[0].trim() || 
-         req.socket.remoteAddress || 
-         'desconocida';
-}
-
-// Registrar en auditoría
-async function registrarAuditoria(entityType, entityId, accion, usuarioId, usuarioNombre, usuarioRol, camposModificados, detalles, req) {
-  try {
-    const auditId = db.collection('auditoria').doc().id;
-    
-    await db.collection('auditoria').doc(auditId).set({
-      auditId,
-      entityType,
-      entityId,
-      accion,
-      usuarioId,
-      usuarioNombre,
-      usuarioRol,
-      camposModificados: camposModificados || {},
-      detalles: detalles || '',
-      metadata: {
-        ipAddress: obtenerIP(req),
-        userAgent: req.headers['user-agent'] || 'desconocido',
-        navegador: req.headers['user-agent']?.match(/Chrome|Firefox|Safari|Edge/)?.[0] || 'desconocido',
-        sistemaOperativo: req.headers['user-agent']?.match(/Windows|Mac|Linux|Android|iOS/)?.[0] || 'desconocido',
-        dispositivo: req.headers['user-agent']?.includes('Mobile') ? 'Mobile' : 'Desktop'
-      },
-      timestamp: admin.firestore.Timestamp.now(),
-      fechaLectura: new Date().toISOString()
-    });
-    
-    console.log(`✓ Auditoría registrada: ${accion} en ${entityType}/${entityId}`);
-  } catch (error) {
-    console.error('Error registrando auditoría:', error);
-  }
-}
-
-// Middleware de autenticación
+// ============================================
+// MIDDLEWARE: Verificar JWT
+// ============================================
 function verificarToken(req, res, next) {
-  const token = req.headers['authorization']?.split(' ')[1];
+  const token = req.headers.authorization?.split(' ')[1];
   
   if (!token) {
     return res.status(401).json({ error: 'Token no proporcionado' });
   }
-  
+
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
     req.usuario = decoded;
     next();
-  } catch (error) {
+  } catch (err) {
     return res.status(401).json({ error: 'Token inválido' });
   }
 }
 
-// Middleware de autorización por rol
-function requiereRol(...rolesPermitidos) {
-  return (req, res, next) => {
-    if (!rolesPermitidos.includes(req.usuario.rol)) {
-      return res.status(403).json({ error: 'Acceso denegado: rol insuficiente' });
-    }
-    next();
-  };
-}
+// ============================================
+// ENDPOINTS
+// ============================================
 
-// ============ RUTAS DE AUTENTICACIÓN ============
-
+// 1. Login
 app.post('/api/auth/login', async (req, res) => {
   try {
-    const { usuario, password } = req.body;
+    const { usuario, contrasena } = req.body;
     
-    if (!usuario || !password) {
+    if (!usuario || !contrasena) {
       return res.status(400).json({ error: 'Usuario y contraseña requeridos' });
     }
+
+    const usuarioData = usuarios[usuario];
     
-    const usuarioData = USUARIOS_DEMO[usuario];
-    if (!usuarioData || usuarioData.password !== password) {
-      // Registrar intento fallido
-      await registrarAuditoria('usuario', usuario, 'login_fallido', usuario, usuario, 'desconocido', {}, 'Intento de login fallido', req);
+    if (!usuarioData || usuarioData.contrasena !== contrasena) {
       return res.status(401).json({ error: 'Usuario o contraseña incorrectos' });
     }
-    
-    // Crear JWT
+
     const token = jwt.sign(
-      { usuarioId: usuario, nombre: usuarioData.nombre, rol: usuarioData.rol },
+      { usuario, rol: usuarioData.rol, nombre: usuarioData.nombre },
       JWT_SECRET,
       { expiresIn: '24h' }
     );
-    
-    // Registrar login exitoso
-    await registrarAuditoria('usuario', usuario, 'login', usuario, usuarioData.nombre, usuarioData.rol, {}, 'Login exitoso', req);
-    
-    res.json({
-      token,
-      usuario: {
-        usuarioId: usuario,
-        nombre: usuarioData.nombre,
-        rol: usuarioData.rol
+
+    // Registrar login en auditoría
+    await db.collection('auditoria').add({
+      entityType: 'usuario',
+      entityId: usuario,
+      accion: 'login',
+      usuarioId: usuario,
+      usuarioNombre: usuarioData.nombre,
+      usuarioRol: usuarioData.rol,
+      timestamp: new Date(),
+      metadata: {
+        ipAddress: req.ip,
+        userAgent: req.headers['user-agent']
       }
     });
-  } catch (error) {
-    console.error('Error en login:', error);
-    res.status(500).json({ error: 'Error en el servidor' });
-  }
-});
 
-app.post('/api/auth/logout', verificarToken, async (req, res) => {
-  try {
-    await registrarAuditoria('usuario', req.usuario.usuarioId, 'logout', req.usuario.usuarioId, req.usuario.nombre, req.usuario.rol, {}, 'Logout', req);
-    res.json({ mensaje: 'Sesión cerrada' });
-  } catch (error) {
-    res.status(500).json({ error: 'Error en logout' });
-  }
-});
-
-// ============ RUTAS DE REGISTROS (HORAS OVT) ============
-
-// Crear nuevo registro
-app.post('/api/registros', verificarToken, async (req, res) => {
-  try {
-    const { idCambio, cambio, cliente, fechaInicio, horaInicio, horaFin, especializad, horas, descripcion, estado } = req.body;
-    
-    if (!idCambio || !horas) {
-      return res.status(400).json({ error: 'ID del cambio y horas son requeridos' });
-    }
-    
-    const registroId = db.collection('registros').doc().id;
-    
-    const nuevoRegistro = {
-      registroId,
-      especialistaId: req.usuario.usuarioId,
-      especialistaNombre: req.usuario.nombre,
-      idCambio,
-      cambio: cambio || '',
-      cliente: cliente || '',
-      fechaInicio: fechaInicio || new Date().toISOString(),
-      horaInicio: horaInicio || '',
-      horaFin: horaFin || '',
-      cantidadHoras: parseFloat(horas),
-      descripcion: descripcion || '',
-      estado: estado || 'Pendiente',
-      generaOVT: true,
-      creadoPor: req.usuario.usuarioId,
-      fechaCreacion: admin.firestore.Timestamp.now(),
-      modificadoPor: req.usuario.usuarioId,
-      fechaModificacion: admin.firestore.Timestamp.now(),
-      version: 1
-    };
-    
-    await db.collection('registros').doc(registroId).set(nuevoRegistro);
-    
-    // Registrar en auditoría
-    await registrarAuditoria('registro', registroId, 'crear', req.usuario.usuarioId, req.usuario.nombre, req.usuario.rol, 
-      { cantidadHoras: { valorAnterior: null, valorNuevo: horas }, estado: { valorAnterior: null, valorNuevo: 'Pendiente' } },
-      `Nuevo registro: ${idCambio} - ${horas}h`, req);
-    
-    res.status(201).json({ 
-      mensaje: 'Registro creado exitosamente',
-      registro: nuevoRegistro 
+    res.json({
+      token,
+      usuario: { id: usuario, nombre: usuarioData.nombre, rol: usuarioData.rol }
     });
-  } catch (error) {
-    console.error('Error creando registro:', error);
-    res.status(500).json({ error: 'Error al crear registro' });
+  } catch (err) {
+    console.error('Error login:', err);
+    res.status(500).json({ error: err.message });
   }
 });
 
-// Listar registros (con filtros por rol)
+// 2. Obtener registros
 app.get('/api/registros', verificarToken, async (req, res) => {
   try {
+    const { especialista } = req.query;
     let query = db.collection('registros');
-    
-    // Si es especialista, solo ve sus propios registros
+
     if (req.usuario.rol === 'especialista') {
-      query = query.where('especialistaId', '==', req.usuario.usuarioId);
+      query = query.where('especialista', '==', req.usuario.nombre);
+    } else if (especialista) {
+      query = query.where('especialista', '==', especialista);
     }
-    
-    const snapshot = await query.orderBy('fechaCreacion', 'desc').get();
-    const registros = snapshot.docs.map(doc => ({
-      ...doc.data(),
-      fechaCreacion: doc.data().fechaCreacion?.toDate?.() || new Date(),
-      fechaModificacion: doc.data().fechaModificacion?.toDate?.() || new Date()
-    }));
-    
-    res.json({ registros, total: registros.length });
-  } catch (error) {
-    console.error('Error listando registros:', error);
-    res.status(500).json({ error: 'Error al listar registros' });
+
+    const snapshot = await query.get();
+    const registros = [];
+    snapshot.forEach(doc => {
+      registros.push({ id: doc.id, ...doc.data() });
+    });
+
+    res.json(registros);
+  } catch (err) {
+    console.error('Error obtener registros:', err);
+    res.status(500).json({ error: err.message });
   }
 });
 
-// Aprobar registro
-app.patch('/api/registros/:id/aprobar', verificarToken, requiereRol('coordinador', 'admin'), async (req, res) => {
+// 3. Crear registro
+app.post('/api/registros', verificarToken, async (req, res) => {
+  try {
+    const { idCambio, nombreCambio, cliente, fechaInicio, horaInicio, horaFin, horas } = req.body;
+
+    if (!idCambio || !nombreCambio || !horas) {
+      return res.status(400).json({ error: 'Campos requeridos incompletos' });
+    }
+
+    const nuevoRegistro = {
+      idCambio,
+      nombreCambio,
+      cliente,
+      fechaInicio,
+      horaInicio,
+      horaFin,
+      horas: parseFloat(horas),
+      especialista: req.usuario.nombre,
+      estado: 'pendiente',
+      createdAt: new Date(),
+      usuarioId: req.usuario.usuario
+    };
+
+    const docRef = await db.collection('registros').add(nuevoRegistro);
+
+    // Registrar en auditoría
+    await db.collection('auditoria').add({
+      entityType: 'registro',
+      entityId: docRef.id,
+      accion: 'crear',
+      usuarioId: req.usuario.usuario,
+      usuarioNombre: req.usuario.nombre,
+      usuarioRol: req.usuario.rol,
+      camposModificados: nuevoRegistro,
+      timestamp: new Date(),
+      metadata: {
+        ipAddress: req.ip,
+        userAgent: req.headers['user-agent']
+      }
+    });
+
+    res.json({ id: docRef.id, ...nuevoRegistro });
+  } catch (err) {
+    console.error('Error crear registro:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 4. Actualizar registro
+app.patch('/api/registros/:id', verificarToken, async (req, res) => {
   try {
     const { id } = req.params;
-    const registroRef = db.collection('registros').doc(id);
-    const registroSnap = await registroRef.get();
-    
-    if (!registroSnap.exists) {
-      return res.status(404).json({ error: 'Registro no encontrado' });
-    }
-    
-    const registroAnterior = registroSnap.data();
-    
-    await registroRef.update({
-      estado: 'Aprobado',
-      aprobadoPor: req.usuario.usuarioId,
-      fechaAprobacion: admin.firestore.Timestamp.now(),
-      modificadoPor: req.usuario.usuarioId,
-      fechaModificacion: admin.firestore.Timestamp.now()
+    const updates = req.body;
+
+    const docRef = db.collection('registros').doc(id);
+    await docRef.update(updates);
+
+    // Registrar en auditoría
+    await db.collection('auditoria').add({
+      entityType: 'registro',
+      entityId: id,
+      accion: 'editar',
+      usuarioId: req.usuario.usuario,
+      usuarioNombre: req.usuario.nombre,
+      usuarioRol: req.usuario.rol,
+      camposModificados: updates,
+      timestamp: new Date(),
+      metadata: {
+        ipAddress: req.ip,
+        userAgent: req.headers['user-agent']
+      }
     });
-    
-    // Auditoría
-    await registrarAuditoria('registro', id, 'aprobar', req.usuario.usuarioId, req.usuario.nombre, req.usuario.rol,
-      { estado: { valorAnterior: registroAnterior.estado, valorNuevo: 'Aprobado' } },
-      `Registro ${registroAnterior.idCambio} aprobado`, req);
-    
-    res.json({ mensaje: 'Registro aprobado' });
-  } catch (error) {
-    console.error('Error aprobando registro:', error);
-    res.status(500).json({ error: 'Error al aprobar registro' });
+
+    res.json({ id, ...updates });
+  } catch (err) {
+    console.error('Error actualizar registro:', err);
+    res.status(500).json({ error: err.message });
   }
 });
 
-// Rechazar registro
-app.patch('/api/registros/:id/rechazar', verificarToken, requiereRol('coordinador', 'admin'), async (req, res) => {
+// 5. Aprobar registro
+app.patch('/api/registros/:id/aprobar', verificarToken, async (req, res) => {
   try {
+    if (req.usuario.rol !== 'coordinador' && req.usuario.rol !== 'admin') {
+      return res.status(403).json({ error: 'No autorizado' });
+    }
+
     const { id } = req.params;
-    const { razonRechazo } = req.body;
-    const registroRef = db.collection('registros').doc(id);
-    const registroSnap = await registroRef.get();
-    
-    if (!registroSnap.exists) {
-      return res.status(404).json({ error: 'Registro no encontrado' });
+    await db.collection('registros').doc(id).update({
+      estado: 'aprobado',
+      aprobadoPor: req.usuario.nombre,
+      aprobadoEn: new Date()
+    });
+
+    await db.collection('auditoria').add({
+      entityType: 'registro',
+      entityId: id,
+      accion: 'aprobar',
+      usuarioId: req.usuario.usuario,
+      usuarioNombre: req.usuario.nombre,
+      usuarioRol: req.usuario.rol,
+      timestamp: new Date(),
+      metadata: { ipAddress: req.ip }
+    });
+
+    res.json({ id, estado: 'aprobado' });
+  } catch (err) {
+    console.error('Error aprobar:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 6. Rechazar registro
+app.patch('/api/registros/:id/rechazar', verificarToken, async (req, res) => {
+  try {
+    if (req.usuario.rol !== 'coordinador' && req.usuario.rol !== 'admin') {
+      return res.status(403).json({ error: 'No autorizado' });
     }
-    
-    const registroAnterior = registroSnap.data();
-    
-    await registroRef.update({
-      estado: 'Rechazado',
-      razonRechazo: razonRechazo || 'Sin especificar',
-      modificadoPor: req.usuario.usuarioId,
-      fechaModificacion: admin.firestore.Timestamp.now()
+
+    const { id } = req.params;
+    const { razon } = req.body;
+
+    await db.collection('registros').doc(id).update({
+      estado: 'rechazado',
+      rechazadoPor: req.usuario.nombre,
+      rechazadoEn: new Date(),
+      razonRechazo: razon
     });
-    
-    // Auditoría
-    await registrarAuditoria('registro', id, 'rechazar', req.usuario.usuarioId, req.usuario.nombre, req.usuario.rol,
-      { estado: { valorAnterior: registroAnterior.estado, valorNuevo: 'Rechazado' } },
-      `Registro ${registroAnterior.idCambio} rechazado. Razón: ${razonRechazo}`, req);
-    
-    res.json({ mensaje: 'Registro rechazado' });
-  } catch (error) {
-    console.error('Error rechazando registro:', error);
-    res.status(500).json({ error: 'Error al rechazar registro' });
-  }
-});
 
-// ============ RUTAS DE AUDITORÍA ============
-
-// Ver historial de un registro
-app.get('/api/auditoria/:entityId', verificarToken, requiereRol('coordinador', 'admin'), async (req, res) => {
-  try {
-    const { entityId } = req.params;
-    const snapshot = await db.collection('auditoria')
-      .where('entityId', '==', entityId)
-      .orderBy('timestamp', 'desc')
-      .get();
-    
-    const logs = snapshot.docs.map(doc => ({
-      ...doc.data(),
-      timestamp: doc.data().timestamp?.toDate?.() || new Date()
-    }));
-    
-    res.json({ 
-      entityId,
-      historial: logs,
-      total: logs.length
+    await db.collection('auditoria').add({
+      entityType: 'registro',
+      entityId: id,
+      accion: 'rechazar',
+      usuarioId: req.usuario.usuario,
+      usuarioNombre: req.usuario.nombre,
+      usuarioRol: req.usuario.rol,
+      timestamp: new Date(),
+      metadata: { ipAddress: req.ip }
     });
-  } catch (error) {
-    console.error('Error obteniendo auditoría:', error);
-    res.status(500).json({ error: 'Error al obtener auditoría' });
+
+    res.json({ id, estado: 'rechazado' });
+  } catch (err) {
+    console.error('Error rechazar:', err);
+    res.status(500).json({ error: err.message });
   }
 });
 
-// Ver todos los logs (solo admin)
-app.get('/api/auditoria', verificarToken, requiereRol('admin'), async (req, res) => {
+// 7. Obtener auditoría
+app.get('/api/auditoria', verificarToken, async (req, res) => {
   try {
-    const snapshot = await db.collection('auditoria')
-      .orderBy('timestamp', 'desc')
-      .limit(1000)
-      .get();
-    
-    const logs = snapshot.docs.map(doc => ({
-      ...doc.data(),
-      timestamp: doc.data().timestamp?.toDate?.() || new Date()
-    }));
-    
-    res.json({ logs, total: logs.length });
-  } catch (error) {
-    console.error('Error obteniendo auditoría:', error);
-    res.status(500).json({ error: 'Error al obtener auditoría' });
+    if (req.usuario.rol !== 'admin') {
+      return res.status(403).json({ error: 'Solo admin puede ver auditoría' });
+    }
+
+    const snapshot = await db.collection('auditoria').orderBy('timestamp', 'desc').limit(500).get();
+    const logs = [];
+    snapshot.forEach(doc => {
+      logs.push({ id: doc.id, ...doc.data() });
+    });
+
+    res.json(logs);
+  } catch (err) {
+    console.error('Error auditoría:', err);
+    res.status(500).json({ error: err.message });
   }
 });
 
-// ============ RUTAS DE DASHBOARD ============
-
+// 8. Dashboard
 app.get('/api/dashboard/resumen', verificarToken, async (req, res) => {
   try {
-    let query = db.collection('registros');
-    
-    // Filtrar por especialista si no es coordinador/admin
-    if (req.usuario.rol === 'especialista') {
-      query = query.where('especialistaId', '==', req.usuario.usuarioId);
-    }
-    
-    const snapshot = await query.get();
-    const registros = snapshot.docs.map(d => d.data());
-    
-    const totalHoras = registros.reduce((sum, r) => sum + (r.cantidadHoras || 0), 0);
-    const horasAprobadas = registros
-      .filter(r => r.estado === 'Aprobado')
-      .reduce((sum, r) => sum + r.cantidadHoras, 0);
-    const horasPendientes = registros
-      .filter(r => r.estado === 'Pendiente')
-      .reduce((sum, r) => sum + r.cantidadHoras, 0);
-    
-    res.json({
-      totalHoras: Math.round(totalHoras * 10) / 10,
-      horasAprobadas: Math.round(horasAprobadas * 10) / 10,
-      horasPendientes: Math.round(horasPendientes * 10) / 10,
-      totalActividades: registros.length,
-      especialistas: [...new Set(registros.map(r => r.especialistaNombre))].length
+    const snapshot = await db.collection('registros').get();
+    const registros = [];
+    snapshot.forEach(doc => {
+      registros.push(doc.data());
     });
-  } catch (error) {
-    console.error('Error en dashboard:', error);
-    res.status(500).json({ error: 'Error al obtener datos del dashboard' });
+
+    const totalHoras = registros.reduce((sum, r) => sum + (r.horas || 0), 0);
+    const pendientes = registros.filter(r => r.estado === 'pendiente').length;
+    const aprobados = registros.filter(r => r.estado === 'aprobado').length;
+
+    res.json({
+      totalRegistros: registros.length,
+      totalHoras,
+      pendientes,
+      aprobados,
+      rechazados: registros.filter(r => r.estado === 'rechazado').length
+    });
+  } catch (err) {
+    console.error('Error dashboard:', err);
+    res.status(500).json({ error: err.message });
   }
 });
 
-// ============ HEALTH CHECK ============
-
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'OK', timestamp: new Date().toISOString() });
+// Health check
+app.get('/health', (req, res) => {
+  res.json({ status: 'ok', timestamp: new Date() });
 });
 
-// ============ INICIAR SERVIDOR ============
-
-const PORT = process.env.PORT || 3001;
+// ============================================
+// INICIAR SERVIDOR
+// ============================================
 app.listen(PORT, () => {
-  console.log(`\n${'='.repeat(50)}`);
-  console.log(`✓ SERVIDOR OVT INICIADO`);
-  console.log(`✓ Puerto: ${PORT}`);
-  console.log(`✓ Auditoría: ACTIVA`);
-  console.log(`✓ Usuarios: 25 especialistas + coordinador + admin`);
-  console.log(`${'='.repeat(50)}\n`);
+  console.log('\n==================================================');
+  console.log('✓ SERVIDOR OVT INICIADO');
+  console.log('✓ Puerto: ' + PORT);
+  console.log('✓ Auditoría: ACTIVA');
+  console.log('✓ Usuarios: 22 especialistas + coordinador + admin');
+  console.log('==================================================\n');
 });
-
-module.exports = app;
