@@ -1,0 +1,13 @@
+{
+  "name": "sistema-ovt",
+  "version": "1.0.0",
+  "description": "Sistema de Control de Overtime",
+  "main": "backend/server.js",
+  "scripts": {
+    "start": "node backend/server.js",
+    "install": "cd backend && npm install"
+  },
+  "engines": {
+    "node": "18.x"
+  }
+}
