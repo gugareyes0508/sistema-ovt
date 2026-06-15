@@ -241,21 +241,7 @@ function App() {
     }
   };
 
-  // Eliminar registro (Admin)
-  const manejarEliminar = async (id) => {
-    if (!window.confirm('¿Estás seguro de eliminar este registro?')) return;
-    
-    try {
-      await axios.delete(`${API_URL}/api/registros/${id}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      cargarRegistros();
-      cargarDashboard();
-      alert('Registro eliminado');
-    } catch (err) {
-      alert('Error: ' + err.message);
-    }
-  };
+
 
 
 
