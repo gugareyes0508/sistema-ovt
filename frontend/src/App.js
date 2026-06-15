@@ -241,6 +241,21 @@ function App() {
     }
   };
 
+  // Aprobar o Rechazar registro (Admin)
+  const manejarAprobacion = async (id, nuevoEstado) => {
+    try {
+      await axios.patch(`${API_URL}/api/registros/${id}`, 
+        { estado: nuevoEstado },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      alert(`✓ Registro ${nuevoEstado === 'exitoso' ? 'aprobado' : 'rechazado'}`);
+      cargarRegistros();
+      cargarDashboard();
+    } catch (err) {
+      alert('Error: ' + (err.response?.data?.error || err.message));
+    }
+  };
+
 
 
 
@@ -750,7 +765,7 @@ function App() {
         {/* SECCIÓN: DASHBOARD (Admin) */}
         {vista === 'dashboard' && usuario.rol === 'admin' && (
           <section className="seccion">
-            <h2>📊 Dashboard Completo</h2>
+            <h2>📊 Dashboard - Gestión de Registros</h2>
             
             <div className="filtros-dashboard">
               <div className="form-group">
@@ -766,7 +781,6 @@ function App() {
                   ))}
                 </select>
               </div>
-
               <div className="form-group">
                 <label>Año</label>
                 <select
@@ -778,36 +792,108 @@ function App() {
                   <option value="2026">2026</option>
                 </select>
               </div>
-
-              <div className="form-group">
-                <label>Desde</label>
-                <input
-                  type="date"
-                  value={filtros.fechaInicio ? filtros.fechaInicio.toISOString().split('T')[0] : ''}
-                  onChange={(e) => setFiltros({ ...filtros, fechaInicio: e.target.value ? new Date(e.target.value) : null })}
-                />
-              </div>
-
-              <div className="form-group">
-                <label>Hasta</label>
-                <input
-                  type="date"
-                  value={filtros.fechaFin ? filtros.fechaFin.toISOString().split('T')[0] : ''}
-                  onChange={(e) => setFiltros({ ...filtros, fechaFin: e.target.value ? new Date(e.target.value) : null })}
-                />
-              </div>
             </div>
 
+            {/* Tarjetas resumen */}
             <div className="dashboard-grid">
               <div className="card card-blue">
-                <h3>📋 Total Registros</h3>
-                <p className="numero">{dashboard.totalRegistros || 0}</p>
+                <h3>⏳ Pendientes</h3>
+                <p className="numero">{registros.filter(r => r.estado === 'pendiente').length}</p>
               </div>
               <div className="card card-green">
-                <h3>⏱️ Total Horas</h3>
-                <p className="numero">{dashboard.totalHoras || 0}h</p>
+                <h3>✅ Aprobados</h3>
+                <p className="numero">{registros.filter(r => r.estado === 'exitoso').length}</p>
+              </div>
+              <div className="card card-red">
+                <h3>❌ Rechazados</h3>
+                <p className="numero">{registros.filter(r => r.estado === 'fallido').length}</p>
+              </div>
+              <div className="card card-yellow">
+                <h3>📈 Total Horas</h3>
+                <p className="numero">{registros.reduce((sum, r) => sum + (r.horas || 0), 0)}h</p>
               </div>
             </div>
+
+            {/* Tabla: Registros Pendientes */}
+            <h3>⏳ Registros Pendientes de Aprobación</h3>
+            {registros.filter(r => r.estado === 'pendiente').length === 0 ? (
+              <p className="sin-datos">No hay registros pendientes</p>
+            ) : (
+              <table className="tabla">
+                <thead>
+                  <tr>
+                    <th>Especialista</th>
+                    <th>Tipo</th>
+                    <th>Descripción</th>
+                    <th>Fecha</th>
+                    <th>Horas</th>
+                    <th>Especialidad</th>
+                    <th>Acciones</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {registros.filter(r => r.estado === 'pendiente').map(r => (
+                    <tr key={r.id}>
+                      <td><strong>{r.createdByNombre || r.especialista}</strong></td>
+                      <td>{r.tipo}</td>
+                      <td>{r.descripcion?.substring(0, 30)}</td>
+                      <td>{r.fechaInicio ? new Date(r.fechaInicio.toDate?.() || r.fechaInicio).toLocaleDateString('es-CL') : '-'}</td>
+                      <td className="numero">{r.horas}h</td>
+                      <td>{r.especialidad}</td>
+                      <td className="acciones">
+                        <button 
+                          className="btn-aprobar"
+                          onClick={() => manejarAprobacion(r.id, 'exitoso')}
+                          title="Aprobar registro"
+                        >
+                          ✅ Aprobar
+                        </button>
+                        <button 
+                          className="btn-rechazar"
+                          onClick={() => manejarAprobacion(r.id, 'fallido')}
+                          title="Rechazar registro"
+                        >
+                          ❌ Rechazar
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+
+            {/* Tabla: Historial */}
+            <h3>📋 Historial de Aprobaciones</h3>
+            {registros.filter(r => r.estado !== 'pendiente').length === 0 ? (
+              <p className="sin-datos">No hay registros procesados</p>
+            ) : (
+              <table className="tabla">
+                <thead>
+                  <tr>
+                    <th>Especialista</th>
+                    <th>Horas</th>
+                    <th>Especialidad</th>
+                    <th>Estado</th>
+                    <th>Fecha</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {registros.filter(r => r.estado !== 'pendiente').map(r => (
+                    <tr key={r.id}>
+                      <td>{r.createdByNombre || r.especialista}</td>
+                      <td className="numero">{r.horas}h</td>
+                      <td>{r.especialidad}</td>
+                      <td>
+                        <span className={`badge badge-${r.estado}`}>
+                          {r.estado === 'exitoso' ? '✅ Aprobado' : '❌ Rechazado'}
+                        </span>
+                      </td>
+                      <td>{r.fechaInicio ? new Date(r.fechaInicio.toDate?.() || r.fechaInicio).toLocaleDateString('es-CL') : '-'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
           </section>
         )}
 

@@ -441,12 +441,91 @@ body {
   font-size: 14px;
   align-self: flex-start;
   min-width: 160px;
+  margin-right: 10px;
 }
 
 .btn-primary:hover {
   background: var(--primary-dark);
   transform: translateY(-2px);
   box-shadow: var(--shadow-lg);
+}
+
+.btn-cancelar {
+  padding: 12px 24px;
+  background: var(--gray-500);
+  color: white;
+  border: none;
+  border-radius: var(--border-radius);
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s;
+  font-size: 14px;
+  align-self: flex-start;
+  min-width: 160px;
+}
+
+.btn-cancelar:hover {
+  background: var(--gray-600);
+  transform: translateY(-2px);
+}
+
+.btn-editar {
+  padding: 6px 12px;
+  background: var(--primary);
+  color: white;
+  border: none;
+  border-radius: var(--border-radius);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s;
+  margin-right: 5px;
+}
+
+.btn-editar:hover {
+  background: var(--primary-dark);
+  transform: translateY(-2px);
+}
+
+.btn-aprobar {
+  padding: 6px 12px;
+  background: #4CAF50;
+  color: white;
+  border: none;
+  border-radius: var(--border-radius);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  margin-right: 5px;
+  transition: all 0.3s;
+}
+
+.btn-aprobar:hover {
+  background: #45a049;
+  transform: translateY(-2px);
+}
+
+.btn-rechazar {
+  padding: 6px 12px;
+  background: #f44336;
+  color: white;
+  border: none;
+  border-radius: var(--border-radius);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  margin-right: 5px;
+  transition: all 0.3s;
+}
+
+.btn-rechazar:hover {
+  background: #da190b;
+  transform: translateY(-2px);
+}
+
+.card-red {
+  background: linear-gradient(135deg, #f44336, #da190b);
+  color: white;
 }
 
 .btn-eliminar {
