@@ -139,13 +139,21 @@ app.post('/api/auth/login', async (req, res) => {
 });
 
 // ============================================
-// RUTAS: REGISTROS
+// RUTAS: REGISTROS MEJORADOS
 // ============================================
 
-// GET todos los registros
+// GET registros - Especialista ve solo suyos, Coordinador/Admin ven todos
 app.get('/api/registros', verificarToken, async (req, res) => {
   try {
-    const snapshot = await db.collection('registros').orderBy('createdAt', 'desc').get();
+    let query = db.collection('registros');
+    
+    // Si es especialista, solo ve sus registros
+    if (req.usuario.rol === 'especialista') {
+      query = query.where('createdBy', '==', req.usuario.usuario);
+    }
+    
+    // Ordenar por fecha descendente
+    const snapshot = await query.orderBy('createdAt', 'desc').get();
     const registros = [];
     
     snapshot.forEach(doc => {
@@ -162,24 +170,42 @@ app.get('/api/registros', verificarToken, async (req, res) => {
   }
 });
 
-// POST crear registro
+// POST crear registro MEJORADO
 app.post('/api/registros', verificarToken, async (req, res) => {
   try {
-    const { idCambio, nombreCambio, cliente, horas } = req.body;
+    const {
+      tipo,
+      descripcion,
+      cliente,
+      fechaInicio,
+      fechaFin,
+      horas,
+      especialista,
+      interno_cliente,
+      genera_ovt,
+      estado,
+      especialidad
+    } = req.body;
     
-    if (!idCambio || !horas) {
-      return res.status(400).json({ error: 'idCambio y horas son requeridos' });
+    if (!tipo || !descripcion || !cliente || !fechaInicio || !fechaFin) {
+      return res.status(400).json({ error: 'Campos requeridos faltando' });
     }
     
     const docRef = await db.collection('registros').add({
-      idCambio: String(idCambio),
-      nombreCambio: String(nombreCambio || ''),
-      cliente: String(cliente || ''),
+      tipo: String(tipo),
+      descripcion: String(descripcion),
+      cliente: String(cliente),
+      fechaInicio: new Date(fechaInicio),
+      fechaFin: new Date(fechaFin),
       horas: parseFloat(horas),
-      especialista: req.usuario.nombre,
-      estado: 'pendiente',
+      especialista: String(especialista),
+      interno_cliente: String(interno_cliente),
+      genera_ovt: String(genera_ovt),
+      estado: String(estado),
+      especialidad: String(especialidad),
       createdAt: new Date(),
-      createdBy: req.usuario.usuario
+      createdBy: req.usuario.usuario,
+      createdByNombre: req.usuario.nombre
     });
     
     // Registrar en auditoría
@@ -188,104 +214,127 @@ app.post('/api/registros', verificarToken, async (req, res) => {
       usuarioNombre: req.usuario.nombre,
       usuarioRol: req.usuario.rol,
       timestamp: new Date(),
-      camposModificados: { idCambio, horas }
+      camposModificados: { tipo, cliente, especialidad }
     });
     
-    res.json({ id: docRef.id, ...req.body });
+    res.json({ 
+      id: docRef.id,
+      mensaje: 'Registro guardado correctamente'
+    });
   } catch (err) {
     console.error('Error en POST /api/registros:', err);
-    res.status(500).json({ error: 'Error al crear registro' });
+    res.status(500).json({ error: 'Error al crear registro: ' + err.message });
   }
 });
 
-// PATCH aprobar registro
-app.patch('/api/registros/:id/aprobar', verificarToken, async (req, res) => {
+// PATCH actualizar registro (Especialista su propio registro)
+app.patch('/api/registros/:id', verificarToken, async (req, res) => {
   try {
-    if (req.usuario.rol !== 'coordinador' && req.usuario.rol !== 'admin') {
-      return res.status(403).json({ error: 'No autorizado' });
+    const registroRef = db.collection('registros').doc(req.params.id);
+    const doc = await registroRef.get();
+    
+    if (!doc.exists) {
+      return res.status(404).json({ error: 'Registro no encontrado' });
     }
     
-    await db.collection('registros').doc(req.params.id).update({
-      estado: 'aprobado',
+    // Solo el especialista propietario o admin puede modificar
+    if (req.usuario.rol === 'especialista' && doc.data().createdBy !== req.usuario.usuario) {
+      return res.status(403).json({ error: 'No tienes permiso para modificar este registro' });
+    }
+    
+    await registroRef.update({
+      ...req.body,
       updatedAt: new Date(),
       updatedBy: req.usuario.usuario
     });
     
     // Registrar en auditoría
     await db.collection('auditoria').add({
-      accion: 'APROBAR_REGISTRO',
+      accion: 'ACTUALIZAR_REGISTRO',
       usuarioNombre: req.usuario.nombre,
       usuarioRol: req.usuario.rol,
       timestamp: new Date(),
       registroId: req.params.id
     });
     
-    res.json({ message: 'Registro aprobado' });
+    res.json({ message: 'Registro actualizado' });
   } catch (err) {
-    console.error('Error en PATCH /aprobar:', err);
-    res.status(500).json({ error: 'Error al aprobar' });
+    console.error('Error en PATCH /api/registros:', err);
+    res.status(500).json({ error: 'Error al actualizar' });
   }
 });
 
-// PATCH rechazar registro
-app.patch('/api/registros/:id/rechazar', verificarToken, async (req, res) => {
+// DELETE eliminar registro (Solo Admin)
+app.delete('/api/registros/:id', verificarToken, async (req, res) => {
   try {
-    if (req.usuario.rol !== 'coordinador' && req.usuario.rol !== 'admin') {
-      return res.status(403).json({ error: 'No autorizado' });
+    if (req.usuario.rol !== 'admin') {
+      return res.status(403).json({ error: 'Solo el admin puede eliminar' });
     }
     
-    await db.collection('registros').doc(req.params.id).update({
-      estado: 'rechazado',
-      updatedAt: new Date(),
-      updatedBy: req.usuario.usuario
-    });
+    await db.collection('registros').doc(req.params.id).delete();
     
     // Registrar en auditoría
     await db.collection('auditoria').add({
-      accion: 'RECHAZAR_REGISTRO',
+      accion: 'ELIMINAR_REGISTRO',
       usuarioNombre: req.usuario.nombre,
       usuarioRol: req.usuario.rol,
       timestamp: new Date(),
       registroId: req.params.id
     });
     
-    res.json({ message: 'Registro rechazado' });
+    res.json({ message: 'Registro eliminado' });
   } catch (err) {
-    console.error('Error en PATCH /rechazar:', err);
-    res.status(500).json({ error: 'Error al rechazar' });
+    console.error('Error en DELETE /api/registros:', err);
+    res.status(500).json({ error: 'Error al eliminar' });
   }
 });
 
 // ============================================
-// RUTAS: DASHBOARD
+// RUTAS: DASHBOARD MEJORADO
 // ============================================
 
 app.get('/api/dashboard/resumen', verificarToken, async (req, res) => {
   try {
-    const snapshot = await db.collection('registros').get();
+    let query = db.collection('registros');
+    
+    // Si es especialista, solo sus registros
+    if (req.usuario.rol === 'especialista') {
+      query = query.where('createdBy', '==', req.usuario.usuario);
+    }
+    
+    const snapshot = await query.get();
     
     let totalRegistros = 0;
     let totalHoras = 0;
-    let pendientes = 0;
-    let aprobados = 0;
-    let rechazados = 0;
+    let horasEsteMes = 0;
+    let registrosPendientes = 0;
+    
+    const ahora = new Date();
+    const mesActual = ahora.getMonth();
+    const anioActual = ahora.getFullYear();
     
     snapshot.forEach(doc => {
       const data = doc.data();
       totalRegistros++;
-      totalHoras += parseFloat(data.horas || 0);
+      const horas = parseFloat(data.horas || 0);
+      totalHoras += horas;
       
-      if (data.estado === 'pendiente') pendientes++;
-      if (data.estado === 'aprobado') aprobados++;
-      if (data.estado === 'rechazado') rechazados++;
+      // Verificar si es de este mes
+      const fecha = data.fechaInicio?.toDate?.() || new Date(data.fechaInicio);
+      if (fecha.getMonth() === mesActual && fecha.getFullYear() === anioActual) {
+        horasEsteMes += horas;
+      }
+      
+      if (data.estado === 'pendiente') {
+        registrosPendientes++;
+      }
     });
     
     res.json({
       totalRegistros,
       totalHoras: totalHoras.toFixed(1),
-      pendientes,
-      aprobados,
-      rechazados
+      horasEsteMes: horasEsteMes.toFixed(1),
+      registrosPendientes
     });
   } catch (err) {
     console.error('Error en GET /dashboard:', err);
@@ -330,14 +379,14 @@ app.get('/health', (req, res) => {
 
 app.get('/', (req, res) => {
   res.json({ 
-    message: 'Sistema OVT - Backend API',
-    version: '1.0.0',
+    message: 'Sistema OVT v2 - Backend API',
+    version: '2.0.0',
     endpoints: [
       'POST /api/auth/login',
       'GET /api/registros',
       'POST /api/registros',
-      'PATCH /api/registros/:id/aprobar',
-      'PATCH /api/registros/:id/rechazar',
+      'PATCH /api/registros/:id',
+      'DELETE /api/registros/:id',
       'GET /api/dashboard/resumen',
       'GET /api/auditoria'
     ]
@@ -359,11 +408,12 @@ app.use((err, req, res, next) => {
 
 app.listen(PORT, () => {
   console.log('==================================================');
-  console.log('✓ SERVIDOR OVT INICIADO CORRECTAMENTE');
+  console.log('✓ SERVIDOR OVT V2 INICIADO CORRECTAMENTE');
   console.log('==================================================');
   console.log('✓ Puerto:', PORT);
   console.log('✓ Firebase: CONECTADO');
   console.log('✓ Auditoría: ACTIVA');
   console.log('✓ 22 especialistas + coordinador + admin');
+  console.log('✓ Cambios y Alertas con todos los campos');
   console.log('==================================================');
 });

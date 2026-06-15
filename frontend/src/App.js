@@ -1,6 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
+import DatePicker from 'react-datepicker';
+import 'react-datepicker/dist/react-datepicker.css';
 import './App.css';
+import { es } from 'date-fns/locale';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
 
@@ -8,21 +11,37 @@ function App() {
   const [token, setToken] = useState(localStorage.getItem('token'));
   const [usuario, setUsuario] = useState(JSON.parse(localStorage.getItem('usuario') || '{}'));
   const [registros, setRegistros] = useState([]);
+  const [vista, setVista] = useState('registros');
+  const [auditoria, setAuditoria] = useState([]);
+  
+  // Formulario mejorado
   const [formulario, setFormulario] = useState({
-    idCambio: '',
-    nombreCambio: '',
-    cliente: '',
-    horas: '0.5'
+    tipo: 'cambio',
+    descripcion: '',
+    cliente: 'Banco de Chile',
+    fechaInicio: new Date(),
+    fechaFin: new Date(),
+    horas: 0,
+    especialista: usuario.nombre || '',
+    interno_cliente: 'interno',
+    genera_ovt: 'no',
+    estado: 'pendiente',
+    especialidad: 'operaciones'
   });
+
   const [dashboard, setDashboard] = useState({
     totalRegistros: 0,
     totalHoras: 0,
-    pendientes: 0,
-    aprobados: 0,
-    rechazados: 0
+    horasEsteMes: 0,
+    registrosPendientes: 0
   });
-  const [vista, setVista] = useState('registros');
-  const [auditoria, setAuditoria] = useState([]);
+
+  const [filtros, setFiltros] = useState({
+    mes: new Date().getMonth() + 1,
+    anio: new Date().getFullYear(),
+    fechaInicio: null,
+    fechaFin: null
+  });
 
   // Cargar registros
   const cargarRegistros = useCallback(async () => {
@@ -63,7 +82,7 @@ function App() {
     }
   }, [token, usuario.rol]);
 
-  // Efecto: cargar datos al iniciar
+  // Efecto inicial
   useEffect(() => {
     cargarRegistros();
     cargarDashboard();
@@ -71,6 +90,24 @@ function App() {
       cargarAuditoria();
     }
   }, [token, cargarRegistros, cargarDashboard, cargarAuditoria, usuario.rol]);
+
+  // Calcular horas automáticamente
+  const calcularHoras = (inicio, fin) => {
+    if (!inicio || !fin) return 0;
+    const diff = (fin - inicio) / (1000 * 60 * 60);
+    return Math.max(0, diff.toFixed(2));
+  };
+
+  // Manejar cambio de fechas
+  const handleFechaChange = (campo, valor) => {
+    setFormulario(prev => {
+      const nuevoForm = { ...prev, [campo]: valor };
+      if (campo === 'fechaInicio' || campo === 'fechaFin') {
+        nuevoForm.horas = calcularHoras(nuevoForm.fechaInicio, nuevoForm.fechaFin);
+      }
+      return nuevoForm;
+    });
+  };
 
   // Login
   const manejarLogin = async (e) => {
@@ -91,7 +128,6 @@ function App() {
       setVista('registros');
     } catch (err) {
       alert('Credenciales incorrectas');
-      e.target.reset();
     }
   };
 
@@ -101,48 +137,60 @@ function App() {
     localStorage.removeItem('usuario');
     setToken(null);
     setUsuario({});
-    setVista('registros');
   };
 
-  // Registrar horas
+  // Registrar cambio/alerta
   const manejarRegistro = async (e) => {
     e.preventDefault();
     try {
       await axios.post(`${API_URL}/api/registros`, formulario, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      setFormulario({ idCambio: '', nombreCambio: '', cliente: '', horas: '0.5' });
+      setFormulario({
+        tipo: 'cambio',
+        descripcion: '',
+        cliente: 'Banco de Chile',
+        fechaInicio: new Date(),
+        fechaFin: new Date(),
+        horas: 0,
+        especialista: usuario.nombre || '',
+        interno_cliente: 'interno',
+        genera_ovt: 'no',
+        estado: 'pendiente',
+        especialidad: 'operaciones'
+      });
       cargarRegistros();
       cargarDashboard();
-      alert('Horas registradas correctamente');
+      alert('Registro guardado correctamente');
     } catch (err) {
       alert('Error: ' + err.message);
     }
   };
 
-  // Aprobar registro
-  const manejarAprobar = async (id) => {
+  // Eliminar registro (Admin)
+  const manejarEliminar = async (id) => {
+    if (!window.confirm('¿Estás seguro de eliminar este registro?')) return;
+    
     try {
-      await axios.patch(`${API_URL}/api/registros/${id}/aprobar`, {}, {
+      await axios.delete(`${API_URL}/api/registros/${id}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       cargarRegistros();
       cargarDashboard();
-      alert('Registro aprobado');
+      alert('Registro eliminado');
     } catch (err) {
       alert('Error: ' + err.message);
     }
   };
 
-  // Rechazar registro
-  const manejarRechazar = async (id) => {
+  // Modificar registro (Especialista)
+  const manejarModificar = async (id) => {
     try {
-      await axios.patch(`${API_URL}/api/registros/${id}/rechazar`, {}, {
+      await axios.patch(`${API_URL}/api/registros/${id}`, formulario, {
         headers: { Authorization: `Bearer ${token}` }
       });
       cargarRegistros();
-      cargarDashboard();
-      alert('Registro rechazado');
+      alert('Registro actualizado');
     } catch (err) {
       alert('Error: ' + err.message);
     }
@@ -164,7 +212,7 @@ function App() {
           </form>
           <div className="login-footer">
             <p>Sistema de Control de Overtime - Kyndryl Chile</p>
-            <p className="version">v1.0.0</p>
+            <p className="version">v2.0.0</p>
           </div>
         </div>
       </div>
@@ -179,7 +227,7 @@ function App() {
       {/* HEADER */}
       <header className="header">
         <div className="header-left">
-          <h1>🕐 Sistema OVT</h1>
+          <h1>🕐 Sistema OVT v2</h1>
         </div>
         <div className="header-right">
           <span className="user-badge">
@@ -196,7 +244,7 @@ function App() {
           className={vista === 'registros' ? 'nav-btn active' : 'nav-btn'} 
           onClick={() => setVista('registros')}
         >
-          📋 Mis Registros
+          📋 Registrar Cambio/Alerta
         </button>
 
         {(usuario.rol === 'coordinador' || usuario.rol === 'admin') && (
@@ -207,169 +255,212 @@ function App() {
             >
               ⚙️ Mantenedor
             </button>
+          </>
+        )}
+
+        {usuario.rol === 'especialista' && (
+          <button 
+            className={vista === 'resumen' ? 'nav-btn active' : 'nav-btn'} 
+            onClick={() => setVista('resumen')}
+          >
+            📊 Mi Resumen
+          </button>
+        )}
+
+        {usuario.rol === 'admin' && (
+          <>
             <button 
               className={vista === 'dashboard' ? 'nav-btn active' : 'nav-btn'} 
               onClick={() => setVista('dashboard')}
             >
               📊 Dashboard
             </button>
+            <button 
+              className={vista === 'auditoria' ? 'nav-btn active' : 'nav-btn'} 
+              onClick={() => setVista('auditoria')}
+            >
+              🔍 Auditoría
+            </button>
           </>
-        )}
-
-        {usuario.rol === 'admin' && (
-          <button 
-            className={vista === 'auditoria' ? 'nav-btn active' : 'nav-btn'} 
-            onClick={() => setVista('auditoria')}
-          >
-            🔍 Auditoría
-          </button>
         )}
       </nav>
 
       {/* CONTENIDO PRINCIPAL */}
       <main className="main">
         
-        {/* SECCIÓN: MIS REGISTROS */}
+        {/* SECCIÓN: REGISTRAR CAMBIO/ALERTA */}
         {vista === 'registros' && (
           <section className="seccion">
-            <h2>📋 Registrar Horas de Overtime</h2>
+            <h2>📋 Registrar Cambio o Alerta</h2>
             
-            <form onSubmit={manejarRegistro} className="formulario">
+            <form onSubmit={manejarRegistro} className="formulario-mejorado">
+              <div className="form-row">
+                <div className="form-group">
+                  <label>Tipo de Registro *</label>
+                  <select
+                    value={formulario.tipo}
+                    onChange={(e) => setFormulario({ ...formulario, tipo: e.target.value })}
+                    required
+                  >
+                    <option value="cambio">Cambio</option>
+                    <option value="alerta">Alerta</option>
+                  </select>
+                </div>
+
+                <div className="form-group">
+                  <label>Estado *</label>
+                  <select
+                    value={formulario.estado}
+                    onChange={(e) => setFormulario({ ...formulario, estado: e.target.value })}
+                  >
+                    <option value="pendiente">Pendiente</option>
+                    <option value="exitoso">Exitoso</option>
+                    <option value="fallido">Fallido</option>
+                  </select>
+                </div>
+
+                <div className="form-group">
+                  <label>Cliente *</label>
+                  <select
+                    value={formulario.cliente}
+                    onChange={(e) => setFormulario({ ...formulario, cliente: e.target.value })}
+                  >
+                    <option value="Banco de Chile">Banco de Chile</option>
+                    <option value="Banco Santander">Banco Santander</option>
+                    <option value="Banco BCI">Banco BCI</option>
+                    <option value="Banco Estado">Banco Estado</option>
+                    <option value="Otro">Otro</option>
+                  </select>
+                </div>
+              </div>
+
               <div className="form-group">
-                <label>ID del Cambio *</label>
-                <input
-                  type="text"
-                  placeholder="Ej: CHG-2024-001"
-                  value={formulario.idCambio}
-                  onChange={(e) => setFormulario({ ...formulario, idCambio: e.target.value })}
+                <label>Descripción del Cambio/Alerta *</label>
+                <textarea
+                  placeholder="Describe el cambio o alerta..."
+                  value={formulario.descripcion}
+                  onChange={(e) => setFormulario({ ...formulario, descripcion: e.target.value })}
                   required
+                  rows="3"
                 />
               </div>
 
-              <div className="form-group">
-                <label>Nombre del Cambio</label>
-                <input
-                  type="text"
-                  placeholder="Ej: Actualización Sistema"
-                  value={formulario.nombreCambio}
-                  onChange={(e) => setFormulario({ ...formulario, nombreCambio: e.target.value })}
-                />
+              <div className="form-row">
+                <div className="form-group">
+                  <label>Especialista</label>
+                  <input
+                    type="text"
+                    value={formulario.especialista}
+                    disabled
+                    className="input-disabled"
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label>Especialidad *</label>
+                  <select
+                    value={formulario.especialidad}
+                    onChange={(e) => setFormulario({ ...formulario, especialidad: e.target.value })}
+                  >
+                    <option value="operaciones">Operaciones Cloud</option>
+                    <option value="middleware">Middleware</option>
+                    <option value="ambas">Ambas</option>
+                  </select>
+                </div>
+
+                <div className="form-group">
+                  <label>Interno/Cliente *</label>
+                  <select
+                    value={formulario.interno_cliente}
+                    onChange={(e) => setFormulario({ ...formulario, interno_cliente: e.target.value })}
+                  >
+                    <option value="interno">Interno</option>
+                    <option value="cliente">Cliente</option>
+                  </select>
+                </div>
               </div>
 
-              <div className="form-group">
-                <label>Cliente</label>
-                <input
-                  type="text"
-                  placeholder="Ej: Cliente A"
-                  value={formulario.cliente}
-                  onChange={(e) => setFormulario({ ...formulario, cliente: e.target.value })}
-                />
+              <div className="form-row">
+                <div className="form-group">
+                  <label>Fecha/Hora Inicio *</label>
+                  <DatePicker
+                    selected={formulario.fechaInicio}
+                    onChange={(date) => handleFechaChange('fechaInicio', date)}
+                    showTimeSelect
+                    timeFormat="HH:mm"
+                    dateFormat="dd/MM/yyyy HH:mm"
+                    locale={es}
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label>Fecha/Hora Fin *</label>
+                  <DatePicker
+                    selected={formulario.fechaFin}
+                    onChange={(date) => handleFechaChange('fechaFin', date)}
+                    showTimeSelect
+                    timeFormat="HH:mm"
+                    dateFormat="dd/MM/yyyy HH:mm"
+                    locale={es}
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label>Horas (calculado automáticamente)</label>
+                  <input
+                    type="number"
+                    value={formulario.horas}
+                    disabled
+                    className="input-disabled"
+                    step="0.01"
+                  />
+                </div>
               </div>
 
-              <div className="form-group">
-                <label>Horas *</label>
-                <select
-                  value={formulario.horas}
-                  onChange={(e) => setFormulario({ ...formulario, horas: e.target.value })}
-                >
-                  <option value="0.5">0.5 horas</option>
-                  <option value="1">1 hora</option>
-                  <option value="1.5">1.5 horas</option>
-                  <option value="2">2 horas</option>
-                  <option value="2.5">2.5 horas</option>
-                  <option value="3">3 horas</option>
-                  <option value="4">4 horas</option>
-                  <option value="8">8 horas (Jornada)</option>
-                </select>
+              <div className="form-row">
+                <div className="form-group">
+                  <label>¿Genera OVT? *</label>
+                  <select
+                    value={formulario.genera_ovt}
+                    onChange={(e) => setFormulario({ ...formulario, genera_ovt: e.target.value })}
+                  >
+                    <option value="si">Sí</option>
+                    <option value="no">No</option>
+                  </select>
+                </div>
               </div>
 
-              <button type="submit" className="btn-primary">✓ Registrar Horas</button>
+              <button type="submit" className="btn-primary">✓ Guardar Registro</button>
             </form>
 
-            <h3>Tus Registros</h3>
+            <h3>Mis Registros</h3>
             {registros.length === 0 ? (
               <p className="sin-datos">No hay registros</p>
             ) : (
               <table className="tabla">
                 <thead>
                   <tr>
-                    <th>ID Cambio</th>
-                    <th>Nombre</th>
+                    <th>Tipo</th>
+                    <th>Descripción</th>
                     <th>Cliente</th>
                     <th>Horas</th>
                     <th>Estado</th>
+                    <th>Inicio</th>
                   </tr>
                 </thead>
                 <tbody>
                   {registros.map(r => (
                     <tr key={r.id}>
-                      <td><strong>{r.idCambio}</strong></td>
-                      <td>{r.nombreCambio || '-'}</td>
-                      <td>{r.cliente || '-'}</td>
-                      <td className="numero">{r.horas}</td>
-                      <td>
-                        <span className={`badge badge-${r.estado}`}>
-                          {r.estado}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </section>
-        )}
-
-        {/* SECCIÓN: MANTENEDOR (Coordinador/Admin) */}
-        {vista === 'mantenedor' && (usuario.rol === 'coordinador' || usuario.rol === 'admin') && (
-          <section className="seccion">
-            <h2>⚙️ Mantenedor - Aprobar/Rechazar Registros</h2>
-            
-            {registros.length === 0 ? (
-              <p className="sin-datos">No hay registros pendientes</p>
-            ) : (
-              <table className="tabla tabla-acciones">
-                <thead>
-                  <tr>
-                    <th>ID Cambio</th>
-                    <th>Especialista</th>
-                    <th>Horas</th>
-                    <th>Estado</th>
-                    <th>Acciones</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {registros.map(r => (
-                    <tr key={r.id}>
-                      <td><strong>{r.idCambio}</strong></td>
-                      <td>{r.especialista}</td>
+                      <td><strong>{r.tipo}</strong></td>
+                      <td>{r.descripcion?.substring(0, 30)}</td>
+                      <td>{r.cliente}</td>
                       <td className="numero">{r.horas}h</td>
                       <td>
                         <span className={`badge badge-${r.estado}`}>
                           {r.estado}
                         </span>
                       </td>
-                      <td className="acciones">
-                        {r.estado === 'pendiente' && (
-                          <>
-                            <button 
-                              className="btn-aprobar"
-                              onClick={() => manejarAprobar(r.id)}
-                            >
-                              ✓ Aprobar
-                            </button>
-                            <button 
-                              className="btn-rechazar"
-                              onClick={() => manejarRechazar(r.id)}
-                            >
-                              ✗ Rechazar
-                            </button>
-                          </>
-                        )}
-                        {r.estado !== 'pendiente' && (
-                          <span className="sin-acciones">-</span>
-                        )}
-                      </td>
+                      <td>{r.fechaInicio ? new Date(r.fechaInicio).toLocaleDateString('es-CL') : '-'}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -378,10 +469,131 @@ function App() {
           </section>
         )}
 
-        {/* SECCIÓN: DASHBOARD */}
-        {vista === 'dashboard' && (usuario.rol === 'coordinador' || usuario.rol === 'admin') && (
+        {/* SECCIÓN: MANTENEDOR */}
+        {vista === 'mantenedor' && (usuario.rol === 'coordinador' || usuario.rol === 'admin') && (
           <section className="seccion">
-            <h2>📊 Dashboard</h2>
+            <h2>⚙️ Mantenedor - Gestionar Registros</h2>
+            
+            {registros.length === 0 ? (
+              <p className="sin-datos">No hay registros</p>
+            ) : (
+              <div className="tabla-responsive">
+                <table className="tabla tabla-acciones">
+                  <thead>
+                    <tr>
+                      <th>Tipo</th>
+                      <th>Especialista</th>
+                      <th>Descripción</th>
+                      <th>Horas</th>
+                      <th>Estado</th>
+                      <th>Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {registros.map(r => (
+                      <tr key={r.id}>
+                        <td><strong>{r.tipo}</strong></td>
+                        <td>{r.especialista}</td>
+                        <td>{r.descripcion?.substring(0, 30)}</td>
+                        <td className="numero">{r.horas}h</td>
+                        <td>
+                          <span className={`badge badge-${r.estado}`}>
+                            {r.estado}
+                          </span>
+                        </td>
+                        <td className="acciones">
+                          {usuario.rol === 'admin' && (
+                            <button 
+                              className="btn-eliminar"
+                              onClick={() => manejarEliminar(r.id)}
+                            >
+                              🗑️ Eliminar
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </section>
+        )}
+
+        {/* SECCIÓN: MI RESUMEN (Especialista) */}
+        {vista === 'resumen' && usuario.rol === 'especialista' && (
+          <section className="seccion">
+            <h2>📊 Mi Resumen del Mes</h2>
+            <div className="dashboard-grid">
+              <div className="card card-blue">
+                <h3>📋 Registros Este Mes</h3>
+                <p className="numero">{dashboard.horasEsteMes || 0}</p>
+              </div>
+              <div className="card card-green">
+                <h3>⏱️ Horas Registradas</h3>
+                <p className="numero">{dashboard.totalHoras || 0}h</p>
+              </div>
+              <div className="card card-yellow">
+                <h3>⏳ Registros Pendientes</h3>
+                <p className="numero">{dashboard.registrosPendientes || 0}</p>
+              </div>
+            </div>
+          </section>
+        )}
+
+        {/* SECCIÓN: DASHBOARD (Admin) */}
+        {vista === 'dashboard' && usuario.rol === 'admin' && (
+          <section className="seccion">
+            <h2>📊 Dashboard Completo</h2>
+            
+            <div className="filtros-dashboard">
+              <div className="form-group">
+                <label>Mes</label>
+                <select
+                  value={filtros.mes}
+                  onChange={(e) => setFiltros({ ...filtros, mes: parseInt(e.target.value) })}
+                >
+                  {[...Array(12)].map((_, i) => (
+                    <option key={i + 1} value={i + 1}>
+                      {new Date(2024, i).toLocaleString('es-CL', { month: 'long' })}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="form-group">
+                <label>Año</label>
+                <select
+                  value={filtros.anio}
+                  onChange={(e) => setFiltros({ ...filtros, anio: parseInt(e.target.value) })}
+                >
+                  <option value="2024">2024</option>
+                  <option value="2025">2025</option>
+                  <option value="2026">2026</option>
+                </select>
+              </div>
+
+              <div className="form-group">
+                <label>Desde</label>
+                <DatePicker
+                  selected={filtros.fechaInicio}
+                  onChange={(date) => setFiltros({ ...filtros, fechaInicio: date })}
+                  dateFormat="dd/MM/yyyy"
+                  locale={es}
+                />
+              </div>
+
+              <div className="form-group">
+                <label>Hasta</label>
+                <DatePicker
+                  selected={filtros.fechaFin}
+                  onChange={(date) => setFiltros({ ...filtros, fechaFin: date })}
+                  dateFormat="dd/MM/yyyy"
+                  locale={es}
+                />
+              </div>
+            </div>
+
             <div className="dashboard-grid">
               <div className="card card-blue">
                 <h3>📋 Total Registros</h3>
@@ -391,37 +603,24 @@ function App() {
                 <h3>⏱️ Total Horas</h3>
                 <p className="numero">{dashboard.totalHoras || 0}h</p>
               </div>
-              <div className="card card-yellow">
-                <h3>⏳ Pendientes</h3>
-                <p className="numero">{dashboard.pendientes || 0}</p>
-              </div>
-              <div className="card card-success">
-                <h3>✓ Aprobados</h3>
-                <p className="numero">{dashboard.aprobados || 0}</p>
-              </div>
-              <div className="card card-danger">
-                <h3>✗ Rechazados</h3>
-                <p className="numero">{dashboard.rechazados || 0}</p>
-              </div>
             </div>
           </section>
         )}
 
-        {/* SECCIÓN: AUDITORÍA (Solo Admin) */}
+        {/* SECCIÓN: AUDITORÍA */}
         {vista === 'auditoria' && usuario.rol === 'admin' && (
           <section className="seccion">
-            <h2>🔍 Auditoría - Historial Completo</h2>
+            <h2>🔍 Auditoría</h2>
             
             {auditoria.length === 0 ? (
-              <p className="sin-datos">Sin registros de auditoría</p>
+              <p className="sin-datos">Sin registros</p>
             ) : (
-              <table className="tabla tabla-auditoria">
+              <table className="tabla">
                 <thead>
                   <tr>
                     <th>Acción</th>
                     <th>Usuario</th>
-                    <th>Rol</th>
-                    <th>Fecha y Hora</th>
+                    <th>Fecha/Hora</th>
                     <th>Detalles</th>
                   </tr>
                 </thead>
@@ -429,20 +628,14 @@ function App() {
                   {auditoria.map(log => (
                     <tr key={log.id}>
                       <td><strong>{log.accion}</strong></td>
-                      <td>{log.usuarioNombre || log.nombre || '-'}</td>
-                      <td>{log.usuarioRol || log.rol || '-'}</td>
+                      <td>{log.usuarioNombre || '-'}</td>
                       <td>
                         {log.timestamp ? 
                           new Date(log.timestamp.toDate?.() || log.timestamp).toLocaleString('es-CL')
                           : '-'
                         }
                       </td>
-                      <td className="detalles">
-                        {log.camposModificados ? 
-                          JSON.stringify(log.camposModificados).substring(0, 50)
-                          : '-'
-                        }
-                      </td>
+                      <td>{log.camposModificados ? JSON.stringify(log.camposModificados).substring(0, 50) : '-'}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -454,7 +647,7 @@ function App() {
 
       {/* FOOTER */}
       <footer className="footer">
-        <p>Sistema OVT © 2024 - Control de Overtime</p>
+        <p>Sistema OVT v2.0 © 2024 - Control de Overtime y Cambios/Alertas</p>
       </footer>
     </div>
   );
