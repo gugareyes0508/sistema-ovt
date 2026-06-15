@@ -152,8 +152,8 @@ app.get('/api/registros', verificarToken, async (req, res) => {
       query = query.where('createdBy', '==', req.usuario.usuario);
     }
     
-    // Ordenar por fecha descendente
-    const snapshot = await query.orderBy('createdAt', 'desc').get();
+    // Obtener registros sin ordenar primero
+    const snapshot = await query.get();
     const registros = [];
     
     snapshot.forEach(doc => {
@@ -161,6 +161,13 @@ app.get('/api/registros', verificarToken, async (req, res) => {
         id: doc.id,
         ...doc.data()
       });
+    });
+    
+    // Ordenar en memoria por createdAt descendente
+    registros.sort((a, b) => {
+      const fechaA = a.createdAt?.toDate?.() || new Date(a.createdAt) || new Date(0);
+      const fechaB = b.createdAt?.toDate?.() || new Date(b.createdAt) || new Date(0);
+      return fechaB - fechaA;
     });
     
     res.json(registros);
