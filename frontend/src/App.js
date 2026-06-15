@@ -571,7 +571,7 @@ function App() {
                       <td className="numero">{r.horas}h</td>
                       <td>
                         <span className={`badge badge-${r.estado}`}>
-                          {r.estado}
+                          {r.estado === 'pendiente' ? 'Pendiente de Aprobación' : r.estado === 'exitoso' ? 'Aprobado' : 'Rechazado'}
                         </span>
                       </td>
                       <td>
@@ -633,7 +633,7 @@ function App() {
                         <td className="numero">{r.horas}h</td>
                         <td>
                           <span className={`badge badge-${r.estado}`}>
-                            {r.estado}
+                            {r.estado === 'pendiente' ? 'Pendiente de Aprobación' : r.estado === 'exitoso' ? 'Aprobado' : 'Rechazado'}
                           </span>
                         </td>
                         <td className="acciones">
@@ -707,9 +707,9 @@ function App() {
                   onChange={(e) => setFiltros({ ...filtros, estado: e.target.value || null })}
                 >
                   <option value="">Todos</option>
-                  <option value="pendiente">Pendiente</option>
-                  <option value="exitoso">Exitoso</option>
-                  <option value="fallido">Fallido</option>
+                  <option value="pendiente">Pendiente de Aprobación</option>
+                  <option value="exitoso">Aprobado</option>
+                  <option value="fallido">Rechazado</option>
                 </select>
               </div>
             </div>
@@ -738,11 +738,19 @@ function App() {
                       <td><strong>{r.tipo}</strong></td>
                       <td>{r.descripcion?.substring(0, 25)}</td>
                       <td>{r.cliente}</td>
-                      <td>{r.fechaInicio ? new Date(r.fechaInicio.toDate?.() || r.fechaInicio).toLocaleDateString('es-CL') : '-'}</td>
+                      <td>
+                        {r.fechaInicio ? 
+                          (() => {
+                            const fecha = r.fechaInicio.toDate?.() || new Date(r.fechaInicio);
+                            return !isNaN(fecha.getTime()) ? fecha.toLocaleDateString('es-CL') : 'Sin fecha';
+                          })()
+                          : 'Sin fecha'
+                        }
+                      </td>
                       <td className="numero">{r.horas}h</td>
                       <td>
                         <span className={`badge badge-${r.estado}`}>
-                          {r.estado}
+                          {r.estado === 'pendiente' ? 'Pendiente de Aprobación' : r.estado === 'exitoso' ? 'Aprobado' : 'Rechazado'}
                         </span>
                       </td>
                       <td>{r.genera_ovt === 'si' ? '✓' : '✗'}</td>
