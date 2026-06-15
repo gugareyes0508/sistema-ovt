@@ -23,7 +23,7 @@ function App() {
     especialista: usuario.nombre || '',
     interno_cliente: 'interno',
     genera_ovt: 'no',
-    estado: 'exitoso',
+    estado: 'pendiente',
     especialidad: 'operaciones'
   });
 
@@ -167,15 +167,15 @@ function App() {
         especialista: usuario.nombre || '',
         interno_cliente: 'interno',
         genera_ovt: 'no',
-        estado: 'exitoso',
+        estado: 'pendiente',
         especialidad: 'operaciones'
       });
       
-      // Recargar
+      // Recargar después de un pequeño delay
       setTimeout(() => {
         cargarRegistros();
         cargarDashboard();
-      }, 500);
+      }, 800);
     } catch (err) {
       console.error('Error:', err);
       alert('Error: ' + (err.response?.data?.error || err.message));
@@ -220,7 +220,7 @@ function App() {
       especialista: usuario.nombre || '',
       interno_cliente: 'interno',
       genera_ovt: 'no',
-      estado: 'exitoso',
+      estado: 'pendiente',
       especialidad: 'operaciones'
     });
   };
@@ -362,9 +362,9 @@ function App() {
                     value={formulario.estado}
                     onChange={(e) => setFormulario({ ...formulario, estado: e.target.value })}
                   >
+                    <option value="pendiente">Pendiente</option>
                     <option value="exitoso">Exitoso</option>
                     <option value="fallido">Fallido</option>
-                    <option value="pendiente">Pendiente</option>
                   </select>
                 </div>
 
