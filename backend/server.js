@@ -1,62 +1,55 @@
 const express = require('express');
 const cors = require('cors');
 const jwt = require('jsonwebtoken');
-const fs = require('fs');
-const path = require('path');
 require('dotenv').config();
 
 const admin = require('firebase-admin');
 
 // ============================================
-// CREAR firebase-key.json DESDE VARIABLE
+// VERIFICAR VARIABLES OBLIGATORIAS
 // ============================================
-let serviceAccount;
-
-if (process.env.FIREBASE_KEY_JSON) {
-  // Modo producción (Railway): Leer desde variable
-  try {
-    serviceAccount = JSON.parse(process.env.FIREBASE_KEY_JSON);
-    console.log('✓ Firebase config desde variable de entorno');
-  } catch (err) {
-    console.error('✗ Error parseando FIREBASE_KEY_JSON:', err.message);
+const requiredEnvVars = ['FIREBASE_KEY_JSON', 'JWT_SECRET', 'PORT'];
+for (const envVar of requiredEnvVars) {
+  if (!process.env[envVar]) {
+    console.error(`✗ FALTA VARIABLE: ${envVar}`);
+    console.error(`  Configura esta variable en Railway > Variables`);
+    if (envVar === 'FIREBASE_KEY_JSON') {
+      console.error(`  Valor: Copia TODO el contenido de tu firebase-key.json`);
+    }
     process.exit(1);
   }
-} else if (fs.existsSync('./firebase-key.json')) {
-  // Modo desarrollo local: Leer desde archivo
-  try {
-    serviceAccount = require('./firebase-key.json');
-    console.log('✓ Firebase config desde archivo local');
-  } catch (err) {
-    console.error('✗ Error leyendo firebase-key.json:', err.message);
-    process.exit(1);
-  }
-} else {
-  console.error('✗ No se encontró configuración de Firebase');
-  console.error('   Configura FIREBASE_KEY_JSON en variables de entorno o crea firebase-key.json');
-  process.exit(1);
 }
 
-// Inicializar Firebase
+// ============================================
+// INICIALIZAR FIREBASE
+// ============================================
 try {
+  const firebaseConfig = JSON.parse(process.env.FIREBASE_KEY_JSON);
+  
   admin.initializeApp({
-    credential: admin.credential.cert(serviceAccount),
-    databaseURL: 'https://sistema-ovt-bcochile.firebaseio.com'
+    credential: admin.credential.cert(firebaseConfig),
+    databaseURL: firebaseConfig.database_url || 'https://sistema-ovt-bcochile.firebaseio.com'
   });
-  console.log('✓ Firebase inicializado correctamente');
+  
+  console.log('✓ Firebase inicializado');
 } catch (err) {
-  console.error('✗ Error inicializando Firebase:', err.message);
+  console.error('✗ Error inicializando Firebase');
+  console.error('  Verifica que FIREBASE_KEY_JSON sea un JSON válido');
+  console.error('  Error:', err.message);
   process.exit(1);
 }
 
 const db = admin.firestore();
 const app = express();
 
-// Middleware
+// ============================================
+// CONFIGURACIÓN
+// ============================================
+const PORT = process.env.PORT || 3001;
+const JWT_SECRET = process.env.JWT_SECRET;
+
 app.use(cors({ origin: '*' }));
 app.use(express.json());
-
-const PORT = process.env.PORT || 3001;
-const JWT_SECRET = process.env.JWT_SECRET || 'secreto-demo-cambiar';
 
 // ============================================
 // USUARIOS DE PRUEBA
@@ -89,16 +82,17 @@ const usuarios = {
 };
 
 // ============================================
-// MIDDLEWARE: Verificar JWT
+// MIDDLEWARE: Verificar Token
 // ============================================
 function verificarToken(req, res, next) {
-  const token = req.headers.authorization?.split(' ')[1];
-  if (!token) return res.status(401).json({ error: 'Sin token' });
-
   try {
+    const token = req.headers.authorization?.split(' ')[1];
+    if (!token) {
+      return res.status(401).json({ error: 'Token requerido' });
+    }
     req.usuario = jwt.verify(token, JWT_SECRET);
     next();
-  } catch {
+  } catch (err) {
     res.status(401).json({ error: 'Token inválido' });
   }
 }
@@ -106,6 +100,11 @@ function verificarToken(req, res, next) {
 // ============================================
 // ENDPOINTS
 // ============================================
+
+// Health check
+app.get('/health', (req, res) => {
+  res.json({ status: 'ok', timestamp: new Date() });
+});
 
 // Login
 app.post('/api/auth/login', async (req, res) => {
@@ -129,9 +128,12 @@ app.post('/api/auth/login', async (req, res) => {
       nombre: u.nombre,
       rol: u.rol,
       timestamp: new Date()
-    });
+    }).catch(e => console.error('Auditoría error:', e.message));
 
-    res.json({ token, usuario: { id: usuario, nombre: u.nombre, rol: u.rol } });
+    res.json({ 
+      token, 
+      usuario: { id: usuario, nombre: u.nombre, rol: u.rol } 
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -148,6 +150,7 @@ app.get('/api/registros', verificarToken, async (req, res) => {
     const snap = await query.get();
     const registros = [];
     snap.forEach(doc => registros.push({ id: doc.id, ...doc.data() }));
+    
     res.json(registros);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -159,17 +162,21 @@ app.post('/api/registros', verificarToken, async (req, res) => {
   try {
     const { idCambio, nombreCambio, cliente, horas } = req.body;
     
-    const doc = await db.collection('registros').add({
+    if (!idCambio || !horas) {
+      return res.status(400).json({ error: 'Campos requeridos' });
+    }
+
+    const docRef = await db.collection('registros').add({
       idCambio,
-      nombreCambio,
-      cliente,
+      nombreCambio: nombreCambio || '',
+      cliente: cliente || '',
       horas: parseFloat(horas),
       especialista: req.usuario.nombre,
       estado: 'pendiente',
       createdAt: new Date()
     });
 
-    res.json({ id: doc.id, ...req.body });
+    res.json({ id: docRef.id, ...req.body });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -188,7 +195,7 @@ app.patch('/api/registros/:id', verificarToken, async (req, res) => {
 // Aprobar
 app.patch('/api/registros/:id/aprobar', verificarToken, async (req, res) => {
   try {
-    if (req.usuario.rol !== 'coordinador' && req.usuario.rol !== 'admin') {
+    if (!['coordinador', 'admin'].includes(req.usuario.rol)) {
       return res.status(403).json({ error: 'No autorizado' });
     }
 
@@ -207,7 +214,7 @@ app.patch('/api/registros/:id/aprobar', verificarToken, async (req, res) => {
 // Rechazar
 app.patch('/api/registros/:id/rechazar', verificarToken, async (req, res) => {
   try {
-    if (req.usuario.rol !== 'coordinador' && req.usuario.rol !== 'admin') {
+    if (!['coordinador', 'admin'].includes(req.usuario.rol)) {
       return res.status(403).json({ error: 'No autorizado' });
     }
 
@@ -223,16 +230,21 @@ app.patch('/api/registros/:id/rechazar', verificarToken, async (req, res) => {
   }
 });
 
-// Auditoría
+// Auditoría (solo admin)
 app.get('/api/auditoria', verificarToken, async (req, res) => {
   try {
     if (req.usuario.rol !== 'admin') {
       return res.status(403).json({ error: 'Solo admin' });
     }
 
-    const snap = await db.collection('auditoria').orderBy('timestamp', 'desc').limit(100).get();
+    const snap = await db.collection('auditoria')
+      .orderBy('timestamp', 'desc')
+      .limit(100)
+      .get();
+    
     const logs = [];
     snap.forEach(doc => logs.push({ id: doc.id, ...doc.data() }));
+    
     res.json(logs);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -246,29 +258,39 @@ app.get('/api/dashboard/resumen', verificarToken, async (req, res) => {
     const registros = [];
     snap.forEach(doc => registros.push(doc.data()));
 
-    res.json({
+    const resultado = {
       totalRegistros: registros.length,
-      totalHoras: registros.reduce((s, r) => s + (r.horas || 0), 0),
+      totalHoras: registros.reduce((sum, r) => sum + (parseFloat(r.horas) || 0), 0),
       pendientes: registros.filter(r => r.estado === 'pendiente').length,
       aprobados: registros.filter(r => r.estado === 'aprobado').length,
       rechazados: registros.filter(r => r.estado === 'rechazado').length
-    });
+    };
+
+    res.json(resultado);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// Health check
-app.get('/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date() });
-});
-
-// Iniciar servidor
+// ============================================
+// INICIAR SERVIDOR
+// ============================================
 app.listen(PORT, () => {
-  console.log('\n==================================================');
-  console.log('✓ SERVIDOR OVT ACTIVO');
-  console.log('✓ Puerto: ' + PORT);
+  console.log('\n' + '='.repeat(50));
+  console.log('✓ SERVIDOR OVT INICIADO CORRECTAMENTE');
+  console.log('='.repeat(50));
+  console.log(`✓ Puerto: ${PORT}`);
   console.log('✓ Firebase: CONECTADO');
   console.log('✓ Auditoría: ACTIVA');
-  console.log('==================================================\n');
+  console.log('✓ 22 especialistas + coordinador + admin');
+  console.log('='.repeat(50) + '\n');
+});
+
+// Manejo de errores sin capturar
+process.on('uncaughtException', (err) => {
+  console.error('✗ Error no capturado:', err.message);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('✗ Promise rechazada sin manejo:', reason);
 });
