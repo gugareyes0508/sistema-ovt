@@ -225,7 +225,48 @@ function App() {
     });
   };
 
-  // Eliminar registro (Solo Admin)
+  // Función para parsear fechas de forma robusta
+  const parseDate = (fecha) => {
+    if (!fecha) return 'Sin fecha';
+    
+    try {
+      let date;
+      
+      // Si es un objeto Firestore Timestamp
+      if (fecha.toDate && typeof fecha.toDate === 'function') {
+        date = fecha.toDate();
+      }
+      // Si es un string ISO
+      else if (typeof fecha === 'string') {
+        date = new Date(fecha);
+      }
+      // Si es un número (timestamp)
+      else if (typeof fecha === 'number') {
+        date = new Date(fecha);
+      }
+      // Si es un objeto Date
+      else if (fecha instanceof Date) {
+        date = fecha;
+      }
+      // Si es un objeto con propiedores _seconds y _nanoseconds
+      else if (fecha._seconds !== undefined) {
+        date = new Date(fecha._seconds * 1000);
+      }
+      else {
+        date = new Date(fecha);
+      }
+      
+      // Verificar si la fecha es válida
+      if (isNaN(date.getTime())) {
+        return 'Sin fecha';
+      }
+      
+      return date.toLocaleDateString('es-CL');
+    } catch (err) {
+      console.error('Error parseando fecha:', err, fecha);
+      return 'Sin fecha';
+    }
+  };
   const manejarEliminar = async (id) => {
     if (!window.confirm('¿Estás seguro de eliminar este registro?')) return;
     
@@ -575,10 +616,7 @@ function App() {
                         </span>
                       </td>
                       <td>
-                        {r.fechaInicio ? 
-                          new Date(r.fechaInicio.toDate?.() || r.fechaInicio).toLocaleDateString('es-CL')
-                          : 'Sin fecha'
-                        }
+                        {parseDate(r.fechaInicio)}
                       </td>
                       <td>
                         <button 
@@ -640,12 +678,32 @@ function App() {
                           <button 
                             className="btn-editar"
                             onClick={() => cargarParaEditar(r)}
+                            title="Editar registro"
                           >
                             ✏️ Editar
                           </button>
+                          {r.estado === 'pendiente' && (
+                            <>
+                              <button 
+                                className="btn-aprobar"
+                                onClick={() => manejarAprobacion(r.id, 'exitoso')}
+                                title="Aprobar registro"
+                              >
+                                ✅ Aprobar
+                              </button>
+                              <button 
+                                className="btn-rechazar"
+                                onClick={() => manejarAprobacion(r.id, 'fallido')}
+                                title="Rechazar registro"
+                              >
+                                ❌ Rechazar
+                              </button>
+                            </>
+                          )}
                           <button 
                             className="btn-eliminar"
                             onClick={() => manejarEliminar(r.id)}
+                            title="Eliminar registro"
                           >
                             🗑️ Eliminar
                           </button>
@@ -738,15 +796,7 @@ function App() {
                       <td><strong>{r.tipo}</strong></td>
                       <td>{r.descripcion?.substring(0, 25)}</td>
                       <td>{r.cliente}</td>
-                      <td>
-                        {r.fechaInicio ? 
-                          (() => {
-                            const fecha = r.fechaInicio.toDate?.() || new Date(r.fechaInicio);
-                            return !isNaN(fecha.getTime()) ? fecha.toLocaleDateString('es-CL') : 'Sin fecha';
-                          })()
-                          : 'Sin fecha'
-                        }
-                      </td>
+                      <td>{parseDate(r.fechaInicio)}</td>
                       <td className="numero">{r.horas}h</td>
                       <td>
                         <span className={`badge badge-${r.estado}`}>
@@ -896,14 +946,7 @@ function App() {
                           {r.estado === 'exitoso' ? '✅ Aprobado' : '❌ Rechazado'}
                         </span>
                       </td>
-                      <td>{r.fechaInicio ? new Date(r.fechaInicio.toDate?.() || r.fechaInicio).toLocaleDateString('es-CL') : '-'}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </section>
-        )}
+                      <td>{parseDate(r.fechaInicio)}</td>
 
         {/* SECCIÓN: AUDITORÍA */}
         {vista === 'auditoria' && usuario.rol === 'admin' && (
