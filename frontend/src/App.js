@@ -357,18 +357,6 @@ function App() {
                 </div>
 
                 <div className="form-group">
-                  <label>Estado *</label>
-                  <select
-                    value={formulario.estado}
-                    onChange={(e) => setFormulario({ ...formulario, estado: e.target.value })}
-                  >
-                    <option value="pendiente">Pendiente</option>
-                    <option value="exitoso">Exitoso</option>
-                    <option value="fallido">Fallido</option>
-                  </select>
-                </div>
-
-                <div className="form-group">
                   <label>Cliente *</label>
                   <select
                     value={formulario.cliente}
@@ -431,18 +419,16 @@ function App() {
 
               <div className="form-row">
                 <div className="form-group">
-                  <label>Fecha Inicio * (YYYY-MM-DD)</label>
+                  <label>Fecha Inicio *</label>
                   <input
-                    type="text"
-                    placeholder="2026-06-15"
+                    type="date"
                     value={formulario.fechaInicio instanceof Date ? 
                       formulario.fechaInicio.toISOString().split('T')[0]
                       : ''
                     }
                     onChange={(e) => {
-                      const valor = e.target.value;
-                      if (valor && /^\d{4}-\d{2}-\d{2}$/.test(valor)) {
-                        const [año, mes, dia] = valor.split('-');
+                      if (e.target.value) {
+                        const [año, mes, dia] = e.target.value.split('-');
                         const fecha = new Date(parseInt(año), parseInt(mes) - 1, parseInt(dia));
                         fecha.setHours(formulario.fechaInicio.getHours(), formulario.fechaInicio.getMinutes());
                         handleFechaChange('fechaInicio', fecha);
@@ -454,41 +440,34 @@ function App() {
                 <div className="form-group">
                   <label>Hora Inicio * (HH:MM)</label>
                   <input
-                    type="text"
-                    placeholder="07:15"
-                    maxLength="5"
+                    type="time"
                     value={formulario.fechaInicio instanceof Date ? 
                       String(formulario.fechaInicio.getHours()).padStart(2, '0') + ':' + 
                       String(formulario.fechaInicio.getMinutes()).padStart(2, '0')
                       : ''
                     }
                     onChange={(e) => {
-                      const valor = e.target.value;
-                      if (valor && /^\d{2}:\d{2}$/.test(valor)) {
-                        const [horas, minutos] = valor.split(':');
-                        if (parseInt(horas) >= 0 && parseInt(horas) < 24 && parseInt(minutos) >= 0 && parseInt(minutos) < 60) {
-                          const nuevaFecha = new Date(formulario.fechaInicio);
-                          nuevaFecha.setHours(parseInt(horas), parseInt(minutos));
-                          handleFechaChange('fechaInicio', nuevaFecha);
-                        }
+                      if (e.target.value) {
+                        const [horas, minutos] = e.target.value.split(':');
+                        const nuevaFecha = new Date(formulario.fechaInicio);
+                        nuevaFecha.setHours(parseInt(horas), parseInt(minutos));
+                        handleFechaChange('fechaInicio', nuevaFecha);
                       }
                     }}
                   />
                 </div>
 
                 <div className="form-group">
-                  <label>Fecha Fin * (YYYY-MM-DD)</label>
+                  <label>Fecha Fin *</label>
                   <input
-                    type="text"
-                    placeholder="2026-06-15"
+                    type="date"
                     value={formulario.fechaFin instanceof Date ? 
                       formulario.fechaFin.toISOString().split('T')[0]
                       : ''
                     }
                     onChange={(e) => {
-                      const valor = e.target.value;
-                      if (valor && /^\d{4}-\d{2}-\d{2}$/.test(valor)) {
-                        const [año, mes, dia] = valor.split('-');
+                      if (e.target.value) {
+                        const [año, mes, dia] = e.target.value.split('-');
                         const fecha = new Date(parseInt(año), parseInt(mes) - 1, parseInt(dia));
                         fecha.setHours(formulario.fechaFin.getHours(), formulario.fechaFin.getMinutes());
                         handleFechaChange('fechaFin', fecha);
@@ -500,23 +479,18 @@ function App() {
                 <div className="form-group">
                   <label>Hora Fin * (HH:MM)</label>
                   <input
-                    type="text"
-                    placeholder="08:15"
-                    maxLength="5"
+                    type="time"
                     value={formulario.fechaFin instanceof Date ? 
                       String(formulario.fechaFin.getHours()).padStart(2, '0') + ':' + 
                       String(formulario.fechaFin.getMinutes()).padStart(2, '0')
                       : ''
                     }
                     onChange={(e) => {
-                      const valor = e.target.value;
-                      if (valor && /^\d{2}:\d{2}$/.test(valor)) {
-                        const [horas, minutos] = valor.split(':');
-                        if (parseInt(horas) >= 0 && parseInt(horas) < 24 && parseInt(minutos) >= 0 && parseInt(minutos) < 60) {
-                          const nuevaFecha = new Date(formulario.fechaFin);
-                          nuevaFecha.setHours(parseInt(horas), parseInt(minutos));
-                          handleFechaChange('fechaFin', nuevaFecha);
-                        }
+                      if (e.target.value) {
+                        const [horas, minutos] = e.target.value.split(':');
+                        const nuevaFecha = new Date(formulario.fechaFin);
+                        nuevaFecha.setHours(parseInt(horas), parseInt(minutos));
+                        handleFechaChange('fechaFin', nuevaFecha);
                       }
                     }}
                   />
