@@ -183,18 +183,7 @@ function App() {
     }
   };
 
-  // Modificar registro (Especialista)
-  const manejarModificar = async (id) => {
-    try {
-      await axios.patch(`${API_URL}/api/registros/${id}`, formulario, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      cargarRegistros();
-      alert('Registro actualizado');
-    } catch (err) {
-      alert('Error: ' + err.message);
-    }
-  };
+
 
   // ============================================
   // VISTA: LOGIN
