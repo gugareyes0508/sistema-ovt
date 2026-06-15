@@ -1,7 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
-import DatePicker from 'react-datepicker';
-import 'react-datepicker/dist/react-datepicker.css';
 import './App.css';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
@@ -371,23 +369,19 @@ function App() {
               <div className="form-row">
                 <div className="form-group">
                   <label>Fecha/Hora Inicio *</label>
-                  <DatePicker
-                    selected={formulario.fechaInicio}
-                    onChange={(date) => handleFechaChange('fechaInicio', date)}
-                    showTimeSelect
-                    timeFormat="HH:mm"
-                    dateFormat="dd/MM/yyyy HH:mm"
+                  <input
+                    type="datetime-local"
+                    value={formulario.fechaInicio.toISOString().slice(0, 16)}
+                    onChange={(e) => handleFechaChange('fechaInicio', new Date(e.target.value))}
                   />
                 </div>
 
                 <div className="form-group">
                   <label>Fecha/Hora Fin *</label>
-                  <DatePicker
-                    selected={formulario.fechaFin}
-                    onChange={(date) => handleFechaChange('fechaFin', date)}
-                    showTimeSelect
-                    timeFormat="HH:mm"
-                    dateFormat="dd/MM/yyyy HH:mm"
+                  <input
+                    type="datetime-local"
+                    value={formulario.fechaFin.toISOString().slice(0, 16)}
+                    onChange={(e) => handleFechaChange('fechaFin', new Date(e.target.value))}
                   />
                 </div>
 
@@ -561,19 +555,19 @@ function App() {
 
               <div className="form-group">
                 <label>Desde</label>
-                <DatePicker
-                  selected={filtros.fechaInicio}
-                  onChange={(date) => setFiltros({ ...filtros, fechaInicio: date })}
-                  dateFormat="dd/MM/yyyy"
+                <input
+                  type="date"
+                  value={filtros.fechaInicio ? filtros.fechaInicio.toISOString().split('T')[0] : ''}
+                  onChange={(e) => setFiltros({ ...filtros, fechaInicio: e.target.value ? new Date(e.target.value) : null })}
                 />
               </div>
 
               <div className="form-group">
                 <label>Hasta</label>
-                <DatePicker
-                  selected={filtros.fechaFin}
-                  onChange={(date) => setFiltros({ ...filtros, fechaFin: date })}
-                  dateFormat="dd/MM/yyyy"
+                <input
+                  type="date"
+                  value={filtros.fechaFin ? filtros.fechaFin.toISOString().split('T')[0] : ''}
+                  onChange={(e) => setFiltros({ ...filtros, fechaFin: e.target.value ? new Date(e.target.value) : null })}
                 />
               </div>
             </div>
