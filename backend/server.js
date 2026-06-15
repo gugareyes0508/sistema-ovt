@@ -163,22 +163,38 @@ app.post('/api/registros', verificarToken, async (req, res) => {
     const { idCambio, nombreCambio, cliente, horas } = req.body;
     
     if (!idCambio || !horas) {
-      return res.status(400).json({ error: 'Campos requeridos' });
+      return res.status(400).json({ error: 'idCambio y horas son requeridos' });
+    }
+
+    const horasNumero = parseFloat(horas);
+    if (isNaN(horasNumero)) {
+      return res.status(400).json({ error: 'Horas debe ser un número válido' });
     }
 
     const docRef = await db.collection('registros').add({
-      idCambio,
-      nombreCambio: nombreCambio || '',
-      cliente: cliente || '',
-      horas: parseFloat(horas),
+      idCambio: String(idCambio),
+      nombreCambio: String(nombreCambio || ''),
+      cliente: String(cliente || ''),
+      horas: horasNumero,
       especialista: req.usuario.nombre,
       estado: 'pendiente',
-      createdAt: new Date()
+      createdAt: new Date(),
+      createdBy: req.usuario.usuario
     });
 
-    res.json({ id: docRef.id, ...req.body });
+    console.log('✓ Registro creado:', docRef.id);
+    res.json({ 
+      id: docRef.id, 
+      idCambio,
+      nombreCambio,
+      cliente,
+      horas: horasNumero,
+      especialista: req.usuario.nombre,
+      estado: 'pendiente'
+    });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error('✗ Error en POST /api/registros:', err);
+    res.status(500).json({ error: 'Error al registrar: ' + err.message });
   }
 });
 
