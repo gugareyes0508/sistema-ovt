@@ -3,7 +3,6 @@ import axios from 'axios';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import './App.css';
-import { es } from 'date-fns/locale';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
 
@@ -378,7 +377,6 @@ function App() {
                     showTimeSelect
                     timeFormat="HH:mm"
                     dateFormat="dd/MM/yyyy HH:mm"
-                    locale={es}
                   />
                 </div>
 
@@ -390,7 +388,6 @@ function App() {
                     showTimeSelect
                     timeFormat="HH:mm"
                     dateFormat="dd/MM/yyyy HH:mm"
-                    locale={es}
                   />
                 </div>
 
@@ -568,7 +565,6 @@ function App() {
                   selected={filtros.fechaInicio}
                   onChange={(date) => setFiltros({ ...filtros, fechaInicio: date })}
                   dateFormat="dd/MM/yyyy"
-                  locale={es}
                 />
               </div>
 
@@ -578,7 +574,6 @@ function App() {
                   selected={filtros.fechaFin}
                   onChange={(date) => setFiltros({ ...filtros, fechaFin: date })}
                   dateFormat="dd/MM/yyyy"
-                  locale={es}
                 />
               </div>
             </div>
