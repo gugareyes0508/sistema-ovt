@@ -431,16 +431,19 @@ function App() {
 
               <div className="form-row">
                 <div className="form-group">
-                  <label>Fecha Inicio *</label>
+                  <label>Fecha Inicio * (YYYY-MM-DD)</label>
                   <input
-                    type="date"
+                    type="text"
+                    placeholder="2026-06-15"
                     value={formulario.fechaInicio instanceof Date ? 
                       formulario.fechaInicio.toISOString().split('T')[0]
                       : ''
                     }
                     onChange={(e) => {
-                      if (e.target.value) {
-                        const fecha = new Date(e.target.value);
+                      const valor = e.target.value;
+                      if (valor && /^\d{4}-\d{2}-\d{2}$/.test(valor)) {
+                        const [año, mes, dia] = valor.split('-');
+                        const fecha = new Date(parseInt(año), parseInt(mes) - 1, parseInt(dia));
                         fecha.setHours(formulario.fechaInicio.getHours(), formulario.fechaInicio.getMinutes());
                         handleFechaChange('fechaInicio', fecha);
                       }
@@ -455,12 +458,13 @@ function App() {
                     placeholder="07:15"
                     maxLength="5"
                     value={formulario.fechaInicio instanceof Date ? 
-                      formulario.fechaInicio.toLocaleTimeString('es-CL', {hour: '2-digit', minute: '2-digit', hour12: false})
+                      String(formulario.fechaInicio.getHours()).padStart(2, '0') + ':' + 
+                      String(formulario.fechaInicio.getMinutes()).padStart(2, '0')
                       : ''
                     }
                     onChange={(e) => {
                       const valor = e.target.value;
-                      if (valor && valor.length === 5 && valor.includes(':')) {
+                      if (valor && /^\d{2}:\d{2}$/.test(valor)) {
                         const [horas, minutos] = valor.split(':');
                         if (parseInt(horas) >= 0 && parseInt(horas) < 24 && parseInt(minutos) >= 0 && parseInt(minutos) < 60) {
                           const nuevaFecha = new Date(formulario.fechaInicio);
@@ -473,16 +477,19 @@ function App() {
                 </div>
 
                 <div className="form-group">
-                  <label>Fecha Fin *</label>
+                  <label>Fecha Fin * (YYYY-MM-DD)</label>
                   <input
-                    type="date"
+                    type="text"
+                    placeholder="2026-06-15"
                     value={formulario.fechaFin instanceof Date ? 
                       formulario.fechaFin.toISOString().split('T')[0]
                       : ''
                     }
                     onChange={(e) => {
-                      if (e.target.value) {
-                        const fecha = new Date(e.target.value);
+                      const valor = e.target.value;
+                      if (valor && /^\d{4}-\d{2}-\d{2}$/.test(valor)) {
+                        const [año, mes, dia] = valor.split('-');
+                        const fecha = new Date(parseInt(año), parseInt(mes) - 1, parseInt(dia));
                         fecha.setHours(formulario.fechaFin.getHours(), formulario.fechaFin.getMinutes());
                         handleFechaChange('fechaFin', fecha);
                       }
@@ -497,12 +504,13 @@ function App() {
                     placeholder="08:15"
                     maxLength="5"
                     value={formulario.fechaFin instanceof Date ? 
-                      formulario.fechaFin.toLocaleTimeString('es-CL', {hour: '2-digit', minute: '2-digit', hour12: false})
+                      String(formulario.fechaFin.getHours()).padStart(2, '0') + ':' + 
+                      String(formulario.fechaFin.getMinutes()).padStart(2, '0')
                       : ''
                     }
                     onChange={(e) => {
                       const valor = e.target.value;
-                      if (valor && valor.length === 5 && valor.includes(':')) {
+                      if (valor && /^\d{2}:\d{2}$/.test(valor)) {
                         const [horas, minutos] = valor.split(':');
                         if (parseInt(horas) >= 0 && parseInt(horas) < 24 && parseInt(minutos) >= 0 && parseInt(minutos) < 60) {
                           const nuevaFecha = new Date(formulario.fechaFin);
