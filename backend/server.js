@@ -1,163 +1,168 @@
 const express = require('express');
 const cors = require('cors');
 const jwt = require('jsonwebtoken');
+const admin = require('firebase-admin');
 require('dotenv').config();
 
-const admin = require('firebase-admin');
+const app = express();
+const PORT = process.env.PORT || 3001;
+const JWT_SECRET = process.env.JWT_SECRET || 'demo123';
 
 // ============================================
-// VERIFICAR VARIABLES OBLIGATORIAS
+// MIDDLEWARES
 // ============================================
-const requiredEnvVars = ['FIREBASE_KEY_JSON', 'JWT_SECRET', 'PORT'];
-for (const envVar of requiredEnvVars) {
-  if (!process.env[envVar]) {
-    console.error(`✗ FALTA VARIABLE: ${envVar}`);
-    console.error(`  Configura esta variable en Railway > Variables`);
-    if (envVar === 'FIREBASE_KEY_JSON') {
-      console.error(`  Valor: Copia TODO el contenido de tu firebase-key.json`);
-    }
-    process.exit(1);
-  }
-}
+
+app.use(express.json());
+app.use(cors({
+  origin: '*',
+  credentials: true
+}));
 
 // ============================================
-// INICIALIZAR FIREBASE
+// FIREBASE INIT
 // ============================================
+
 try {
-  const firebaseConfig = JSON.parse(process.env.FIREBASE_KEY_JSON);
+  let serviceAccount;
+  
+  if (process.env.FIREBASE_KEY_JSON) {
+    serviceAccount = JSON.parse(process.env.FIREBASE_KEY_JSON);
+  } else if (require.resolve('./firebase-key.json')) {
+    serviceAccount = require('./firebase-key.json');
+  }
   
   admin.initializeApp({
-    credential: admin.credential.cert(firebaseConfig),
-    databaseURL: firebaseConfig.database_url || 'https://sistema-ovt-bcochile.firebaseio.com'
+    credential: admin.credential.cert(serviceAccount),
+    databaseURL: 'https://sistema-ovt-bcochile.firebaseio.com'
   });
   
   console.log('✓ Firebase inicializado');
 } catch (err) {
-  console.error('✗ Error inicializando Firebase');
-  console.error('  Verifica que FIREBASE_KEY_JSON sea un JSON válido');
-  console.error('  Error:', err.message);
+  console.error('✗ Error inicializando Firebase:', err.message);
   process.exit(1);
 }
 
 const db = admin.firestore();
-const app = express();
 
 // ============================================
-// CONFIGURACIÓN
+// USUARIOS DEMO
 // ============================================
-const PORT = process.env.PORT || 3001;
-const JWT_SECRET = process.env.JWT_SECRET;
 
-app.use(cors({ origin: '*' }));
-app.use(express.json());
-
-// ============================================
-// USUARIOS DE PRUEBA
-// ============================================
 const usuarios = {
-  'jorge.maureira': { rol: 'especialista', nombre: 'Jorge Maureira', contrasena: 'demo123' },
-  'jhon.estrada': { rol: 'especialista', nombre: 'Jhon Estrada', contrasena: 'demo123' },
-  'luis.vasquez': { rol: 'especialista', nombre: 'Luis Vasquez', contrasena: 'demo123' },
-  'moises.junco': { rol: 'especialista', nombre: 'Moises Junco', contrasena: 'demo123' },
-  'manuel.urbina': { rol: 'especialista', nombre: 'Manuel Urbina', contrasena: 'demo123' },
-  'benjamin.fierro': { rol: 'especialista', nombre: 'Benjamin Fierro', contrasena: 'demo123' },
-  'mauricio.serrano': { rol: 'especialista', nombre: 'Mauricio Serrano', contrasena: 'demo123' },
-  'ricardo.rojas': { rol: 'especialista', nombre: 'Ricardo Rojas', contrasena: 'demo123' },
-  'ariel.garate': { rol: 'especialista', nombre: 'Ariel Garate', contrasena: 'demo123' },
-  'najeeb.escobar': { rol: 'especialista', nombre: 'Najeeb Escobar', contrasena: 'demo123' },
-  'rodrigo.sanhueza': { rol: 'especialista', nombre: 'Rodrigo Sanhueza', contrasena: 'demo123' },
-  'sebastian.arroyo': { rol: 'especialista', nombre: 'Sebastian Arroyo', contrasena: 'demo123' },
-  'cristian.madariaga': { rol: 'especialista', nombre: 'Cristian Madariaga', contrasena: 'demo123' },
-  'miguel.martinez': { rol: 'especialista', nombre: 'Miguel Martinez', contrasena: 'demo123' },
-  'fabian.tobar': { rol: 'especialista', nombre: 'Fabian Tobar', contrasena: 'demo123' },
-  'gustavo.perolo': { rol: 'especialista', nombre: 'Gustavo Perolo', contrasena: 'demo123' },
-  'leonardo.silva': { rol: 'especialista', nombre: 'Leonardo Silva', contrasena: 'demo123' },
-  'cristian.lecaros': { rol: 'especialista', nombre: 'Cristian Lecaros', contrasena: 'demo123' },
-  'rodrigo.escobedo': { rol: 'especialista', nombre: 'Rodrigo Escobedo', contrasena: 'demo123' },
-  'alexis.alfonzo': { rol: 'especialista', nombre: 'Alexis Alfonzo', contrasena: 'demo123' },
-  'danilo.isla': { rol: 'especialista', nombre: 'Danilo Isla', contrasena: 'demo123' },
-  'gustavo.reyes': { rol: 'especialista', nombre: 'Gustavo Reyes', contrasena: 'demo123' },
-  'maria.admin': { rol: 'coordinador', nombre: 'Maria Admin', contrasena: 'demo123' },
-  'admin': { rol: 'admin', nombre: 'Administrador', contrasena: 'demo123' }
+  'jorge.maureira': { nombre: 'Jorge Maureira', rol: 'especialista', contrasena: 'demo123' },
+  'jhon.estrada': { nombre: 'Jhon Estrada', rol: 'especialista', contrasena: 'demo123' },
+  'luis.vasquez': { nombre: 'Luis Vasquez', rol: 'especialista', contrasena: 'demo123' },
+  'moises.junco': { nombre: 'Moises Junco', rol: 'especialista', contrasena: 'demo123' },
+  'manuel.urbina': { nombre: 'Manuel Urbina Hernández', rol: 'especialista', contrasena: 'demo123' },
+  'benjamin.fierro': { nombre: 'Benjamín Fierro', rol: 'especialista', contrasena: 'demo123' },
+  'mauricio.serrano': { nombre: 'Mauricio Antonio Serrano Gonzalez', rol: 'especialista', contrasena: 'demo123' },
+  'ricardo.rojas': { nombre: 'Ricardo Andrés Rojas Ramos', rol: 'especialista', contrasena: 'demo123' },
+  'ariel.garate': { nombre: 'Ariel Garate', rol: 'especialista', contrasena: 'demo123' },
+  'najeeb.escobar': { nombre: 'Najeeb Ency Escobar Perez', rol: 'especialista', contrasena: 'demo123' },
+  'rodrigo.sanhueza': { nombre: 'Rodrigo Alejandro Sanhueza', rol: 'especialista', contrasena: 'demo123' },
+  'sebastian.arroyo': { nombre: 'Sebastian Arroyo Vigouroux', rol: 'especialista', contrasena: 'demo123' },
+  'cristian.madariaga': { nombre: 'Cristian Madariaga', rol: 'especialista', contrasena: 'demo123' },
+  'miguel.martinez': { nombre: 'Miguel Martinez', rol: 'especialista', contrasena: 'demo123' },
+  'fabian.tobar': { nombre: 'Fabian Tobar', rol: 'especialista', contrasena: 'demo123' },
+  'gustavo.perolo': { nombre: 'Gustavo Perolo', rol: 'especialista', contrasena: 'demo123' },
+  'leonardo.silva': { nombre: 'Leonardo Silva', rol: 'especialista', contrasena: 'demo123' },
+  'cristian.lecaros': { nombre: 'Cristian Lecaros', rol: 'especialista', contrasena: 'demo123' },
+  'rodrigo.escobedo': { nombre: 'Rodrigo Escobedo', rol: 'especialista', contrasena: 'demo123' },
+  'alexis.alfonzo': { nombre: 'Alexis José Alfonzo', rol: 'especialista', contrasena: 'demo123' },
+  'danilo.isla': { nombre: 'Danilo Isla', rol: 'especialista', contrasena: 'demo123' },
+  'gustavo.reyes': { nombre: 'Gustavo Reyes', rol: 'especialista', contrasena: 'demo123' },
+  'maria.admin': { nombre: 'Maria Admin', rol: 'coordinador', contrasena: 'demo123' },
+  'admin': { nombre: 'Administrador', rol: 'admin', contrasena: 'demo123' }
 };
 
 // ============================================
 // MIDDLEWARE: Verificar Token
 // ============================================
-function verificarToken(req, res, next) {
+
+const verificarToken = (req, res, next) => {
+  const token = req.headers.authorization?.replace('Bearer ', '');
+  
+  if (!token) {
+    return res.status(401).json({ error: 'Token no proporcionado' });
+  }
+  
   try {
-    const token = req.headers.authorization?.split(' ')[1];
-    if (!token) {
-      return res.status(401).json({ error: 'Token requerido' });
-    }
-    req.usuario = jwt.verify(token, JWT_SECRET);
+    const decoded = jwt.verify(token, JWT_SECRET);
+    req.usuario = decoded;
     next();
   } catch (err) {
-    res.status(401).json({ error: 'Token inválido' });
+    return res.status(401).json({ error: 'Token inválido' });
   }
-}
+};
 
 // ============================================
-// ENDPOINTS
+// RUTAS: AUTH
 // ============================================
 
-// Health check
-app.get('/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date() });
-});
-
-// Login
 app.post('/api/auth/login', async (req, res) => {
   try {
     const { usuario, contrasena } = req.body;
-    const u = usuarios[usuario];
-
-    if (!u || u.contrasena !== contrasena) {
+    
+    if (!usuario || !contrasena) {
+      return res.status(400).json({ error: 'Usuario y contraseña requeridos' });
+    }
+    
+    const user = usuarios[usuario];
+    
+    if (!user || user.contrasena !== contrasena) {
       return res.status(401).json({ error: 'Credenciales incorrectas' });
     }
-
+    
     const token = jwt.sign(
-      { usuario, rol: u.rol, nombre: u.nombre },
+      { usuario, nombre: user.nombre, rol: user.rol },
       JWT_SECRET,
       { expiresIn: '24h' }
     );
-
+    
+    // Registrar en auditoría
     await db.collection('auditoria').add({
-      accion: 'login',
-      usuario,
-      nombre: u.nombre,
-      rol: u.rol,
-      timestamp: new Date()
-    }).catch(e => console.error('Auditoría error:', e.message));
-
-    res.json({ 
-      token, 
-      usuario: { id: usuario, nombre: u.nombre, rol: u.rol } 
+      accion: 'LOGIN',
+      usuarioNombre: user.nombre,
+      usuarioRol: user.rol,
+      timestamp: new Date(),
+      ip: req.ip
+    });
+    
+    res.json({
+      token,
+      usuario: { usuario, nombre: user.nombre, rol: user.rol }
     });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error('Error en login:', err);
+    res.status(500).json({ error: 'Error interno del servidor' });
   }
 });
 
-// Get registros
+// ============================================
+// RUTAS: REGISTROS
+// ============================================
+
+// GET todos los registros
 app.get('/api/registros', verificarToken, async (req, res) => {
   try {
-    let query = db.collection('registros');
-    if (req.usuario.rol === 'especialista') {
-      query = query.where('especialista', '==', req.usuario.nombre);
-    }
-
-    const snap = await query.get();
+    const snapshot = await db.collection('registros').orderBy('createdAt', 'desc').get();
     const registros = [];
-    snap.forEach(doc => registros.push({ id: doc.id, ...doc.data() }));
+    
+    snapshot.forEach(doc => {
+      registros.push({
+        id: doc.id,
+        ...doc.data()
+      });
+    });
     
     res.json(registros);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error('Error en GET /api/registros:', err);
+    res.status(500).json({ error: 'Error al obtener registros' });
   }
 });
 
-// Create registro
+// POST crear registro
 app.post('/api/registros', verificarToken, async (req, res) => {
   try {
     const { idCambio, nombreCambio, cliente, horas } = req.body;
@@ -165,148 +170,200 @@ app.post('/api/registros', verificarToken, async (req, res) => {
     if (!idCambio || !horas) {
       return res.status(400).json({ error: 'idCambio y horas son requeridos' });
     }
-
-    const horasNumero = parseFloat(horas);
-    if (isNaN(horasNumero)) {
-      return res.status(400).json({ error: 'Horas debe ser un número válido' });
-    }
-
+    
     const docRef = await db.collection('registros').add({
       idCambio: String(idCambio),
       nombreCambio: String(nombreCambio || ''),
       cliente: String(cliente || ''),
-      horas: horasNumero,
+      horas: parseFloat(horas),
       especialista: req.usuario.nombre,
       estado: 'pendiente',
       createdAt: new Date(),
       createdBy: req.usuario.usuario
     });
-
-    console.log('✓ Registro creado:', docRef.id);
-    res.json({ 
-      id: docRef.id, 
-      idCambio,
-      nombreCambio,
-      cliente,
-      horas: horasNumero,
-      especialista: req.usuario.nombre,
-      estado: 'pendiente'
+    
+    // Registrar en auditoría
+    await db.collection('auditoria').add({
+      accion: 'CREAR_REGISTRO',
+      usuarioNombre: req.usuario.nombre,
+      usuarioRol: req.usuario.rol,
+      timestamp: new Date(),
+      camposModificados: { idCambio, horas }
     });
+    
+    res.json({ id: docRef.id, ...req.body });
   } catch (err) {
-    console.error('✗ Error en POST /api/registros:', err);
-    res.status(500).json({ error: 'Error al registrar: ' + err.message });
+    console.error('Error en POST /api/registros:', err);
+    res.status(500).json({ error: 'Error al crear registro' });
   }
 });
 
-// Update registro
-app.patch('/api/registros/:id', verificarToken, async (req, res) => {
-  try {
-    await db.collection('registros').doc(req.params.id).update(req.body);
-    res.json({ id: req.params.id, ...req.body });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// Aprobar
+// PATCH aprobar registro
 app.patch('/api/registros/:id/aprobar', verificarToken, async (req, res) => {
   try {
-    if (!['coordinador', 'admin'].includes(req.usuario.rol)) {
+    if (req.usuario.rol !== 'coordinador' && req.usuario.rol !== 'admin') {
       return res.status(403).json({ error: 'No autorizado' });
     }
-
+    
     await db.collection('registros').doc(req.params.id).update({
       estado: 'aprobado',
-      aprobadoPor: req.usuario.nombre,
-      aprobadoEn: new Date()
+      updatedAt: new Date(),
+      updatedBy: req.usuario.usuario
     });
-
-    res.json({ id: req.params.id, estado: 'aprobado' });
+    
+    // Registrar en auditoría
+    await db.collection('auditoria').add({
+      accion: 'APROBAR_REGISTRO',
+      usuarioNombre: req.usuario.nombre,
+      usuarioRol: req.usuario.rol,
+      timestamp: new Date(),
+      registroId: req.params.id
+    });
+    
+    res.json({ message: 'Registro aprobado' });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error('Error en PATCH /aprobar:', err);
+    res.status(500).json({ error: 'Error al aprobar' });
   }
 });
 
-// Rechazar
+// PATCH rechazar registro
 app.patch('/api/registros/:id/rechazar', verificarToken, async (req, res) => {
   try {
-    if (!['coordinador', 'admin'].includes(req.usuario.rol)) {
+    if (req.usuario.rol !== 'coordinador' && req.usuario.rol !== 'admin') {
       return res.status(403).json({ error: 'No autorizado' });
     }
-
+    
     await db.collection('registros').doc(req.params.id).update({
       estado: 'rechazado',
-      rechazadoPor: req.usuario.nombre,
-      rechazadoEn: new Date()
+      updatedAt: new Date(),
+      updatedBy: req.usuario.usuario
     });
-
-    res.json({ id: req.params.id, estado: 'rechazado' });
+    
+    // Registrar en auditoría
+    await db.collection('auditoria').add({
+      accion: 'RECHAZAR_REGISTRO',
+      usuarioNombre: req.usuario.nombre,
+      usuarioRol: req.usuario.rol,
+      timestamp: new Date(),
+      registroId: req.params.id
+    });
+    
+    res.json({ message: 'Registro rechazado' });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error('Error en PATCH /rechazar:', err);
+    res.status(500).json({ error: 'Error al rechazar' });
   }
 });
 
-// Auditoría (solo admin)
+// ============================================
+// RUTAS: DASHBOARD
+// ============================================
+
+app.get('/api/dashboard/resumen', verificarToken, async (req, res) => {
+  try {
+    const snapshot = await db.collection('registros').get();
+    
+    let totalRegistros = 0;
+    let totalHoras = 0;
+    let pendientes = 0;
+    let aprobados = 0;
+    let rechazados = 0;
+    
+    snapshot.forEach(doc => {
+      const data = doc.data();
+      totalRegistros++;
+      totalHoras += parseFloat(data.horas || 0);
+      
+      if (data.estado === 'pendiente') pendientes++;
+      if (data.estado === 'aprobado') aprobados++;
+      if (data.estado === 'rechazado') rechazados++;
+    });
+    
+    res.json({
+      totalRegistros,
+      totalHoras: totalHoras.toFixed(1),
+      pendientes,
+      aprobados,
+      rechazados
+    });
+  } catch (err) {
+    console.error('Error en GET /dashboard:', err);
+    res.status(500).json({ error: 'Error al obtener dashboard' });
+  }
+});
+
+// ============================================
+// RUTAS: AUDITORÍA
+// ============================================
+
 app.get('/api/auditoria', verificarToken, async (req, res) => {
   try {
     if (req.usuario.rol !== 'admin') {
-      return res.status(403).json({ error: 'Solo admin' });
+      return res.status(403).json({ error: 'No autorizado' });
     }
-
-    const snap = await db.collection('auditoria')
-      .orderBy('timestamp', 'desc')
-      .limit(100)
-      .get();
     
+    const snapshot = await db.collection('auditoria').orderBy('timestamp', 'desc').limit(100).get();
     const logs = [];
-    snap.forEach(doc => logs.push({ id: doc.id, ...doc.data() }));
+    
+    snapshot.forEach(doc => {
+      logs.push({
+        id: doc.id,
+        ...doc.data()
+      });
+    });
     
     res.json(logs);
   } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// Dashboard
-app.get('/api/dashboard/resumen', verificarToken, async (req, res) => {
-  try {
-    const snap = await db.collection('registros').get();
-    const registros = [];
-    snap.forEach(doc => registros.push(doc.data()));
-
-    const resultado = {
-      totalRegistros: registros.length,
-      totalHoras: registros.reduce((sum, r) => sum + (parseFloat(r.horas) || 0), 0),
-      pendientes: registros.filter(r => r.estado === 'pendiente').length,
-      aprobados: registros.filter(r => r.estado === 'aprobado').length,
-      rechazados: registros.filter(r => r.estado === 'rechazado').length
-    };
-
-    res.json(resultado);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error('Error en GET /auditoria:', err);
+    res.status(500).json({ error: 'Error al obtener auditoría' });
   }
 });
 
 // ============================================
-// INICIAR SERVIDOR
+// HEALTH CHECK
 // ============================================
+
+app.get('/health', (req, res) => {
+  res.json({ status: 'ok', timestamp: new Date() });
+});
+
+app.get('/', (req, res) => {
+  res.json({ 
+    message: 'Sistema OVT - Backend API',
+    version: '1.0.0',
+    endpoints: [
+      'POST /api/auth/login',
+      'GET /api/registros',
+      'POST /api/registros',
+      'PATCH /api/registros/:id/aprobar',
+      'PATCH /api/registros/:id/rechazar',
+      'GET /api/dashboard/resumen',
+      'GET /api/auditoria'
+    ]
+  });
+});
+
+// ============================================
+// ERROR HANDLER
+// ============================================
+
+app.use((err, req, res, next) => {
+  console.error('Error no manejado:', err);
+  res.status(500).json({ error: 'Error interno del servidor' });
+});
+
+// ============================================
+// START SERVER
+// ============================================
+
 app.listen(PORT, () => {
-  console.log('\n' + '='.repeat(50));
+  console.log('==================================================');
   console.log('✓ SERVIDOR OVT INICIADO CORRECTAMENTE');
-  console.log('='.repeat(50));
-  console.log(`✓ Puerto: ${PORT}`);
+  console.log('==================================================');
+  console.log('✓ Puerto:', PORT);
   console.log('✓ Firebase: CONECTADO');
   console.log('✓ Auditoría: ACTIVA');
   console.log('✓ 22 especialistas + coordinador + admin');
-  console.log('='.repeat(50) + '\n');
-});
-
-// Manejo de errores sin capturar
-process.on('uncaughtException', (err) => {
-  console.error('✗ Error no capturado:', err.message);
-});
-
-process.on('unhandledRejection', (reason, promise) => {
-  console.error('✗ Promise rechazada sin manejo:', reason);
+  console.log('==================================================');
 });
