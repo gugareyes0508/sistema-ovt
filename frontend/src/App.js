@@ -150,7 +150,7 @@ function App() {
         setEditandoId(null);
       } else {
         // Crear nuevo registro
-        const response = await axios.post(`${API_URL}/api/registros`, formulario, {
+        await axios.post(`${API_URL}/api/registros`, formulario, {
           headers: { Authorization: `Bearer ${token}` }
         });
         alert('✓ Registro guardado correctamente');
