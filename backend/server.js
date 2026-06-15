@@ -1,14 +1,42 @@
 const express = require('express');
 const cors = require('cors');
 const jwt = require('jsonwebtoken');
+const fs = require('fs');
 const path = require('path');
 require('dotenv').config();
 
 const admin = require('firebase-admin');
 
-// Cargar credenciales Firebase desde archivo JSON
-const serviceAccount = require('./firebase-key.json');
+// ============================================
+// CREAR firebase-key.json DESDE VARIABLE
+// ============================================
+let serviceAccount;
 
+if (process.env.FIREBASE_KEY_JSON) {
+  // Modo producción (Railway): Leer desde variable
+  try {
+    serviceAccount = JSON.parse(process.env.FIREBASE_KEY_JSON);
+    console.log('✓ Firebase config desde variable de entorno');
+  } catch (err) {
+    console.error('✗ Error parseando FIREBASE_KEY_JSON:', err.message);
+    process.exit(1);
+  }
+} else if (fs.existsSync('./firebase-key.json')) {
+  // Modo desarrollo local: Leer desde archivo
+  try {
+    serviceAccount = require('./firebase-key.json');
+    console.log('✓ Firebase config desde archivo local');
+  } catch (err) {
+    console.error('✗ Error leyendo firebase-key.json:', err.message);
+    process.exit(1);
+  }
+} else {
+  console.error('✗ No se encontró configuración de Firebase');
+  console.error('   Configura FIREBASE_KEY_JSON en variables de entorno o crea firebase-key.json');
+  process.exit(1);
+}
+
+// Inicializar Firebase
 try {
   admin.initializeApp({
     credential: admin.credential.cert(serviceAccount),
@@ -28,9 +56,11 @@ app.use(cors({ origin: '*' }));
 app.use(express.json());
 
 const PORT = process.env.PORT || 3001;
-const JWT_SECRET = process.env.JWT_SECRET || 'secreto-demo';
+const JWT_SECRET = process.env.JWT_SECRET || 'secreto-demo-cambiar';
 
-// Usuarios de prueba
+// ============================================
+// USUARIOS DE PRUEBA
+// ============================================
 const usuarios = {
   'jorge.maureira': { rol: 'especialista', nombre: 'Jorge Maureira', contrasena: 'demo123' },
   'jhon.estrada': { rol: 'especialista', nombre: 'Jhon Estrada', contrasena: 'demo123' },
@@ -58,7 +88,9 @@ const usuarios = {
   'admin': { rol: 'admin', nombre: 'Administrador', contrasena: 'demo123' }
 };
 
-// Verificar JWT
+// ============================================
+// MIDDLEWARE: Verificar JWT
+// ============================================
 function verificarToken(req, res, next) {
   const token = req.headers.authorization?.split(' ')[1];
   if (!token) return res.status(401).json({ error: 'Sin token' });
@@ -71,7 +103,11 @@ function verificarToken(req, res, next) {
   }
 }
 
-// LOGIN
+// ============================================
+// ENDPOINTS
+// ============================================
+
+// Login
 app.post('/api/auth/login', async (req, res) => {
   try {
     const { usuario, contrasena } = req.body;
@@ -87,7 +123,6 @@ app.post('/api/auth/login', async (req, res) => {
       { expiresIn: '24h' }
     );
 
-    // Log en auditoría
     await db.collection('auditoria').add({
       accion: 'login',
       usuario,
@@ -102,7 +137,7 @@ app.post('/api/auth/login', async (req, res) => {
   }
 });
 
-// GET registros
+// Get registros
 app.get('/api/registros', verificarToken, async (req, res) => {
   try {
     let query = db.collection('registros');
@@ -119,7 +154,7 @@ app.get('/api/registros', verificarToken, async (req, res) => {
   }
 });
 
-// POST registros
+// Create registro
 app.post('/api/registros', verificarToken, async (req, res) => {
   try {
     const { idCambio, nombreCambio, cliente, horas } = req.body;
@@ -140,7 +175,17 @@ app.post('/api/registros', verificarToken, async (req, res) => {
   }
 });
 
-// PATCH aprobar
+// Update registro
+app.patch('/api/registros/:id', verificarToken, async (req, res) => {
+  try {
+    await db.collection('registros').doc(req.params.id).update(req.body);
+    res.json({ id: req.params.id, ...req.body });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Aprobar
 app.patch('/api/registros/:id/aprobar', verificarToken, async (req, res) => {
   try {
     if (req.usuario.rol !== 'coordinador' && req.usuario.rol !== 'admin') {
@@ -159,7 +204,7 @@ app.patch('/api/registros/:id/aprobar', verificarToken, async (req, res) => {
   }
 });
 
-// PATCH rechazar
+// Rechazar
 app.patch('/api/registros/:id/rechazar', verificarToken, async (req, res) => {
   try {
     if (req.usuario.rol !== 'coordinador' && req.usuario.rol !== 'admin') {
@@ -178,7 +223,7 @@ app.patch('/api/registros/:id/rechazar', verificarToken, async (req, res) => {
   }
 });
 
-// GET auditoría
+// Auditoría
 app.get('/api/auditoria', verificarToken, async (req, res) => {
   try {
     if (req.usuario.rol !== 'admin') {
@@ -194,7 +239,7 @@ app.get('/api/auditoria', verificarToken, async (req, res) => {
   }
 });
 
-// GET dashboard
+// Dashboard
 app.get('/api/dashboard/resumen', verificarToken, async (req, res) => {
   try {
     const snap = await db.collection('registros').get();
@@ -218,12 +263,12 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date() });
 });
 
-// Iniciar
+// Iniciar servidor
 app.listen(PORT, () => {
   console.log('\n==================================================');
   console.log('✓ SERVIDOR OVT ACTIVO');
   console.log('✓ Puerto: ' + PORT);
-  console.log('✓ Firebase: Conectado');
+  console.log('✓ Firebase: CONECTADO');
   console.log('✓ Auditoría: ACTIVA');
   console.log('==================================================\n');
 });
