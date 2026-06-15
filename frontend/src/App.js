@@ -162,12 +162,9 @@ function App() {
             <input type="password" name="contrasena" placeholder="Contraseña" required />
             <button type="submit">Iniciar Sesión</button>
           </form>
-          <div className="demo-info">
-            <p><strong>Usuarios Demo:</strong></p>
-            <p>👤 Especialista: <code>jorge.maureira</code></p>
-            <p>👥 Coordinador: <code>maria.admin</code></p>
-            <p>🔑 Admin: <code>admin</code></p>
-            <p><strong>Contraseña:</strong> <code>demo123</code></p>
+          <div className="login-footer">
+            <p>Sistema de Control de Overtime - Kyndryl Chile</p>
+            <p className="version">v1.0.0</p>
           </div>
         </div>
       </div>
