@@ -10,6 +10,7 @@ function App() {
   const [registros, setRegistros] = useState([]);
   const [vista, setVista] = useState('registros');
   const [auditoria, setAuditoria] = useState([]);
+  const [editandoId, setEditandoId] = useState(null);
   
   // Formulario mejorado
   const [formulario, setFormulario] = useState({
@@ -22,7 +23,7 @@ function App() {
     especialista: usuario.nombre || '',
     interno_cliente: 'interno',
     genera_ovt: 'no',
-    estado: 'pendiente',
+    estado: 'exitoso',
     especialidad: 'operaciones'
   });
 
@@ -136,13 +137,26 @@ function App() {
     setUsuario({});
   };
 
-  // Registrar cambio/alerta
+  // Registrar o actualizar cambio/alerta
   const manejarRegistro = async (e) => {
     e.preventDefault();
     try {
-      await axios.post(`${API_URL}/api/registros`, formulario, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      if (editandoId) {
+        // Actualizar registro
+        await axios.patch(`${API_URL}/api/registros/${editandoId}`, formulario, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        alert('✓ Registro actualizado correctamente');
+        setEditandoId(null);
+      } else {
+        // Crear nuevo registro
+        const response = await axios.post(`${API_URL}/api/registros`, formulario, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        alert('✓ Registro guardado correctamente');
+      }
+      
+      // Limpiar formulario
       setFormulario({
         tipo: 'cambio',
         descripcion: '',
@@ -153,14 +167,77 @@ function App() {
         especialista: usuario.nombre || '',
         interno_cliente: 'interno',
         genera_ovt: 'no',
-        estado: 'pendiente',
+        estado: 'exitoso',
         especialidad: 'operaciones'
+      });
+      
+      // Recargar
+      setTimeout(() => {
+        cargarRegistros();
+        cargarDashboard();
+      }, 500);
+    } catch (err) {
+      console.error('Error:', err);
+      alert('Error: ' + (err.response?.data?.error || err.message));
+    }
+  };
+
+  // Cargar registro para editar
+  const cargarParaEditar = (registro) => {
+    // Admin puede editar cualquier registro, especialista solo los suyos
+    if (usuario.rol === 'especialista' && registro.createdBy !== usuario.usuario) {
+      alert('Solo puedes editar tus propios registros');
+      return;
+    }
+    
+    setEditandoId(registro.id);
+    setFormulario({
+      tipo: registro.tipo,
+      descripcion: registro.descripcion,
+      cliente: registro.cliente,
+      fechaInicio: registro.fechaInicio?.toDate?.() || new Date(registro.fechaInicio),
+      fechaFin: registro.fechaFin?.toDate?.() || new Date(registro.fechaFin),
+      horas: registro.horas,
+      especialista: registro.especialista,
+      interno_cliente: registro.interno_cliente,
+      genera_ovt: registro.genera_ovt,
+      estado: registro.estado,
+      especialidad: registro.especialidad
+    });
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  // Cancelar edición
+  const cancelarEdicion = () => {
+    setEditandoId(null);
+    setFormulario({
+      tipo: 'cambio',
+      descripcion: '',
+      cliente: 'Banco de Chile',
+      fechaInicio: new Date(),
+      fechaFin: new Date(),
+      horas: 0,
+      especialista: usuario.nombre || '',
+      interno_cliente: 'interno',
+      genera_ovt: 'no',
+      estado: 'exitoso',
+      especialidad: 'operaciones'
+    });
+  };
+
+  // Eliminar registro (Solo Admin)
+  const manejarEliminar = async (id) => {
+    if (!window.confirm('¿Estás seguro de eliminar este registro?')) return;
+    
+    try {
+      await axios.delete(`${API_URL}/api/registros/${id}`, {
+        headers: { Authorization: `Bearer ${token}` }
       });
       cargarRegistros();
       cargarDashboard();
-      alert('Registro guardado correctamente');
+      alert('✓ Registro eliminado');
     } catch (err) {
-      alert('Error: ' + err.message);
+      alert('Error: ' + (err.response?.data?.error || err.message));
     }
   };
 
@@ -277,7 +354,7 @@ function App() {
         {/* SECCIÓN: REGISTRAR CAMBIO/ALERTA */}
         {vista === 'registros' && (
           <section className="seccion">
-            <h2>📋 Registrar Cambio o Alerta</h2>
+            <h2>📋 {editandoId ? '✏️ Editar Cambio/Alerta' : 'Registrar Cambio o Alerta'}</h2>
             
             <form onSubmit={manejarRegistro} className="formulario-mejorado">
               <div className="form-row">
@@ -299,9 +376,9 @@ function App() {
                     value={formulario.estado}
                     onChange={(e) => setFormulario({ ...formulario, estado: e.target.value })}
                   >
-                    <option value="pendiente">Pendiente</option>
                     <option value="exitoso">Exitoso</option>
                     <option value="fallido">Fallido</option>
+                    <option value="pendiente">Pendiente</option>
                   </select>
                 </div>
 
@@ -371,8 +448,16 @@ function App() {
                   <label>Fecha/Hora Inicio *</label>
                   <input
                     type="datetime-local"
-                    value={formulario.fechaInicio.toISOString().slice(0, 16)}
-                    onChange={(e) => handleFechaChange('fechaInicio', new Date(e.target.value))}
+                    value={formulario.fechaInicio instanceof Date ? 
+                      formulario.fechaInicio.toISOString().slice(0, 16) : 
+                      new Date(formulario.fechaInicio).toISOString().slice(0, 16)
+                    }
+                    onChange={(e) => {
+                      if (e.target.value) {
+                        const fecha = new Date(e.target.value);
+                        handleFechaChange('fechaInicio', fecha);
+                      }
+                    }}
                   />
                 </div>
 
@@ -380,8 +465,16 @@ function App() {
                   <label>Fecha/Hora Fin *</label>
                   <input
                     type="datetime-local"
-                    value={formulario.fechaFin.toISOString().slice(0, 16)}
-                    onChange={(e) => handleFechaChange('fechaFin', new Date(e.target.value))}
+                    value={formulario.fechaFin instanceof Date ? 
+                      formulario.fechaFin.toISOString().slice(0, 16) : 
+                      new Date(formulario.fechaFin).toISOString().slice(0, 16)
+                    }
+                    onChange={(e) => {
+                      if (e.target.value) {
+                        const fecha = new Date(e.target.value);
+                        handleFechaChange('fechaFin', fecha);
+                      }
+                    }}
                   />
                 </div>
 
@@ -410,7 +503,14 @@ function App() {
                 </div>
               </div>
 
-              <button type="submit" className="btn-primary">✓ Guardar Registro</button>
+              <button type="submit" className="btn-primary">
+                {editandoId ? '✏️ Actualizar Registro' : '✓ Guardar Registro'}
+              </button>
+              {editandoId && (
+                <button type="button" onClick={cancelarEdicion} className="btn-cancelar">
+                  ✗ Cancelar Edición
+                </button>
+              )}
             </form>
 
             <h3>Mis Registros</h3>
@@ -426,6 +526,7 @@ function App() {
                     <th>Horas</th>
                     <th>Estado</th>
                     <th>Inicio</th>
+                    <th>Acciones</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -440,7 +541,28 @@ function App() {
                           {r.estado}
                         </span>
                       </td>
-                      <td>{r.fechaInicio ? new Date(r.fechaInicio).toLocaleDateString('es-CL') : '-'}</td>
+                      <td>
+                        {r.fechaInicio ? 
+                          new Date(r.fechaInicio.toDate?.() || r.fechaInicio).toLocaleDateString('es-CL')
+                          : 'Sin fecha'
+                        }
+                      </td>
+                      <td>
+                        <button 
+                          className="btn-editar"
+                          onClick={() => cargarParaEditar(r)}
+                        >
+                          ✏️ Editar
+                        </button>
+                        {usuario.rol === 'admin' && (
+                          <button 
+                            className="btn-eliminar"
+                            onClick={() => manejarEliminar(r.id)}
+                          >
+                            🗑️ Eliminar
+                          </button>
+                        )}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -482,14 +604,18 @@ function App() {
                           </span>
                         </td>
                         <td className="acciones">
-                          {usuario.rol === 'admin' && (
-                            <button 
-                              className="btn-eliminar"
-                              onClick={() => manejarEliminar(r.id)}
-                            >
-                              🗑️ Eliminar
-                            </button>
-                          )}
+                          <button 
+                            className="btn-editar"
+                            onClick={() => cargarParaEditar(r)}
+                          >
+                            ✏️ Editar
+                          </button>
+                          <button 
+                            className="btn-eliminar"
+                            onClick={() => manejarEliminar(r.id)}
+                          >
+                            🗑️ Eliminar
+                          </button>
                         </td>
                       </tr>
                     ))}
