@@ -947,6 +947,13 @@ function App() {
                         </span>
                       </td>
                       <td>{parseDate(r.fechaInicio)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </section>
+        )}
 
         {/* SECCIÓN: AUDITORÍA */}
         {vista === 'auditoria' && usuario.rol === 'admin' && (
