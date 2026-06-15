@@ -22,7 +22,7 @@ function App() {
     horas: 0,
     especialista: usuario.nombre || '',
     interno_cliente: 'interno',
-    genera_ovt: 'no',
+    genera_ovt: 'si',
     estado: 'pendiente',
     especialidad: 'operaciones'
   });
@@ -153,7 +153,7 @@ function App() {
         await axios.post(`${API_URL}/api/registros`, formulario, {
           headers: { Authorization: `Bearer ${token}` }
         });
-        alert('✓ Registro guardado correctamente');
+        alert('✓ ¡Registro guardado exitosamente!');
       }
       
       // Limpiar formulario
@@ -166,16 +166,16 @@ function App() {
         horas: 0,
         especialista: usuario.nombre || '',
         interno_cliente: 'interno',
-        genera_ovt: 'no',
+        genera_ovt: 'si',
         estado: 'pendiente',
         especialidad: 'operaciones'
       });
       
-      // Recargar después de un pequeño delay
+      // Recargar después de 1 segundo
       setTimeout(() => {
         cargarRegistros();
         cargarDashboard();
-      }, 800);
+      }, 1000);
     } catch (err) {
       console.error('Error:', err);
       alert('Error: ' + (err.response?.data?.error || err.message));
@@ -219,7 +219,7 @@ function App() {
       horas: 0,
       especialista: usuario.nombre || '',
       interno_cliente: 'interno',
-      genera_ovt: 'no',
+      genera_ovt: 'si',
       estado: 'pendiente',
       especialidad: 'operaciones'
     });
@@ -399,9 +399,9 @@ function App() {
                   <label>Especialista</label>
                   <input
                     type="text"
-                    value={formulario.especialista}
+                    value={usuario.nombre || formulario.especialista}
                     disabled
-                    className="input-disabled"
+                    style={{backgroundColor: '#e8f5e9', cursor: 'not-allowed', fontWeight: 'bold'}}
                   />
                 </div>
 
@@ -431,16 +431,17 @@ function App() {
 
               <div className="form-row">
                 <div className="form-group">
-                  <label>Fecha/Hora Inicio *</label>
+                  <label>Fecha Inicio *</label>
                   <input
-                    type="datetime-local"
+                    type="date"
                     value={formulario.fechaInicio instanceof Date ? 
-                      formulario.fechaInicio.toISOString().slice(0, 16) : 
-                      new Date(formulario.fechaInicio).toISOString().slice(0, 16)
+                      formulario.fechaInicio.toISOString().split('T')[0]
+                      : ''
                     }
                     onChange={(e) => {
                       if (e.target.value) {
                         const fecha = new Date(e.target.value);
+                        fecha.setHours(formulario.fechaInicio.getHours(), formulario.fechaInicio.getMinutes());
                         handleFechaChange('fechaInicio', fecha);
                       }
                     }}
@@ -448,17 +449,66 @@ function App() {
                 </div>
 
                 <div className="form-group">
-                  <label>Fecha/Hora Fin *</label>
+                  <label>Hora Inicio * (HH:MM)</label>
                   <input
-                    type="datetime-local"
+                    type="text"
+                    placeholder="07:15"
+                    maxLength="5"
+                    value={formulario.fechaInicio instanceof Date ? 
+                      formulario.fechaInicio.toLocaleTimeString('es-CL', {hour: '2-digit', minute: '2-digit', hour12: false})
+                      : ''
+                    }
+                    onChange={(e) => {
+                      const valor = e.target.value;
+                      if (valor && valor.length === 5 && valor.includes(':')) {
+                        const [horas, minutos] = valor.split(':');
+                        if (parseInt(horas) >= 0 && parseInt(horas) < 24 && parseInt(minutos) >= 0 && parseInt(minutos) < 60) {
+                          const nuevaFecha = new Date(formulario.fechaInicio);
+                          nuevaFecha.setHours(parseInt(horas), parseInt(minutos));
+                          handleFechaChange('fechaInicio', nuevaFecha);
+                        }
+                      }
+                    }}
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label>Fecha Fin *</label>
+                  <input
+                    type="date"
                     value={formulario.fechaFin instanceof Date ? 
-                      formulario.fechaFin.toISOString().slice(0, 16) : 
-                      new Date(formulario.fechaFin).toISOString().slice(0, 16)
+                      formulario.fechaFin.toISOString().split('T')[0]
+                      : ''
                     }
                     onChange={(e) => {
                       if (e.target.value) {
                         const fecha = new Date(e.target.value);
+                        fecha.setHours(formulario.fechaFin.getHours(), formulario.fechaFin.getMinutes());
                         handleFechaChange('fechaFin', fecha);
+                      }
+                    }}
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label>Hora Fin * (HH:MM)</label>
+                  <input
+                    type="text"
+                    placeholder="08:15"
+                    maxLength="5"
+                    value={formulario.fechaFin instanceof Date ? 
+                      formulario.fechaFin.toLocaleTimeString('es-CL', {hour: '2-digit', minute: '2-digit', hour12: false})
+                      : ''
+                    }
+                    onChange={(e) => {
+                      const valor = e.target.value;
+                      if (valor && valor.length === 5 && valor.includes(':')) {
+                        const [horas, minutos] = valor.split(':');
+                        if (parseInt(horas) >= 0 && parseInt(horas) < 24 && parseInt(minutos) >= 0 && parseInt(minutos) < 60) {
+                          const nuevaFecha = new Date(formulario.fechaFin);
+                          nuevaFecha.setHours(parseInt(horas), parseInt(minutos));
+                          handleFechaChange('fechaFin', nuevaFecha);
+                        }
                       }
                     }}
                   />
@@ -615,7 +665,9 @@ function App() {
         {/* SECCIÓN: MI RESUMEN (Especialista) */}
         {vista === 'resumen' && usuario.rol === 'especialista' && (
           <section className="seccion">
-            <h2>📊 Mi Resumen del Mes</h2>
+            <h2>📊 Mi Resumen</h2>
+            
+            {/* Tarjetas de resumen */}
             <div className="dashboard-grid">
               <div className="card card-blue">
                 <h3>📋 Registros Este Mes</h3>
@@ -630,6 +682,86 @@ function App() {
                 <p className="numero">{dashboard.registrosPendientes || 0}</p>
               </div>
             </div>
+
+            {/* Filtros */}
+            <div className="filtros-dashboard">
+              <div className="form-group">
+                <label>Desde</label>
+                <input
+                  type="date"
+                  value={filtros.fechaInicio ? filtros.fechaInicio.toISOString().split('T')[0] : ''}
+                  onChange={(e) => setFiltros({ ...filtros, fechaInicio: e.target.value ? new Date(e.target.value) : null })}
+                />
+              </div>
+
+              <div className="form-group">
+                <label>Hasta</label>
+                <input
+                  type="date"
+                  value={filtros.fechaFin ? filtros.fechaFin.toISOString().split('T')[0] : ''}
+                  onChange={(e) => setFiltros({ ...filtros, fechaFin: e.target.value ? new Date(e.target.value) : null })}
+                />
+              </div>
+
+              <div className="form-group">
+                <label>Estado</label>
+                <select
+                  value={filtros.estado || ''}
+                  onChange={(e) => setFiltros({ ...filtros, estado: e.target.value || null })}
+                >
+                  <option value="">Todos</option>
+                  <option value="pendiente">Pendiente</option>
+                  <option value="exitoso">Exitoso</option>
+                  <option value="fallido">Fallido</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Tabla de registros */}
+            <h3>Mis Registros</h3>
+            {registros.length === 0 ? (
+              <p className="sin-datos">No hay registros</p>
+            ) : (
+              <table className="tabla">
+                <thead>
+                  <tr>
+                    <th>Tipo</th>
+                    <th>Descripción</th>
+                    <th>Cliente</th>
+                    <th>Fecha Inicio</th>
+                    <th>Horas</th>
+                    <th>Estado</th>
+                    <th>Genera OVT</th>
+                    <th>Acciones</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {registros.map(r => (
+                    <tr key={r.id}>
+                      <td><strong>{r.tipo}</strong></td>
+                      <td>{r.descripcion?.substring(0, 25)}</td>
+                      <td>{r.cliente}</td>
+                      <td>{r.fechaInicio ? new Date(r.fechaInicio.toDate?.() || r.fechaInicio).toLocaleDateString('es-CL') : '-'}</td>
+                      <td className="numero">{r.horas}h</td>
+                      <td>
+                        <span className={`badge badge-${r.estado}`}>
+                          {r.estado}
+                        </span>
+                      </td>
+                      <td>{r.genera_ovt === 'si' ? '✓' : '✗'}</td>
+                      <td className="acciones">
+                        <button 
+                          className="btn-editar"
+                          onClick={() => cargarParaEditar(r)}
+                        >
+                          ✏️ Editar
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
           </section>
         )}
 
