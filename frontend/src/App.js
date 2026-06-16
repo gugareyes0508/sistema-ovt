@@ -204,12 +204,24 @@ function App() {
   const cargarParaEditar = (registro) => {
     // Admin puede editar cualquier registro, especialista solo los suyos
     if (usuario.rol === 'especialista' && registro.createdBy !== usuario.usuario) {
-      alert('Solo puedes editar tus propios registros');
+      alert('❌ Solo puedes editar tus propios registros');
       return;
     }
     
-    // Si es especialista, cambiar a vista de registro
+    // Especialista: No puede editar si está pendiente o aprobado
     if (usuario.rol === 'especialista') {
+      if (registro.estado === 'pendiente') {
+        alert('❌ No puedes editar este registro mientras está pendiente de aprobación.\n\nEspera a que el administrador lo apruebe o rechace.');
+        return;
+      }
+      if (registro.estado === 'exitoso') {
+        alert('❌ No puedes editar este registro porque ya ha sido aprobado.\n\nSolo puedes editar registros rechazados.');
+        return;
+      }
+      // Si es fallido (rechazado), permitir editar
+      if (registro.estado === 'fallido') {
+        alert('ℹ️ Editando registro rechazado.\n\nPuedes corregir y volver a enviarlo para aprobación.');
+      }
       setVista('registrar');
     }
     
@@ -962,12 +974,33 @@ function App() {
                       </td>
                       <td>{r.genera_ovt === 'si' ? '✓' : '✗'}</td>
                       <td className="acciones">
-                        <button 
-                          className="btn-editar"
-                          onClick={() => cargarParaEditar(r)}
-                        >
-                          ✏️ Editar
-                        </button>
+                        {r.estado === 'pendiente' ? (
+                          <button 
+                            className="btn-editar"
+                            disabled
+                            title="No puedes editar mientras está pendiente de aprobación"
+                            style={{opacity: 0.5, cursor: 'not-allowed'}}
+                          >
+                            ⏳ Pendiente
+                          </button>
+                        ) : r.estado === 'exitoso' ? (
+                          <button 
+                            className="btn-editar"
+                            disabled
+                            title="No puedes editar registros aprobados"
+                            style={{opacity: 0.5, cursor: 'not-allowed'}}
+                          >
+                            ✅ Aprobado
+                          </button>
+                        ) : (
+                          <button 
+                            className="btn-editar"
+                            onClick={() => cargarParaEditar(r)}
+                            title="Editar registro rechazado"
+                          >
+                            ✏️ Editar
+                          </button>
+                        )}
                       </td>
                     </tr>
                   ))}
