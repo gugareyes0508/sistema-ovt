@@ -616,7 +616,7 @@ function App() {
                   <input
                     type="date"
                     value={formulario.fechaInicio instanceof Date ? 
-                      formulario.fechaInicio.toISOString().split('T')[0]
+                      (formulario.fechaInicio instanceof Date ? formulario.fechaInicio.toISOString().split('T')[0] : formulario.fechaInicio)
                       : ''
                     }
                     onChange={(e) => {
@@ -655,7 +655,7 @@ function App() {
                   <input
                     type="date"
                     value={formulario.fechaFin instanceof Date ? 
-                      formulario.fechaFin.toISOString().split('T')[0]
+                      (formulario.fechaFin instanceof Date ? formulario.fechaFin.toISOString().split('T')[0] : formulario.fechaFin)
                       : ''
                     }
                     onChange={(e) => {
@@ -1537,7 +1537,7 @@ function App() {
                   <label style={{display: 'block', fontWeight: '600', marginBottom: '5px', fontSize: '14px'}}>Fecha Inicio *</label>
                   <input 
                     type="date"
-                    value={formularioModal.fechaInicio ? formularioModal.fechaInicio.toISOString().split('T')[0] : ''}
+                    value={formularioModal.fechaInicio ? (formularioModal.fechaInicio instanceof Date ? formularioModal.fechaInicio.toISOString().split('T')[0] : formularioModal.fechaInicio) : ''}
                     onChange={(e) => {
                       if (!e.target.value) return;
                       const fecha = new Date(e.target.value + 'T12:00:00');
@@ -1579,7 +1579,7 @@ function App() {
                   <label style={{display: 'block', fontWeight: '600', marginBottom: '5px', fontSize: '14px'}}>Fecha Fin *</label>
                   <input 
                     type="date"
-                    value={formularioModal.fechaFin ? formularioModal.fechaFin.toISOString().split('T')[0] : ''}
+                    value={formularioModal.fechaFin ? (formularioModal.fechaFin instanceof Date ? formularioModal.fechaFin.toISOString().split('T')[0] : formularioModal.fechaFin) : ''}
                     onChange={(e) => {
                       if (!e.target.value) return;
                       const fecha = new Date(e.target.value + 'T12:00:00');
