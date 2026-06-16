@@ -872,16 +872,16 @@ function App() {
             {/* Tarjetas de resumen */}
             <div className="dashboard-grid">
               <div className="card card-blue">
-                <h3>📋 Registros Este Mes</h3>
-                <p className="numero">{registros.filter(r => r.createdBy === usuario.usuario).length}</p>
+                <h3>📋 Registros</h3>
+                <p className="numero">{misRegistrosFiltrados.length}</p>
               </div>
               <div className="card card-green">
                 <h3>✅ Horas Aprobadas</h3>
-                <p className="numero">{registros.filter(r => r.createdBy === usuario.usuario && r.estado === 'exitoso').reduce((sum, r) => sum + (r.horas || 0), 0)}h</p>
+                <p className="numero">{misRegistrosFiltrados.filter(r => r.estado === 'exitoso').reduce((sum, r) => sum + (r.horas || 0), 0)}h</p>
               </div>
               <div className="card card-yellow">
                 <h3>⏳ Registros Pendientes</h3>
-                <p className="numero">{registros.filter(r => r.createdBy === usuario.usuario && r.estado === 'pendiente').length}</p>
+                <p className="numero">{misRegistrosFiltrados.filter(r => r.estado === 'pendiente').length}</p>
               </div>
             </div>
 
