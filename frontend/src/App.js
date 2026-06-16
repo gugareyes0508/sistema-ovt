@@ -263,8 +263,17 @@ function App() {
   const registrosFiltrados = registros.filter(r => {
     if (!r.fechaInicio) return false;
     const fecha = r.fechaInicio.toDate?.() || new Date(r.fechaInicio);
-    return fecha.getMonth() === filtros.mes - 1 && fecha.getFullYear() === filtros.anio;
+    const match = fecha.getMonth() === filtros.mes - 1 && fecha.getFullYear() === filtros.anio;
+    return match;
   });
+
+  // Debug: mostrar en consola
+  React.useEffect(() => {
+    console.log(`[Dashboard] Filtros: mes=${filtros.mes}, año=${filtros.anio}`);
+    console.log(`[Dashboard] Total registros: ${registros.length}`);
+    console.log(`[Dashboard] Registros filtrados: ${registrosFiltrados.length}`);
+    console.log(`[Dashboard] Primeros 3 registros:`, registros.slice(0, 3));
+  }, [filtros.mes, filtros.anio, registros.length, registrosFiltrados.length]);
 
   // Contar estados del mes filtrado
   const pendientes = registrosFiltrados.filter(r => r.estado === 'pendiente').length;
@@ -879,9 +888,11 @@ function App() {
                   value={filtros.anio}
                   onChange={(e) => setFiltros({ ...filtros, anio: parseInt(e.target.value) })}
                 >
+                  <option value="2023">2023</option>
                   <option value="2024">2024</option>
                   <option value="2025">2025</option>
                   <option value="2026">2026</option>
+                  <option value="2027">2027</option>
                 </select>
               </div>
             </div>
@@ -891,6 +902,7 @@ function App() {
               <div className="card card-blue">
                 <h3>⏳ Pendientes</h3>
                 <p className="numero">{pendientes}</p>
+                <p style={{fontSize: '11px', color: '#fff', marginTop: '5px'}}>Total registros: {registrosFiltrados.length}</p>
               </div>
               <div className="card card-green">
                 <h3>✅ Aprobados</h3>
@@ -990,6 +1002,53 @@ function App() {
                 </div>
               )}
             </div>
+
+            {/* Panel de Debugging */}
+            <div style={{background: '#fff3cd', padding: '15px', borderRadius: '8px', marginTop: '20px', fontSize: '12px', border: '1px solid #ffc107'}}>
+              <strong>🐛 DEBUG:</strong> Total: <strong>{registros.length}</strong> registros | 
+              Filtrados: <strong>{registrosFiltrados.length}</strong> | 
+              Buscando: mes <strong>{filtros.mes}</strong>, año <strong>{filtros.anio}</strong>
+              {registros.length > 0 && (
+                <>
+                  <br/>📍 Primer registro: {registros[0]?.especialista?.substring(0, 20)} | 
+                  Fecha: {registros[0]?.fechaInicio?.toDate?.()?.toLocaleDateString?.('es-CL') || 'ERROR'}
+                </>
+              )}
+            </div>
+
+            {/* Tabla: Ver todos los registros sin filtro */}
+            <h3 style={{marginTop: '20px', fontSize: '12px', color: '#999'}}>🔍 DEBUG: Primeros registros sin filtro</h3>
+            {registros.length === 0 ? (
+              <p style={{color: '#d32f2f', fontWeight: 'bold'}}>❌ SIN REGISTROS EN EL SISTEMA</p>
+            ) : (
+              <table style={{width: '100%', fontSize: '11px', borderCollapse: 'collapse', marginBottom: '20px'}}>
+                <thead>
+                  <tr style={{background: '#f0f0f0'}}>
+                    <th style={{padding: '8px', border: '1px solid #ddd'}}>Especialista</th>
+                    <th style={{padding: '8px', border: '1px solid #ddd'}}>Fecha (raw)</th>
+                    <th style={{padding: '8px', border: '1px solid #ddd'}}>Fecha (parsed)</th>
+                    <th style={{padding: '8px', border: '1px solid #ddd'}}>Mes/Año</th>
+                    <th style={{padding: '8px', border: '1px solid #ddd'}}>Estado</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {registros.slice(0, 5).map(r => {
+                    const fecha = r.fechaInicio?.toDate?.() || new Date(r.fechaInicio);
+                    const es_valida = !isNaN(fecha?.getTime?.());
+                    return (
+                      <tr key={r.id} style={{background: es_valida ? '#fff' : '#ffebee'}}>
+                        <td style={{padding: '6px', border: '1px solid #ddd'}}>{r.especialista?.substring(0, 15)}</td>
+                        <td style={{padding: '6px', border: '1px solid #ddd', fontSize: '9px'}}>{String(r.fechaInicio?.constructor?.name)}</td>
+                        <td style={{padding: '6px', border: '1px solid #ddd'}}>{es_valida ? fecha.toLocaleDateString('es-CL') : '❌'}</td>
+                        <td style={{padding: '6px', border: '1px solid #ddd'}}>{es_valida ? `${fecha.getMonth() + 1}/${fecha.getFullYear()}` : '-'}</td>
+                        <td style={{padding: '6px', border: '1px solid #ddd'}}>{r.estado}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            )}
+
             <h3>📋 Historial de Aprobaciones</h3>
             {registrosFiltrados.filter(r => r.estado !== 'pendiente').length === 0 ? (
               <p className="sin-datos">No hay registros procesados</p>
