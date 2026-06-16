@@ -420,7 +420,35 @@ function App() {
     .slice(0, 10);
 
   // Filtrar registros del usuario actual (especialista)
-  const misRegistrosFiltrados = registros && registros.length > 0 ? registros : [];
+  const misRegistrosFiltrados = registros && registros.length > 0 
+    ? registros.filter(r => {
+        // Filtro de mes/año
+        try {
+          let fecha;
+          if (r.fechaInicio && r.fechaInicio.toDate && typeof r.fechaInicio.toDate === 'function') {
+            fecha = r.fechaInicio.toDate();
+          } else if (r.fechaInicio && typeof r.fechaInicio === 'object' && r.fechaInicio._seconds) {
+            fecha = new Date(r.fechaInicio._seconds * 1000);
+          } else if (r.fechaInicio instanceof Date) {
+            fecha = r.fechaInicio;
+          } else {
+            fecha = new Date(r.fechaInicio);
+          }
+          
+          if (!isNaN(fecha.getTime())) {
+            if (fecha.getMonth() + 1 !== filtros.mes) return false;
+            if (fecha.getFullYear() !== filtros.anio) return false;
+          }
+        } catch (err) {
+          console.log('Error procesando fecha:', err);
+        }
+        
+        // Filtro de estado
+        if (filtros.estado && r.estado !== filtros.estado) return false;
+        
+        return true;
+      })
+    : [];
   const manejarEliminar = async (id) => {
     if (!window.confirm('¿Estás seguro de eliminar este registro?')) return;
     
