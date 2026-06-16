@@ -223,8 +223,8 @@ function App() {
         return;
       }
       
-      // Si es fallido (rechazado) y está en la vista resumen, abrir modal
-      if (registro.estado === 'fallido' && vista === 'resumen') {
+      // Si es fallido (rechazado) y está en la vista mi-resumen, abrir modal
+      if (registro.estado === 'fallido' && vista === 'mi-resumen') {
         console.log('🔓 Abriendo modal de edición');
         alert('ℹ️ Editando registro rechazado.\n\nPuedes corregir y volver a enviarlo para aprobación.');
         
