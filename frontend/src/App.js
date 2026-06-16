@@ -1519,276 +1519,59 @@ function App() {
           </section>
         )}
 
-        {/* MODAL: EDICIÓN EN LÍNEA */}
-        {modalEdicion.abierto && modalEdicion.registro && (
-          <div style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            background: 'rgba(0,0,0,0.6)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 9999,
-            padding: '20px'
-          }}>
-            <div style={{
-              background: 'white',
-              padding: '25px',
-              borderRadius: '10px',
-              maxWidth: '650px',
-              width: '100%',
-              maxHeight: '85vh',
-              overflowY: 'auto',
-              boxShadow: '0 5px 25px rgba(0,0,0,0.3)'
+        {/* MODAL SIMPLE - EDICIÓN */}
+        {modalEdicion && modalEdicion.abierto && (
+          <div style={{position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', background: 'white', padding: '30px', borderRadius: '8px', zIndex: 9999, width: '90%', maxWidth: '500px', boxShadow: '0 0 30px rgba(0,0,0,0.5)'}}>
+            <h2 style={{marginTop: 0}}>✏️ Editar Registro</h2>
+            <form onSubmit={(e) => {
+              e.preventDefault();
+              axios.patch(`${API_URL}/api/registros/${modalEdicion.registro.id}`, 
+                {...formularioModal, estado: 'pendiente'},
+                {headers: {Authorization: `Bearer ${token}`}}
+              )
+              .then(() => {
+                alert('✅ Registro guardado y reenviado para aprobación');
+                setModalEdicion({abierto: false, registro: null});
+                cargarRegistros();
+              })
+              .catch(err => alert('❌ Error: ' + err.message));
             }}>
-              <h2 style={{marginTop: 0}}>✏️ Editar Registro Rechazado</h2>
+              <div style={{marginBottom: '15px'}}>
+                <label style={{display: 'block', fontWeight: '600', marginBottom: '5px'}}>Descripción</label>
+                <textarea 
+                  value={formularioModal.descripcion || ''} 
+                  onChange={(e) => setFormularioModal({...formularioModal, descripcion: e.target.value})} 
+                  style={{width: '100%', height: '100px', padding: '8px', borderRadius: '4px', border: '1px solid #ddd', fontFamily: 'inherit'}} 
+                />
+              </div>
               
-              <form onSubmit={(e) => {
-                e.preventDefault();
-                
-                axios.patch(`${API_URL}/api/registros/${modalEdicion.registro.id}`, {
-                  tipo: formularioModal.tipo,
-                  descripcion: formularioModal.descripcion,
-                  cliente: formularioModal.cliente,
-                  fechaInicio: formularioModal.fechaInicio,
-                  fechaFin: formularioModal.fechaFin,
-                  horas: formularioModal.horas,
-                  especialista: formularioModal.especialista,
-                  interno_cliente: formularioModal.interno_cliente,
-                  genera_ovt: formularioModal.genera_ovt,
-                  especialidad: formularioModal.especialidad,
-                  estado: 'pendiente'
-                }, {
-                  headers: { Authorization: `Bearer ${token}` }
-                })
-                .then(() => {
-                  alert('✅ Registro guardado y enviado para aprobación');
-                  setModalEdicion({ abierto: false, registro: null });
-                  cargarRegistros();
-                })
-                .catch(err => {
-                  alert('❌ Error: ' + (err.response?.data?.error || err.message));
-                });
-              }}>
-                
-                <div style={{marginBottom: '15px'}}>
-                  <label style={{display: 'block', marginBottom: '5px', fontWeight: '600'}}>Tipo</label>
-                  <select 
-                    value={formularioModal.tipo || 'cambio'}
-                    onChange={(e) => setFormularioModal({...formularioModal, tipo: e.target.value})}
-                    style={{width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ddd'}}
-                  >
-                    <option value="cambio">Cambio</option>
-                    <option value="alerta">Alerta</option>
-                  </select>
-                </div>
-
-                <div style={{marginBottom: '15px'}}>
-                  <label style={{display: 'block', marginBottom: '5px', fontWeight: '600'}}>Cliente</label>
-                  <select 
-                    value={formularioModal.cliente || 'Banco de Chile'}
-                    onChange={(e) => setFormularioModal({...formularioModal, cliente: e.target.value})}
-                    style={{width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ddd'}}
-                  >
-                    <option value="Banco de Chile">Banco de Chile</option>
-                    <option value="Interno">Interno</option>
-                  </select>
-                </div>
-
-                <div style={{marginBottom: '15px'}}>
-                  <label style={{display: 'block', marginBottom: '5px', fontWeight: '600'}}>Descripción *</label>
-                  <textarea
-                    value={formularioModal.descripcion || ''}
-                    onChange={(e) => setFormularioModal({...formularioModal, descripcion: e.target.value})}
-                    required
-                    style={{width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ddd', minHeight: '80px', fontFamily: 'inherit'}}
-                  />
-                </div>
-
-                <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', marginBottom: '15px'}}>
-                  <div>
-                    <label style={{display: 'block', marginBottom: '5px', fontWeight: '600'}}>Especialidad</label>
-                    <select 
-                      value={formularioModal.especialidad || ''}
-                      onChange={(e) => setFormularioModal({...formularioModal, especialidad: e.target.value})}
-                      required
-                      style={{width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ddd'}}
-                    >
-                      <option value="">Selecciona...</option>
-                      <option value="middleware">Middleware</option>
-                      <option value="operaciones">Operaciones Cloud</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label style={{display: 'block', marginBottom: '5px', fontWeight: '600'}}>Interno/Cliente</label>
-                    <select 
-                      value={formularioModal.interno_cliente || 'interno'}
-                      onChange={(e) => setFormularioModal({...formularioModal, interno_cliente: e.target.value})}
-                      required
-                      style={{width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ddd'}}
-                    >
-                      <option value="interno">Interno</option>
-                      <option value="cliente">Cliente</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', marginBottom: '15px'}}>
-                  <div>
-                    <label style={{display: 'block', marginBottom: '5px', fontWeight: '600'}}>Fecha Inicio *</label>
-                    <input 
-                      type="date"
-                      value={formularioModal.fechaInicio ? formularioModal.fechaInicio.toISOString().split('T')[0] : ''}
-                      onChange={(e) => {
-                        if (!e.target.value) return;
-                        const fecha = new Date(e.target.value + 'T12:00:00');
-                        const fin = formularioModal.fechaFin;
-                        let horas = formularioModal.horas;
-                        if (fin && !isNaN(fin.getTime()) && !isNaN(fecha.getTime())) {
-                          horas = parseFloat(Math.max(0, ((fin - fecha) / (1000 * 60 * 60)).toFixed(2)));
-                        }
-                        setFormularioModal({...formularioModal, fechaInicio: fecha, horas});
-                      }}
-                      required
-                      style={{width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ddd'}}
-                    />
-                  </div>
-
-                  <div>
-                    <label style={{display: 'block', marginBottom: '5px', fontWeight: '600'}}>Hora Inicio (HH:MM) *</label>
-                    <input 
-                      type="time"
-                      value={formularioModal.fechaInicio ? formularioModal.fechaInicio.toTimeString().slice(0, 5) : ''}
-                      onChange={(e) => {
-                        if (!e.target.value || !formularioModal.fechaInicio) return;
-                        const [h, m] = e.target.value.split(':');
-                        const fecha = new Date(formularioModal.fechaInicio);
-                        fecha.setHours(parseInt(h), parseInt(m), 0);
-                        
-                        const fin = formularioModal.fechaFin;
-                        let horas = formularioModal.horas;
-                        if (fin && !isNaN(fin.getTime()) && !isNaN(fecha.getTime())) {
-                          horas = parseFloat(Math.max(0, ((fin - fecha) / (1000 * 60 * 60)).toFixed(2)));
-                        }
-                        setFormularioModal({...formularioModal, fechaInicio: fecha, horas});
-                      }}
-                      required
-                      style={{width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ddd'}}
-                    />
-                  </div>
-                </div>
-
-                <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', marginBottom: '15px'}}>
-                  <div>
-                    <label style={{display: 'block', marginBottom: '5px', fontWeight: '600'}}>Fecha Fin *</label>
-                    <input 
-                      type="date"
-                      value={formularioModal.fechaFin ? formularioModal.fechaFin.toISOString().split('T')[0] : ''}
-                      onChange={(e) => {
-                        if (!e.target.value) return;
-                        const fecha = new Date(e.target.value + 'T12:00:00');
-                        const inicio = formularioModal.fechaInicio;
-                        let horas = formularioModal.horas;
-                        if (inicio && !isNaN(inicio.getTime()) && !isNaN(fecha.getTime())) {
-                          horas = parseFloat(Math.max(0, ((fecha - inicio) / (1000 * 60 * 60)).toFixed(2)));
-                        }
-                        setFormularioModal({...formularioModal, fechaFin: fecha, horas});
-                      }}
-                      required
-                      style={{width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ddd'}}
-                    />
-                  </div>
-
-                  <div>
-                    <label style={{display: 'block', marginBottom: '5px', fontWeight: '600'}}>Hora Fin (HH:MM) *</label>
-                    <input 
-                      type="time"
-                      value={formularioModal.fechaFin ? formularioModal.fechaFin.toTimeString().slice(0, 5) : ''}
-                      onChange={(e) => {
-                        if (!e.target.value || !formularioModal.fechaFin) return;
-                        const [h, m] = e.target.value.split(':');
-                        const fecha = new Date(formularioModal.fechaFin);
-                        fecha.setHours(parseInt(h), parseInt(m), 0);
-                        
-                        const inicio = formularioModal.fechaInicio;
-                        let horas = formularioModal.horas;
-                        if (inicio && !isNaN(inicio.getTime()) && !isNaN(fecha.getTime())) {
-                          horas = parseFloat(Math.max(0, ((fecha - inicio) / (1000 * 60 * 60)).toFixed(2)));
-                        }
-                        setFormularioModal({...formularioModal, fechaFin: fecha, horas});
-                      }}
-                      required
-                      style={{width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ddd'}}
-                    />
-                  </div>
-                </div>
-
-                <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', marginBottom: '20px'}}>
-                  <div>
-                    <label style={{display: 'block', marginBottom: '5px', fontWeight: '600'}}>Horas (Auto)</label>
-                    <input 
-                      type="number"
-                      value={formularioModal.horas || 0}
-                      disabled
-                      style={{width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ddd', background: '#f5f5f5'}}
-                    />
-                  </div>
-
-                  <div>
-                    <label style={{display: 'block', marginBottom: '5px', fontWeight: '600'}}>¿Genera OVT?</label>
-                    <select 
-                      value={formularioModal.genera_ovt || 'si'}
-                      onChange={(e) => setFormularioModal({...formularioModal, genera_ovt: e.target.value})}
-                      required
-                      style={{width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ddd'}}
-                    >
-                      <option value="si">Sí</option>
-                      <option value="no">No</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div style={{display: 'flex', gap: '10px'}}>
-                  <button 
-                    type="submit"
-                    style={{
-                      flex: 1,
-                      padding: '12px',
-                      background: '#2196F3',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '6px',
-                      cursor: 'pointer',
-                      fontWeight: '600',
-                      fontSize: '14px'
-                    }}
-                  >
-                    ✅ Guardar y Reenvirar
-                  </button>
-                  <button 
-                    type="button"
-                    onClick={() => setModalEdicion({ abierto: false, registro: null })}
-                    style={{
-                      flex: 1,
-                      padding: '12px',
-                      background: '#999',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '6px',
-                      cursor: 'pointer',
-                      fontWeight: '600',
-                      fontSize: '14px'
-                    }}
-                  >
-                    ✗ Cancelar
-                  </button>
-                </div>
-              </form>
-            </div>
+              <div style={{marginBottom: '15px'}}>
+                <label style={{display: 'block', fontWeight: '600', marginBottom: '5px'}}>Horas</label>
+                <input 
+                  type="number" 
+                  value={formularioModal.horas || 0} 
+                  onChange={(e) => setFormularioModal({...formularioModal, horas: parseFloat(e.target.value)})} 
+                  style={{width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ddd'}} 
+                  step="0.5"
+                />
+              </div>
+              
+              <div style={{display: 'flex', gap: '10px'}}>
+                <button 
+                  type="submit" 
+                  style={{flex: 1, padding: '12px', background: '#2196F3', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: '600'}}
+                >
+                  ✅ Guardar
+                </button>
+                <button 
+                  type="button" 
+                  onClick={() => setModalEdicion({abierto: false, registro: null})}
+                  style={{flex: 1, padding: '12px', background: '#999', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: '600'}}
+                >
+                  ✗ Cancelar
+                </button>
+              </div>
+            </form>
           </div>
         )}
       </main>
