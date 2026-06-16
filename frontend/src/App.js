@@ -415,42 +415,7 @@ function App() {
     .slice(0, 10);
 
   // Filtrar registros del usuario actual (especialista)
-  const misRegistrosFiltrados = registros.filter(r => {
-    // Para especialistas: mostrar registros que creo (sin validar createdBy si no existe)
-    // Para admins: mostrar todos
-    if (usuario.rol === 'especialista') {
-      // Si el registro tiene createdBy, validar que sea del usuario
-      if (r.createdBy && r.createdBy !== usuario.usuario) return false;
-    }
-    
-    // Filtrar por mes/año si está en "Mi Resumen"
-    if (vista === 'mi-resumen') {
-      try {
-        let fecha;
-        if (r.fechaInicio.toDate && typeof r.fechaInicio.toDate === 'function') {
-          fecha = r.fechaInicio.toDate();
-        } else if (typeof r.fechaInicio === 'object' && r.fechaInicio._seconds !== undefined) {
-          fecha = new Date(r.fechaInicio._seconds * 1000);
-        } else {
-          fecha = new Date(r.fechaInicio);
-        }
-        
-        if (isNaN(fecha.getTime())) return false;
-        
-        const mesCoincide = fecha.getMonth() === filtros.mes - 1;
-        const anioCoincide = fecha.getFullYear() === filtros.anio;
-        
-        if (!mesCoincide || !anioCoincide) return false;
-      } catch (err) {
-        return false;
-      }
-    }
-    
-    // Filtrar por estado si está seleccionado
-    if (filtros.estado && r.estado !== filtros.estado) return false;
-    
-    return true;
-  });
+  const misRegistrosFiltrados = registros && registros.length > 0 ? registros : [];
   const manejarEliminar = async (id) => {
     if (!window.confirm('¿Estás seguro de eliminar este registro?')) return;
     
