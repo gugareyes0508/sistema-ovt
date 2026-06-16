@@ -202,6 +202,8 @@ function App() {
 
   // Cargar registro para editar
   const cargarParaEditar = (registro) => {
+    console.log('📝 Cargando para editar:', registro);
+    
     // Admin puede editar cualquier registro, especialista solo los suyos
     if (usuario.rol === 'especialista' && registro.createdBy !== usuario.usuario) {
       alert('❌ Solo puedes editar tus propios registros');
@@ -222,26 +224,36 @@ function App() {
       if (registro.estado === 'fallido') {
         alert('ℹ️ Editando registro rechazado.\n\nPuedes corregir y volver a enviarlo para aprobación.');
       }
-      setVista('registrar');
     }
     
+    // Cambiar vista
+    setVista('registrar');
     setEditandoId(registro.id);
+    
+    // Cargar datos del registro
+    const fechaInicioObj = registro.fechaInicio?.toDate ? registro.fechaInicio.toDate() : new Date(registro.fechaInicio);
+    const fechaFinObj = registro.fechaFin?.toDate ? registro.fechaFin.toDate() : new Date(registro.fechaFin);
+    
     setFormulario({
-      tipo: registro.tipo,
-      descripcion: registro.descripcion,
-      cliente: registro.cliente,
-      fechaInicio: registro.fechaInicio?.toDate?.() || new Date(registro.fechaInicio),
-      fechaFin: registro.fechaFin?.toDate?.() || new Date(registro.fechaFin),
-      horas: registro.horas,
-      especialista: registro.especialista,
-      interno_cliente: registro.interno_cliente,
-      genera_ovt: registro.genera_ovt,
-      estado: registro.estado,
-      especialidad: registro.especialidad
+      tipo: registro.tipo || 'cambio',
+      descripcion: registro.descripcion || '',
+      cliente: registro.cliente || 'Banco de Chile',
+      fechaInicio: fechaInicioObj,
+      fechaFin: fechaFinObj,
+      horas: registro.horas || 0,
+      especialista: registro.especialista || usuario.nombre,
+      interno_cliente: registro.interno_cliente || 'interno',
+      genera_ovt: registro.genera_ovt || 'si',
+      estado: registro.estado || 'pendiente',
+      especialidad: registro.especialidad || ''
     });
     
+    console.log('✅ Formulario cargado');
+    
     // Scroll al inicio para ver el formulario
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    setTimeout(() => {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }, 100);
     
     // Mostrar alerta solo si es Admin (está en otra vista)
     if (usuario.rol === 'admin') {
@@ -745,59 +757,6 @@ function App() {
                 </button>
               )}
             </form>
-
-            <h3>Mis Registros</h3>
-            {misRegistrosFiltrados.length === 0 ? (
-              <p className="sin-datos">No hay registros</p>
-            ) : (
-              <table className="tabla">
-                <thead>
-                  <tr>
-                    <th>Tipo</th>
-                    <th>Descripción</th>
-                    <th>Cliente</th>
-                    <th>Horas</th>
-                    <th>Estado</th>
-                    <th>Inicio</th>
-                    <th>Acciones</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {misRegistrosFiltrados.map(r => (
-                    <tr key={r.id}>
-                      <td><strong>{r.tipo}</strong></td>
-                      <td>{r.descripcion?.substring(0, 30)}</td>
-                      <td>{r.cliente}</td>
-                      <td className="numero">{r.horas}h</td>
-                      <td>
-                        <span className={`badge badge-${r.estado}`}>
-                          {r.estado === 'pendiente' ? 'Pendiente de Aprobación' : r.estado === 'exitoso' ? 'Aprobado' : 'Rechazado'}
-                        </span>
-                      </td>
-                      <td>
-                        {parseDate(r.fechaInicio)}
-                      </td>
-                      <td>
-                        <button 
-                          className="btn-editar"
-                          onClick={() => cargarParaEditar(r)}
-                        >
-                          ✏️ Editar
-                        </button>
-                        {usuario.rol === 'admin' && (
-                          <button 
-                            className="btn-eliminar"
-                            onClick={() => manejarEliminar(r.id)}
-                          >
-                            🗑️ Eliminar
-                          </button>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
           </section>
         )}
 
