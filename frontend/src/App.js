@@ -1519,28 +1519,6 @@ function App() {
           </section>
         )}
 
-        {/* MODAL MEJORADO - EDICIÓN COMPLETA */}
-                <button 
-                  type="submit" 
-                  style={{flex: 1, padding: '12px', background: '#2196F3', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '600', fontSize: '14px'}}
-                >
-                  ✅ Guardar y Enviar a Aprobación
-                </button>
-                <button 
-                  type="button" 
-                  onClick={() => setModalEdicion({abierto: false, registro: null})}
-                  style={{flex: 1, padding: '12px', background: '#999', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '600', fontSize: '14px'}}
-                >
-                  ✗ Cancelar
-                </button>
-              </div>
-
-              <div style={{fontSize: '12px', color: '#666', textAlign: 'center', marginTop: '12px'}}>
-                El registro quedará como "Pendiente de Aprobación"
-              </div>
-            </form>
-          </div>
-        )}
         {/* MODAL - EDICIÓN SIMPLE Y FUNCIONAL */}
         {modalEdicion && modalEdicion.abierto && (
           <div style={{position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999}}>
