@@ -7,7 +7,12 @@ const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
 function App() {
   const [token, setToken] = useState(localStorage.getItem('token'));
   const [usuario, setUsuario] = useState(JSON.parse(localStorage.getItem('usuario') || '{}'));
-  const [registros, setRegistros] = useState([]);
+  const [registros, setRegistros] = useState([
+    // DATOS DE PRUEBA
+    {id: '1', tipo: 'cambio', descripcion: 'Cambio de configuración', cliente: 'Banco de Chile', fechaInicio: new Date('2026-06-10'), fechaFin: new Date('2026-06-10'), horas: 2, estado: 'fallido', createdBy: 'jorge.maureira', especialista: 'Jorge Maureira', especialidad: 'middleware', interno_cliente: 'interno', genera_ovt: 'si'},
+    {id: '2', tipo: 'alerta', descripcion: 'Alerta de mantenimiento', cliente: 'Banco de Chile', fechaInicio: new Date('2026-06-11'), fechaFin: new Date('2026-06-11'), horas: 1, estado: 'exitoso', createdBy: 'jorge.maureira', especialista: 'Jorge Maureira', especialidad: 'operaciones', interno_cliente: 'cliente', genera_ovt: 'si'},
+    {id: '3', tipo: 'cambio', descripcion: 'Mantenimiento 2', cliente: 'Banco de Chile', fechaInicio: new Date('2026-06-12'), fechaFin: new Date('2026-06-12'), horas: 3, estado: 'pendiente', createdBy: 'jorge.maureira', especialista: 'Jorge Maureira', especialidad: 'middleware', interno_cliente: 'interno', genera_ovt: 'si'}
+  ]);
   const [vista, setVista] = useState('registros');
   const [auditoria, setAuditoria] = useState([]);
   const [editandoId, setEditandoId] = useState(null);
