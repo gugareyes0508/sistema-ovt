@@ -139,8 +139,33 @@ app.post('/api/auth/login', async (req, res) => {
 });
 
 // ============================================
-// ADMIN: Crear nuevos usuarios admin
+// LISTAR TODOS LOS USUARIOS (para admin)
 // ============================================
+app.get('/api/admin/listar-usuarios', verificarToken, async (req, res) => {
+  try {
+    if (req.usuario.usuario !== 'admin') {
+      return res.status(403).json({ error: 'No tienes permisos' });
+    }
+
+    const usuariosList = [];
+    for (const [usuario, datos] of Object.entries(usuarios)) {
+      usuariosList.push({
+        usuario,
+        nombre: datos.nombre,
+        rol: datos.rol,
+        departamento: datos.departamento || 'N/A'
+      });
+    }
+
+    res.json({ 
+      success: true, 
+      usuarios: usuariosList 
+    });
+  } catch (err) {
+    console.error('Error listando usuarios:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
 app.post('/api/admin/crear-usuario', verificarToken, async (req, res) => {
   try {
     // Solo el admin original puede crear nuevos usuarios

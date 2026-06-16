@@ -11,6 +11,7 @@ function App() {
   const [vista, setVista] = useState('registros');
   const [auditoria, setAuditoria] = useState([]);
   const [editandoId, setEditandoId] = useState(null);
+  const [usuarioList, setUsuarioList] = useState([]);
   
   // Formulario mejorado
   const [formulario, setFormulario] = useState({
@@ -74,14 +75,37 @@ function App() {
     }
   }, [token, usuario.rol]);
 
+  // Cargar lista de usuarios (para admin)
+  const cargarUsuarios = useCallback(async () => {
+    if (!token || usuario.rol !== 'admin') return;
+    try {
+      const response = await axios.get(`${API_URL}/api/admin/listar-usuarios`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (response.data.usuarios) {
+        setUsuarioList(response.data.usuarios);
+      }
+    } catch (err) {
+      console.error('Error cargando usuarios:', err.message);
+    }
+  }, [token, usuario.rol]);
+
   // Efecto inicial
   useEffect(() => {
     cargarRegistros();
     cargarDashboard();
     if (usuario.rol === 'admin') {
       cargarAuditoria();
+      cargarUsuarios();
     }
-  }, [token, cargarRegistros, cargarDashboard, cargarAuditoria, usuario.rol]);
+  }, [token, cargarRegistros, cargarDashboard, cargarAuditoria, cargarUsuarios, usuario.rol]);
+
+  // Cargar usuarios cuando se abre la vista de gestión
+  useEffect(() => {
+    if (vista === 'usuarios' && usuario.rol === 'admin') {
+      cargarUsuarios();
+    }
+  }, [vista, cargarUsuarios, usuario.rol]);
 
   // Calcular horas automáticamente
   const calcularHoras = (inicio, fin) => {
@@ -1307,14 +1331,15 @@ function App() {
               <label>🔍 Buscar Usuario</label>
               <input 
                 type="text"
+                id="buscador-usuarios"
                 placeholder="Busca por usuario, nombre o departamento..."
                 onChange={(e) => {
                   const busqueda = e.target.value.toLowerCase();
-                  const lista = document.querySelectorAll('[data-usuario]');
+                  const lista = document.querySelectorAll('[data-usuario-item]');
                   lista.forEach(item => {
-                    const coincide = item.getAttribute('data-usuario').includes(busqueda) || 
-                                    item.getAttribute('data-nombre').toLowerCase().includes(busqueda) ||
-                                    item.getAttribute('data-dept').toLowerCase().includes(busqueda);
+                    const coincide = item.getAttribute('data-usuario-item').includes(busqueda) || 
+                                    item.getAttribute('data-nombre-item').toLowerCase().includes(busqueda) ||
+                                    item.getAttribute('data-dept-item').toLowerCase().includes(busqueda);
                     item.style.display = coincide ? 'flex' : 'none';
                   });
                 }}
@@ -1329,106 +1354,109 @@ function App() {
               />
             </div>
 
-            {[
-              { usuario: 'miguel.padilla', nombre: 'Miguel Padilla', dept: 'DPE', rol: 'admin' },
-              { usuario: 'hugo.araya', nombre: 'Hugo Araya', dept: 'DPE', rol: 'admin' },
-              { usuario: 'gustavo.reyes', nombre: 'Gustavo Reyes', dept: 'Squad', rol: 'admin' },
-              { usuario: 'najeeb.escobar', nombre: 'Najeeb Escobar', dept: 'TL', rol: 'admin' },
-              { usuario: 'john.estrada', nombre: 'john Estrada', dept: 'TL', rol: 'admin' },
-              { usuario: 'danilo.isla', nombre: 'Danilo Isla', dept: 'ITSM', rol: 'itsm' },
-              { usuario: 'maria.admin', nombre: 'Coordinador (maria.admin)', dept: 'Coordinación', rol: 'coordinador' }
-            ].map(u => (
-              <div 
-                key={u.usuario} 
-                data-usuario={u.usuario}
-                data-nombre={u.nombre}
-                data-dept={u.dept}
-                style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  padding: '12px',
-                  background: '#f9f9f9',
-                  borderRadius: '6px',
-                  marginBottom: '8px',
-                  border: '1px solid #eee'
-                }}
-              >
-                <div>
-                  <strong>{u.nombre}</strong><br/>
-                  <small style={{color: '#666'}}>@{u.usuario} • {u.dept}</small>
-                </div>
-                <div style={{display: 'flex', gap: '8px'}}>
-                  <button
-                    onClick={() => {
-                      const nuevaContraseña = prompt(`Ingresa nueva contraseña para ${u.nombre}:\n(mínimo 4 caracteres)`, 'demo123');
+            <div id="lista-usuarios-container">
+              {usuarioList && usuarioList.length > 0 ? (
+                usuarioList.map(u => (
+                  <div 
+                    key={u.usuario} 
+                    data-usuario-item={u.usuario}
+                    data-nombre-item={u.nombre}
+                    data-dept-item={u.departamento}
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      padding: '12px',
+                      background: '#f9f9f9',
+                      borderRadius: '6px',
+                      marginBottom: '8px',
+                      border: '1px solid #eee'
+                    }}
+                  >
+                    <div>
+                      <strong>{u.nombre}</strong><br/>
+                      <small style={{color: '#666'}}>@{u.usuario} • {u.rol} • {u.departamento}</small>
+                    </div>
+                    <div style={{display: 'flex', gap: '8px'}}>
+                      <button
+                        onClick={() => {
+                          const nuevaContraseña = prompt(`Ingresa nueva contraseña para ${u.nombre}:\n(mínimo 4 caracteres)`, 'demo123');
+                          
+                          if (!nuevaContraseña) return;
+                          if (nuevaContraseña.length < 4) {
+                            alert('❌ La contraseña debe tener mínimo 4 caracteres');
+                            return;
+                          }
+
+                          axios.post(`${API_URL}/api/admin/resetear-contrasena`, 
+                            { 
+                              usuario: u.usuario, 
+                              contraseñaNueva: nuevaContraseña 
+                            },
+                            { headers: { Authorization: `Bearer ${token}` } }
+                          )
+                          .then(res => {
+                            alert(`✅ Contraseña reseteada\nNueva: ${nuevaContraseña}`);
+                          })
+                          .catch(err => {
+                            alert('❌ Error: ' + (err.response?.data?.error || err.message));
+                          });
+                        }}
+                        style={{
+                          padding: '8px 16px',
+                          background: '#FF9800',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '6px',
+                          cursor: 'pointer',
+                          fontSize: '12px',
+                          fontWeight: '600'
+                        }}
+                      >
+                        🔐 Resetear
+                      </button>
                       
-                      if (!nuevaContraseña) return;
-                      if (nuevaContraseña.length < 4) {
-                        alert('❌ La contraseña debe tener mínimo 4 caracteres');
-                        return;
-                      }
+                      <button
+                        onClick={() => {
+                          if (u.usuario === 'admin') {
+                            alert('❌ No se puede eliminar al admin original');
+                            return;
+                          }
+                          if (!window.confirm(`¿Eliminar a ${u.nombre}? Esta acción no se puede deshacer.`)) return;
 
-                      axios.post(`${API_URL}/api/admin/resetear-contrasena`, 
-                        { 
-                          usuario: u.usuario, 
-                          contraseñaNueva: nuevaContraseña 
-                        },
-                        { headers: { Authorization: `Bearer ${token}` } }
-                      )
-                      .then(res => {
-                        alert(`✅ Contraseña reseteada\nNueva: ${nuevaContraseña}`);
-                      })
-                      .catch(err => {
-                        alert('❌ Error: ' + (err.response?.data?.error || err.message));
-                      });
-                    }}
-                    style={{
-                      padding: '8px 16px',
-                      background: '#FF9800',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '6px',
-                      cursor: 'pointer',
-                      fontSize: '12px',
-                      fontWeight: '600'
-                    }}
-                  >
-                    🔐 Resetear
-                  </button>
-                  
-                  <button
-                    onClick={() => {
-                      if (!window.confirm(`¿Eliminar a ${u.nombre}? Esta acción no se puede deshacer.`)) return;
-
-                      axios.post(`${API_URL}/api/admin/eliminar-usuario`, 
-                        { usuario: u.usuario },
-                        { headers: { Authorization: `Bearer ${token}` } }
-                      )
-                      .then(res => {
-                        alert(`✅ Usuario ${u.nombre} eliminado`);
-                        window.location.reload();
-                      })
-                      .catch(err => {
-                        alert('❌ Error: ' + (err.response?.data?.error || err.message));
-                      });
-                    }}
-                    style={{
-                      padding: '8px 16px',
-                      background: '#f44336',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '6px',
-                      cursor: 'pointer',
-                      fontSize: '12px',
-                      fontWeight: '600'
-                    }}
-                  >
-                    🗑️ Eliminar
-                  </button>
-                </div>
-              </div>
-            ))}
+                          axios.post(`${API_URL}/api/admin/eliminar-usuario`, 
+                            { usuario: u.usuario },
+                            { headers: { Authorization: `Bearer ${token}` } }
+                          )
+                          .then(res => {
+                            alert(`✅ Usuario ${u.nombre} eliminado`);
+                            // Recargar lista
+                            cargarUsuarios();
+                          })
+                          .catch(err => {
+                            alert('❌ Error: ' + (err.response?.data?.error || err.message));
+                          });
+                        }}
+                        style={{
+                          padding: '8px 16px',
+                          background: '#f44336',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '6px',
+                          cursor: 'pointer',
+                          fontSize: '12px',
+                          fontWeight: '600'
+                        }}
+                      >
+                        🗑️ Eliminar
+                      </button>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <p style={{textAlign: 'center', color: '#999'}}>Cargando usuarios...</p>
+              )}
+            </div>
 
             <div style={{
               background: '#fff3cd',
