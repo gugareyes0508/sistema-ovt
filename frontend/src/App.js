@@ -12,6 +12,8 @@ function App() {
   const [auditoria, setAuditoria] = useState([]);
   const [editandoId, setEditandoId] = useState(null);
   const [usuarioList, setUsuarioList] = useState([]);
+  const [modalEdicion, setModalEdicion] = useState({ abierto: false, registro: null });
+  const [formularioModal, setFormularioModal] = useState({});
   
   // Formulario mejorado
   const [formulario, setFormulario] = useState({
@@ -1502,6 +1504,115 @@ function App() {
               </table>
             )}
           </section>
+        )}
+
+        {/* MODAL: EDICIÓN EN LÍNEA */}
+        {modalEdicion.abierto && (
+          <div style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0,0,0,0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999
+          }}>
+            <div style={{
+              background: 'white',
+              padding: '30px',
+              borderRadius: '12px',
+              maxWidth: '600px',
+              width: '90%',
+              maxHeight: '90vh',
+              overflowY: 'auto',
+              boxShadow: '0 4px 20px rgba(0,0,0,0.3)'
+            }}>
+              <h2>✏️ Editar Registro Rechazado</h2>
+              
+              <form onSubmit={(e) => {
+                e.preventDefault();
+                
+                // Actualizar registro a pendiente
+                axios.patch(`${API_URL}/api/registros/${modalEdicion.registro.id}`, {
+                  tipo: formularioModal.tipo,
+                  descripcion: formularioModal.descripcion,
+                  cliente: formularioModal.cliente,
+                  fechaInicio: formularioModal.fechaInicio,
+                  fechaFin: formularioModal.fechaFin,
+                  horas: formularioModal.horas,
+                  especialista: formularioModal.especialista,
+                  interno_cliente: formularioModal.interno_cliente,
+                  genera_ovt: formularioModal.genera_ovt,
+                  especialidad: formularioModal.especialidad,
+                  estado: 'pendiente' // Volver a pendiente
+                }, {
+                  headers: { Authorization: `Bearer ${token}` }
+                })
+                .then(() => {
+                  alert('✅ Registro actualizado y enviado para aprobación');
+                  setModalEdicion({ abierto: false, registro: null });
+                  cargarRegistros();
+                })
+                .catch(err => alert('❌ Error: ' + err.message));
+              }}>
+                
+                <div className="form-group">
+                  <label>Tipo</label>
+                  <select 
+                    value={formularioModal.tipo || 'cambio'}
+                    onChange={(e) => setFormularioModal({...formularioModal, tipo: e.target.value})}
+                  >
+                    <option value="cambio">Cambio</option>
+                    <option value="alerta">Alerta</option>
+                  </select>
+                </div>
+
+                <div className="form-group">
+                  <label>Descripción *</label>
+                  <textarea
+                    value={formularioModal.descripcion || ''}
+                    onChange={(e) => setFormularioModal({...formularioModal, descripcion: e.target.value})}
+                    placeholder="Describe el cambio o alerta..."
+                    required
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label>Horas</label>
+                  <input 
+                    type="number"
+                    value={formularioModal.horas || 0}
+                    onChange={(e) => setFormularioModal({...formularioModal, horas: parseFloat(e.target.value)})}
+                  />
+                </div>
+
+                <div style={{display: 'flex', gap: '10px', marginTop: '20px'}}>
+                  <button type="submit" className="btn-guardar" style={{flex: 1}}>
+                    ✅ Guardar y Reenvirar
+                  </button>
+                  <button 
+                    type="button" 
+                    onClick={() => setModalEdicion({ abierto: false, registro: null })}
+                    style={{
+                      flex: 1,
+                      padding: '10px',
+                      background: '#999',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '6px',
+                      cursor: 'pointer',
+                      fontWeight: '600'
+                    }}
+                  >
+                    ✗ Cancelar
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
         )}
       </main>
 
