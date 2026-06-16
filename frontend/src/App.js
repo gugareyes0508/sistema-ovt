@@ -204,7 +204,7 @@ function App() {
 
   // Cargar registro para editar
   const cargarParaEditar = (registro) => {
-    console.log('📝 Cargando para editar:', registro);
+    console.log('📝 Cargando para editar:', registro, 'Vista:', vista, 'Rol:', usuario.rol);
     
     // Admin puede editar cualquier registro, especialista solo los suyos
     if (usuario.rol === 'especialista' && registro.createdBy !== usuario.usuario) {
@@ -222,17 +222,36 @@ function App() {
         alert('❌ No puedes editar este registro porque ya ha sido aprobado.\n\nSolo puedes editar registros rechazados.');
         return;
       }
-      // Si es fallido (rechazado), permitir editar
-      if (registro.estado === 'fallido') {
+      
+      // Si es fallido (rechazado) y está en la vista resumen, abrir modal
+      if (registro.estado === 'fallido' && vista === 'resumen') {
+        console.log('🔓 Abriendo modal de edición');
         alert('ℹ️ Editando registro rechazado.\n\nPuedes corregir y volver a enviarlo para aprobación.');
+        
+        const fechaInicioObj = registro.fechaInicio?.toDate ? registro.fechaInicio.toDate() : new Date(registro.fechaInicio);
+        const fechaFinObj = registro.fechaFin?.toDate ? registro.fechaFin.toDate() : new Date(registro.fechaFin);
+        
+        setModalEdicion({ abierto: true, registro });
+        setFormularioModal({
+          tipo: registro.tipo || 'cambio',
+          descripcion: registro.descripcion || '',
+          cliente: registro.cliente || 'Banco de Chile',
+          fechaInicio: fechaInicioObj,
+          fechaFin: fechaFinObj,
+          horas: registro.horas || 0,
+          especialista: registro.especialista || usuario.nombre,
+          interno_cliente: registro.interno_cliente || 'interno',
+          genera_ovt: registro.genera_ovt || 'si',
+          especialidad: registro.especialidad || ''
+        });
+        return;
       }
     }
     
-    // Cambiar vista
+    // Si es admin o edición en otra vista, cambiar vista
     setVista('registrar');
     setEditandoId(registro.id);
     
-    // Cargar datos del registro
     const fechaInicioObj = registro.fechaInicio?.toDate ? registro.fechaInicio.toDate() : new Date(registro.fechaInicio);
     const fechaFinObj = registro.fechaFin?.toDate ? registro.fechaFin.toDate() : new Date(registro.fechaFin);
     
@@ -250,17 +269,11 @@ function App() {
       especialidad: registro.especialidad || ''
     });
     
-    console.log('✅ Formulario cargado');
+    console.log('✅ Formulario cargado para admin');
     
-    // Scroll al inicio para ver el formulario
     setTimeout(() => {
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }, 100);
-    
-    // Mostrar alerta solo si es Admin (está en otra vista)
-    if (usuario.rol === 'admin') {
-      alert('✏️ Registro cargado. Desplázate arriba para ver el formulario.');
-    }
   };
 
   // Cancelar edición
