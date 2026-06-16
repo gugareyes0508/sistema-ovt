@@ -38,6 +38,13 @@ function App() {
   const [usuario, setUsuario] = useState(JSON.parse(localStorage.getItem('usuario') || '{}'));
   const [registros, setRegistros] = useState([]);
   const [vista, setVista] = useState('registros');
+
+  // Cambiar vista inicial según el rol
+  useEffect(() => {
+    if (usuario?.rol === 'admin') {
+      setVista('dashboard');
+    }
+  }, [usuario?.rol]);
   const [auditoria, setAuditoria] = useState([]);
   const [editandoId, setEditandoId] = useState(null);
   const [usuarioList, setUsuarioList] = useState([]);
@@ -509,22 +516,13 @@ function App() {
 
       {/* NAVEGACIÓN */}
       <nav className="nav">
-        <button 
-          className={vista === 'registros' ? 'nav-btn active' : 'nav-btn'} 
-          onClick={() => setVista('registros')}
-        >
-          📋 Registrar Cambio/Alerta
-        </button>
-
-        {(usuario.rol === 'coordinador' || usuario.rol === 'admin') && (
-          <>
-            <button 
-              className={vista === 'mantenedor' ? 'nav-btn active' : 'nav-btn'} 
-              onClick={() => setVista('mantenedor')}
-            >
-              ⚙️ Mantenedor
-            </button>
-          </>
+        {usuario.rol === 'especialista' && (
+          <button 
+            className={vista === 'registros' ? 'nav-btn active' : 'nav-btn'} 
+            onClick={() => setVista('registros')}
+          >
+            📋 Registrar Cambio/Alerta
+          </button>
         )}
 
         {usuario.rol === 'especialista' && (
@@ -549,6 +547,12 @@ function App() {
               onClick={() => setVista('usuarios')}
             >
               👥 Gestión de Usuarios
+            </button>
+            <button 
+              className={vista === 'mantenedor' ? 'nav-btn active' : 'nav-btn'} 
+              onClick={() => setVista('mantenedor')}
+            >
+              ⚙️ Mantenedor
             </button>
             <button 
               className={vista === 'auditoria' ? 'nav-btn active' : 'nav-btn'} 
