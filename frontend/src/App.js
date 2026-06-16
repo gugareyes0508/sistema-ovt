@@ -246,9 +246,13 @@ function App() {
         tipo: registro.tipo || "cambio",
         descripcion: registro.descripcion || "",
         cliente: registro.cliente || "Banco de Chile",
-        fechaInicio: registro.fechaInicio,
-        fechaFin: registro.fechaFin,
-        horas: registro.horas || 0
+        fechaInicio: toDate(registro.fechaInicio),
+        fechaFin: toDate(registro.fechaFin),
+        horas: registro.horas || 0,
+        especialista: registro.especialista || usuario.nombre || "",
+        especialidad: registro.especialidad || "operaciones",
+        interno_cliente: registro.interno_cliente || "interno",
+        genera_ovt: registro.genera_ovt || "si"
       });
     } catch (err) {
       console.error("Error en cargarParaEditar:", err);
