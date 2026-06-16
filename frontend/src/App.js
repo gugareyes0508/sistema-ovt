@@ -350,6 +350,40 @@ function App() {
     .map(([name, value]) => ({ name, value }))
     .sort((a, b) => b.value - a.value)
     .slice(0, 10);
+
+  // Filtrar registros del usuario actual (especialista)
+  const misRegistrosFiltrados = registros.filter(r => {
+    // Solo registros del usuario actual
+    if (r.createdBy !== usuario.usuario) return false;
+    
+    // Filtrar por mes/año si está en "Mi Resumen"
+    if (vista === 'resumen') {
+      try {
+        let fecha;
+        if (r.fechaInicio.toDate && typeof r.fechaInicio.toDate === 'function') {
+          fecha = r.fechaInicio.toDate();
+        } else if (typeof r.fechaInicio === 'object' && r.fechaInicio._seconds !== undefined) {
+          fecha = new Date(r.fechaInicio._seconds * 1000);
+        } else {
+          fecha = new Date(r.fechaInicio);
+        }
+        
+        if (isNaN(fecha.getTime())) return false;
+        
+        const mesCoincide = fecha.getMonth() === filtros.mes - 1;
+        const anioCoincide = fecha.getFullYear() === filtros.anio;
+        
+        if (!mesCoincide || !anioCoincide) return false;
+      } catch (err) {
+        return false;
+      }
+    }
+    
+    // Filtrar por estado si está seleccionado
+    if (filtros.estado && r.estado !== filtros.estado) return false;
+    
+    return true;
+  });
   const manejarEliminar = async (id) => {
     if (!window.confirm('¿Estás seguro de eliminar este registro?')) return;
     
@@ -462,6 +496,12 @@ function App() {
               onClick={() => setVista('dashboard')}
             >
               📊 Dashboard
+            </button>
+            <button 
+              className={vista === 'usuarios' ? 'nav-btn active' : 'nav-btn'} 
+              onClick={() => setVista('usuarios')}
+            >
+              👥 Gestión de Usuarios
             </button>
             <button 
               className={vista === 'auditoria' ? 'nav-btn active' : 'nav-btn'} 
@@ -671,7 +711,7 @@ function App() {
             </form>
 
             <h3>Mis Registros</h3>
-            {registros.length === 0 ? (
+            {misRegistrosFiltrados.length === 0 ? (
               <p className="sin-datos">No hay registros</p>
             ) : (
               <table className="tabla">
@@ -687,7 +727,7 @@ function App() {
                   </tr>
                 </thead>
                 <tbody>
-                  {registros.map(r => (
+                  {misRegistrosFiltrados.map(r => (
                     <tr key={r.id}>
                       <td><strong>{r.tipo}</strong></td>
                       <td>{r.descripcion?.substring(0, 30)}</td>
@@ -1084,6 +1124,181 @@ function App() {
                 </tbody>
               </table>
             )}
+          </section>
+        )}
+
+        {/* SECCIÓN: GESTIÓN DE USUARIOS (Admin) */}
+        {vista === 'usuarios' && usuario.rol === 'admin' && (
+          <section className="seccion">
+            <h2>👥 Gestión de Perfiles y Usuarios</h2>
+
+            {/* Formulario Crear Usuario */}
+            <div className="form-container">
+              <h3>➕ Crear Nuevo Usuario</h3>
+              
+              <form onSubmit={(e) => {
+                e.preventDefault();
+                
+                const nuevoUsuario = {
+                  usuario: e.target.usuario.value,
+                  nombre: e.target.nombre.value,
+                  rol: e.target.rol.value,
+                  departamento: e.target.departamento.value,
+                  contrasena: e.target.contrasena.value
+                };
+
+                // Validar campos
+                if (!nuevoUsuario.usuario || !nuevoUsuario.nombre || !nuevoUsuario.contrasena || !nuevoUsuario.rol) {
+                  alert('❌ Todos los campos son requeridos');
+                  return;
+                }
+
+                // Llamar al backend
+                axios.post(`${API_URL}/api/admin/crear-usuario`, nuevoUsuario, {
+                  headers: { Authorization: `Bearer ${token}` }
+                })
+                .then(res => {
+                  alert(`✅ ${res.data.message}`);
+                  // Limpiar formulario
+                  e.target.reset();
+                  // Recargar si es necesario
+                  cargarRegistros();
+                })
+                .catch(err => {
+                  alert('❌ Error: ' + (err.response?.data?.error || err.message));
+                });
+              }}>
+                
+                <div className="form-group">
+                  <label>Rol * (Selecciona el tipo de usuario)</label>
+                  <select name="rol" defaultValue="especialista" required onChange={(e) => {
+                    const rol = e.target.value;
+                    const deptField = e.target.closest('form').querySelector('[name="departamento"]');
+                    if (rol === 'admin') {
+                      deptField.disabled = false;
+                    } else if (rol === 'itsm') {
+                      deptField.value = 'ITSM';
+                      deptField.disabled = true;
+                    } else {
+                      deptField.value = 'Especialista';
+                      deptField.disabled = true;
+                    }
+                  }}>
+                    <option value="admin">🔑 Admin</option>
+                    <option value="especialista">👤 Especialista</option>
+                    <option value="itsm">🛠️ ITSM</option>
+                  </select>
+                </div>
+
+                <div className="form-group">
+                  <label>Usuario * (ej: miguel.padilla)</label>
+                  <input 
+                    type="text" 
+                    name="usuario"
+                    placeholder="usuario_sin_espacios"
+                    required
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label>Nombre Completo *</label>
+                  <input 
+                    type="text" 
+                    name="nombre"
+                    placeholder="ej: Miguel Padilla"
+                    required
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label>Departamento/Equipo</label>
+                  <select name="departamento" defaultValue="Especialista">
+                    <optgroup label="Admin">
+                      <option value="DPE">DPE</option>
+                      <option value="Squad">Squad</option>
+                      <option value="TL">Team Lead (TL)</option>
+                    </optgroup>
+                    <optgroup label="Especialista">
+                      <option value="Middleware">Middleware</option>
+                      <option value="Operaciones Cloud">Operaciones Cloud</option>
+                    </optgroup>
+                    <optgroup label="ITSM">
+                      <option value="ITSM">ITSM</option>
+                    </optgroup>
+                  </select>
+                </div>
+
+                <div className="form-group">
+                  <label>Contraseña Inicial *</label>
+                  <input 
+                    type="password" 
+                    name="contrasena"
+                    placeholder="ej: demo123"
+                    required
+                  />
+                  <small>Mínimo 4 caracteres. El usuario puede cambiarla después.</small>
+                </div>
+
+                <button type="submit" className="btn-guardar">
+                  ✅ Crear Usuario
+                </button>
+              </form>
+            </div>
+
+            {/* Tabla de usuarios por rol */}
+            <div style={{marginTop: '30px'}}>
+              <h3>📋 Usuarios Creados</h3>
+              
+              <div style={{display: 'flex', gap: '20px', marginTop: '15px', flexWrap: 'wrap'}}>
+                {/* Admins */}
+                <div style={{flex: 1, minWidth: '280px', background: '#f5f5f5', padding: '15px', borderRadius: '8px', border: '2px solid #2196F3'}}>
+                  <h4 style={{color: '#2196F3', marginTop: 0}}>🔑 Admins</h4>
+                  <p style={{fontSize: '12px', color: '#666'}}>
+                    • Miguel Padilla (DPE)<br/>
+                    • Hugo Araya (DPE)<br/>
+                    • Gustavo Reyes (Squad)<br/>
+                    • Najeeb Escobar (TL)<br/>
+                    • john Estrada (TL)
+                  </p>
+                </div>
+
+                {/* Especialistas */}
+                <div style={{flex: 1, minWidth: '280px', background: '#f5f5f5', padding: '15px', borderRadius: '8px', border: '2px solid #4CAF50'}}>
+                  <h4 style={{color: '#4CAF50', marginTop: 0}}>👤 Especialistas</h4>
+                  <p style={{fontSize: '12px', color: '#666'}}>
+                    • Jorge Maureira<br/>
+                    • Jhon Estrada<br/>
+                    • Luis Vasquez<br/>
+                    • ... (22 especialistas en total)
+                  </p>
+                </div>
+
+                {/* ITSM */}
+                <div style={{flex: 1, minWidth: '280px', background: '#f5f5f5', padding: '15px', borderRadius: '8px', border: '2px solid #FF9800'}}>
+                  <h4 style={{color: '#FF9800', marginTop: 0}}>🛠️ ITSM</h4>
+                  <p style={{fontSize: '12px', color: '#666'}}>
+                    • Danilo Isla
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Info útil */}
+            <div style={{
+              background: '#e3f2fd',
+              padding: '15px',
+              borderRadius: '8px',
+              marginTop: '20px',
+              fontSize: '13px',
+              borderLeft: '4px solid #2196F3'
+            }}>
+              <strong>ℹ️ Información:</strong><br/>
+              <strong>🔑 Admin:</strong> Ve Dashboard, Mantenedor, Gestión de Usuarios, Auditoría<br/>
+              <strong>👤 Especialista:</strong> Ve Registrar Cambios/Alertas, Mi Resumen<br/>
+              <strong>🛠️ ITSM:</strong> Ve Dashboard ITSM (próximamente), Auditoría<br/>
+              • Contraseña inicial: Se puede cambiar después de login<br/>
+              • Se registra cada creación en auditoría
+            </div>
           </section>
         )}
 
