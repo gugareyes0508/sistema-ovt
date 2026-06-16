@@ -190,6 +190,11 @@ function App() {
       return;
     }
     
+    // Si es especialista, cambiar a vista de registro
+    if (usuario.rol === 'especialista') {
+      setVista('registrar');
+    }
+    
     setEditandoId(registro.id);
     setFormulario({
       tipo: registro.tipo,
@@ -204,7 +209,14 @@ function App() {
       estado: registro.estado,
       especialidad: registro.especialidad
     });
+    
+    // Scroll al inicio para ver el formulario
     window.scrollTo({ top: 0, behavior: 'smooth' });
+    
+    // Mostrar alerta solo si es Admin (está en otra vista)
+    if (usuario.rol === 'admin') {
+      alert('✏️ Registro cargado. Desplázate arriba para ver el formulario.');
+    }
   };
 
   // Cancelar edición
@@ -803,36 +815,46 @@ function App() {
             <div className="dashboard-grid">
               <div className="card card-blue">
                 <h3>📋 Registros Este Mes</h3>
-                <p className="numero">{dashboard.horasEsteMes || 0}</p>
+                <p className="numero">{registros.filter(r => r.createdBy === usuario.usuario).length}</p>
               </div>
               <div className="card card-green">
-                <h3>⏱️ Horas Registradas</h3>
-                <p className="numero">{dashboard.totalHoras || 0}h</p>
+                <h3>✅ Horas Aprobadas</h3>
+                <p className="numero">{registros.filter(r => r.createdBy === usuario.usuario && r.estado === 'exitoso').reduce((sum, r) => sum + (r.horas || 0), 0)}h</p>
               </div>
               <div className="card card-yellow">
                 <h3>⏳ Registros Pendientes</h3>
-                <p className="numero">{dashboard.registrosPendientes || 0}</p>
+                <p className="numero">{registros.filter(r => r.createdBy === usuario.usuario && r.estado === 'pendiente').length}</p>
               </div>
             </div>
 
             {/* Filtros */}
             <div className="filtros-dashboard">
               <div className="form-group">
-                <label>Desde</label>
-                <input
-                  type="date"
-                  value={filtros.fechaInicio ? filtros.fechaInicio.toISOString().split('T')[0] : ''}
-                  onChange={(e) => setFiltros({ ...filtros, fechaInicio: e.target.value ? new Date(e.target.value) : null })}
-                />
+                <label>Mes</label>
+                <select
+                  value={filtros.mes}
+                  onChange={(e) => setFiltros({ ...filtros, mes: parseInt(e.target.value) })}
+                >
+                  {[...Array(12)].map((_, i) => (
+                    <option key={i + 1} value={i + 1}>
+                      {new Date(2024, i).toLocaleString('es-CL', { month: 'long' })}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div className="form-group">
-                <label>Hasta</label>
-                <input
-                  type="date"
-                  value={filtros.fechaFin ? filtros.fechaFin.toISOString().split('T')[0] : ''}
-                  onChange={(e) => setFiltros({ ...filtros, fechaFin: e.target.value ? new Date(e.target.value) : null })}
-                />
+                <label>Año</label>
+                <select
+                  value={filtros.anio}
+                  onChange={(e) => setFiltros({ ...filtros, anio: parseInt(e.target.value) })}
+                >
+                  <option value="2023">2023</option>
+                  <option value="2024">2024</option>
+                  <option value="2025">2025</option>
+                  <option value="2026">2026</option>
+                  <option value="2027">2027</option>
+                </select>
               </div>
 
               <div className="form-group">
