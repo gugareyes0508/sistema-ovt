@@ -232,41 +232,75 @@ function App() {
     try {
       let date;
       
-      // Si es un objeto Firestore Timestamp
       if (fecha.toDate && typeof fecha.toDate === 'function') {
         date = fecha.toDate();
-      }
-      // Si es un string ISO
-      else if (typeof fecha === 'string') {
+      } else if (typeof fecha === 'string') {
         date = new Date(fecha);
-      }
-      // Si es un número (timestamp)
-      else if (typeof fecha === 'number') {
+      } else if (typeof fecha === 'number') {
         date = new Date(fecha);
-      }
-      // Si es un objeto Date
-      else if (fecha instanceof Date) {
+      } else if (fecha instanceof Date) {
         date = fecha;
-      }
-      // Si es un objeto con propiedores _seconds y _nanoseconds
-      else if (fecha._seconds !== undefined) {
+      } else if (fecha._seconds !== undefined) {
         date = new Date(fecha._seconds * 1000);
-      }
-      else {
+      } else {
         date = new Date(fecha);
       }
       
-      // Verificar si la fecha es válida
       if (isNaN(date.getTime())) {
         return 'Sin fecha';
       }
       
       return date.toLocaleDateString('es-CL');
     } catch (err) {
-      console.error('Error parseando fecha:', err, fecha);
       return 'Sin fecha';
     }
   };
+
+  // ============================================
+  // FILTRADO POR MES/AÑO (DASHBOARD)
+  // ============================================
+  
+  const registrosFiltrados = registros.filter(r => {
+    if (!r.fechaInicio) return false;
+    const fecha = r.fechaInicio.toDate?.() || new Date(r.fechaInicio);
+    return fecha.getMonth() === filtros.mes - 1 && fecha.getFullYear() === filtros.anio;
+  });
+
+  // Contar estados del mes filtrado
+  const pendientes = registrosFiltrados.filter(r => r.estado === 'pendiente').length;
+  const aprobados = registrosFiltrados.filter(r => r.estado === 'exitoso').length;
+  const rechazados = registrosFiltrados.filter(r => r.estado === 'fallido').length;
+  const totalHorasAprobadas = registrosFiltrados
+    .filter(r => r.estado === 'exitoso')
+    .reduce((sum, r) => sum + (r.horas || 0), 0);
+
+  // Gráfico 1: Distribuir por especialidad
+  const porEspecialidad = {};
+  registrosFiltrados
+    .filter(r => r.estado === 'exitoso')
+    .forEach(r => {
+      const esp = r.especialidad || 'Sin especialidad';
+      porEspecialidad[esp] = (porEspecialidad[esp] || 0) + r.horas;
+    });
+
+  const datosEspecialidad = Object.entries(porEspecialidad).map(([name, value]) => ({
+    name: name === 'middleware' ? 'Middleware' : name === 'operaciones' ? 'Operaciones Cloud' : name,
+    value
+  }));
+
+  // Gráfico 2: Horas por especialista
+  const porEspecialista = {};
+  registrosFiltrados
+    .filter(r => r.estado === 'exitoso')
+    .forEach(r => {
+      const esp = r.createdByNombre || r.especialista;
+      porEspecialista[esp] = (porEspecialista[esp] || 0) + r.horas;
+    });
+
+  const datosEspecialista = Object.entries(porEspecialista)
+    .map(([name, value]) => ({ name, value }))
+    .sort((a, b) => b.value - a.value)
+    .slice(0, 10);
   const manejarEliminar = async (id) => {
     if (!window.confirm('¿Estás seguro de eliminar este registro?')) return;
     
@@ -856,25 +890,25 @@ function App() {
             <div className="dashboard-grid">
               <div className="card card-blue">
                 <h3>⏳ Pendientes</h3>
-                <p className="numero">{registros.filter(r => r.estado === 'pendiente').length}</p>
+                <p className="numero">{pendientes}</p>
               </div>
               <div className="card card-green">
                 <h3>✅ Aprobados</h3>
-                <p className="numero">{registros.filter(r => r.estado === 'exitoso').length}</p>
+                <p className="numero">{aprobados}</p>
               </div>
               <div className="card card-red">
                 <h3>❌ Rechazados</h3>
-                <p className="numero">{registros.filter(r => r.estado === 'fallido').length}</p>
+                <p className="numero">{rechazados}</p>
               </div>
               <div className="card card-yellow">
-                <h3>📈 Total Horas</h3>
-                <p className="numero">{registros.reduce((sum, r) => sum + (r.horas || 0), 0)}h</p>
+                <h3>📈 Total Horas Aprobadas</h3>
+                <p className="numero">{totalHorasAprobadas}h</p>
               </div>
             </div>
 
             {/* Tabla: Registros Pendientes */}
             <h3>⏳ Registros Pendientes de Aprobación</h3>
-            {registros.filter(r => r.estado === 'pendiente').length === 0 ? (
+            {registrosFiltrados.filter(r => r.estado === 'pendiente').length === 0 ? (
               <p className="sin-datos">No hay registros pendientes</p>
             ) : (
               <table className="tabla">
@@ -890,12 +924,12 @@ function App() {
                   </tr>
                 </thead>
                 <tbody>
-                  {registros.filter(r => r.estado === 'pendiente').map(r => (
+                  {registrosFiltrados.filter(r => r.estado === 'pendiente').map(r => (
                     <tr key={r.id}>
                       <td><strong>{r.createdByNombre || r.especialista}</strong></td>
                       <td>{r.tipo}</td>
                       <td>{r.descripcion?.substring(0, 30)}</td>
-                      <td>{r.fechaInicio ? new Date(r.fechaInicio.toDate?.() || r.fechaInicio).toLocaleDateString('es-CL') : '-'}</td>
+                      <td>{parseDate(r.fechaInicio)}</td>
                       <td className="numero">{r.horas}h</td>
                       <td>{r.especialidad}</td>
                       <td className="acciones">
@@ -920,9 +954,44 @@ function App() {
               </table>
             )}
 
-            {/* Tabla: Historial */}
+            {/* Gráficos */}
+            <div style={{display: 'flex', gap: '20px', marginTop: '30px', flexWrap: 'wrap', justifyContent: 'space-around'}}>
+              {/* Gráfico 1: Especialidad */}
+              {datosEspecialidad.length > 0 && (
+                <div style={{flex: 1, minWidth: '300px', background: '#f9f9f9', padding: '20px', borderRadius: '8px', border: '1px solid #ddd'}}>
+                  <h4 style={{marginTop: 0, marginBottom: '15px', color: '#333'}}>📊 Horas por Especialidad</h4>
+                  <table style={{width: '100%', fontSize: '14px', borderCollapse: 'collapse'}}>
+                    <tbody>
+                      {datosEspecialidad.map((d, idx) => (
+                        <tr key={d.name} style={{borderBottom: idx < datosEspecialidad.length - 1 ? '1px solid #eee' : 'none', paddingBottom: '8px'}}>
+                          <td style={{padding: '8px 0'}}><strong>{d.name}</strong></td>
+                          <td style={{textAlign: 'right', padding: '8px 0', fontWeight: 'bold', color: '#2196F3'}}>{d.value.toFixed(2)}h</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+              
+              {/* Gráfico 2: Top 10 Especialistas */}
+              {datosEspecialista.length > 0 && (
+                <div style={{flex: 1, minWidth: '300px', background: '#f9f9f9', padding: '20px', borderRadius: '8px', border: '1px solid #ddd'}}>
+                  <h4 style={{marginTop: 0, marginBottom: '15px', color: '#333'}}>👥 Top Especialistas</h4>
+                  <table style={{width: '100%', fontSize: '14px', borderCollapse: 'collapse'}}>
+                    <tbody>
+                      {datosEspecialista.map((d, idx) => (
+                        <tr key={d.name} style={{borderBottom: idx < datosEspecialista.length - 1 ? '1px solid #eee' : 'none', paddingBottom: '8px'}}>
+                          <td style={{padding: '8px 0'}}><strong>{d.name?.substring(0, 25)}</strong></td>
+                          <td style={{textAlign: 'right', padding: '8px 0', fontWeight: 'bold', color: '#4CAF50'}}>{d.value.toFixed(2)}h</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
             <h3>📋 Historial de Aprobaciones</h3>
-            {registros.filter(r => r.estado !== 'pendiente').length === 0 ? (
+            {registrosFiltrados.filter(r => r.estado !== 'pendiente').length === 0 ? (
               <p className="sin-datos">No hay registros procesados</p>
             ) : (
               <table className="tabla">
@@ -936,7 +1005,7 @@ function App() {
                   </tr>
                 </thead>
                 <tbody>
-                  {registros.filter(r => r.estado !== 'pendiente').map(r => (
+                  {registrosFiltrados.filter(r => r.estado !== 'pendiente').map(r => (
                     <tr key={r.id}>
                       <td>{r.createdByNombre || r.especialista}</td>
                       <td className="numero">{r.horas}h</td>
