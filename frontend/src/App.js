@@ -4,6 +4,33 @@ import './App.css';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
 
+// FUNCIONES HELPER PARA FECHAS
+const toDate = (fecha) => {
+  if (fecha instanceof Date) return fecha;
+  if (typeof fecha === 'string') return new Date(fecha);
+  if (fecha && fecha.toDate && typeof fecha.toDate === 'function') return fecha.toDate();
+  if (fecha && fecha._seconds) return new Date(fecha._seconds * 1000);
+  return new Date();
+};
+
+const toDateString = (fecha) => {
+  try {
+    const d = toDate(fecha);
+    return d.toISOString().split('T')[0];
+  } catch {
+    return '';
+  }
+};
+
+const toTimeString = (fecha) => {
+  try {
+    const d = toDate(fecha);
+    return d.toTimeString().slice(0, 5);
+  } catch {
+    return '00:00';
+  }
+};
+
 function App() {
   const [token, setToken] = useState(localStorage.getItem('token'));
   const [usuario, setUsuario] = useState(JSON.parse(localStorage.getItem('usuario') || '{}'));
@@ -1537,7 +1564,7 @@ function App() {
                   <label style={{display: 'block', fontWeight: '600', marginBottom: '5px', fontSize: '14px'}}>Fecha Inicio *</label>
                   <input 
                     type="date"
-                    value={formularioModal.fechaInicio ? (formularioModal.fechaInicio instanceof Date ? formularioModal.fechaInicio.toISOString().split('T')[0] : formularioModal.fechaInicio) : ''}
+                    value={formularioModal.fechaInicio ? (formularioModal.fechaInicio instanceof Date ? toDateString(formularioModal.fechaInicio) : formularioModal.fechaInicio) : ''}
                     onChange={(e) => {
                       if (!e.target.value) return;
                       const fecha = new Date(e.target.value + 'T12:00:00');
@@ -1555,7 +1582,7 @@ function App() {
                   <label style={{display: 'block', fontWeight: '600', marginBottom: '5px', fontSize: '14px'}}>Hora Inicio *</label>
                   <input 
                     type="time"
-                    value={formularioModal.fechaInicio ? formularioModal.fechaInicio.toTimeString().slice(0, 5) : ''}
+                    value={formularioModal.fechaInicio ? (formularioModal.fechaInicio instanceof Date ? toTimeString(formularioModal.fechaInicio) : '00:00') : ''}
                     onChange={(e) => {
                       if (!e.target.value || !formularioModal.fechaInicio) return;
                       const [h, m] = e.target.value.split(':');
@@ -1579,7 +1606,7 @@ function App() {
                   <label style={{display: 'block', fontWeight: '600', marginBottom: '5px', fontSize: '14px'}}>Fecha Fin *</label>
                   <input 
                     type="date"
-                    value={formularioModal.fechaFin ? (formularioModal.fechaFin instanceof Date ? formularioModal.fechaFin.toISOString().split('T')[0] : formularioModal.fechaFin) : ''}
+                    value={formularioModal.fechaFin ? (formularioModal.fechaFin instanceof Date ? toDateString(formularioModal.fechaFin) : formularioModal.fechaFin) : ''}
                     onChange={(e) => {
                       if (!e.target.value) return;
                       const fecha = new Date(e.target.value + 'T12:00:00');
@@ -1597,7 +1624,7 @@ function App() {
                   <label style={{display: 'block', fontWeight: '600', marginBottom: '5px', fontSize: '14px'}}>Hora Fin *</label>
                   <input 
                     type="time"
-                    value={formularioModal.fechaFin ? formularioModal.fechaFin.toTimeString().slice(0, 5) : ''}
+                    value={formularioModal.fechaFin ? (formularioModal.fechaFin instanceof Date ? toTimeString(formularioModal.fechaFin) : '00:00') : ''}
                     onChange={(e) => {
                       if (!e.target.value || !formularioModal.fechaFin) return;
                       const [h, m] = e.target.value.split(':');
