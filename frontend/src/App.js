@@ -25,7 +25,9 @@ const toDateString = (fecha) => {
 const toTimeString = (fecha) => {
   try {
     const d = toDate(fecha);
-    return d.toTimeString().slice(0, 5);
+    const h = String(d.getHours()).padStart(2, '0');
+    const m = String(d.getMinutes()).padStart(2, '0');
+    return `${h}:${m}`;
   } catch {
     return '00:00';
   }
