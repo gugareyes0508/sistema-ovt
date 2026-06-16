@@ -1531,19 +1531,22 @@ function App() {
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            zIndex: 9999
+            zIndex: 9999,
+            overflowY: 'auto'
           }}>
             <div style={{
               background: 'white',
               padding: '30px',
               borderRadius: '12px',
-              maxWidth: '600px',
-              width: '90%',
-              maxHeight: '90vh',
+              maxWidth: '700px',
+              width: '95%',
+              maxHeight: '95vh',
               overflowY: 'auto',
-              boxShadow: '0 4px 20px rgba(0,0,0,0.3)'
+              boxShadow: '0 4px 20px rgba(0,0,0,0.3)',
+              margin: '20px auto'
             }}>
               <h2>✏️ Editar Registro Rechazado</h2>
+              <p style={{color: '#666', fontSize: '13px'}}>Modifica los campos necesarios. El registro se enviará nuevamente para aprobación.</p>
               
               <form onSubmit={(e) => {
                 e.preventDefault();
@@ -1572,15 +1575,30 @@ function App() {
                 .catch(err => alert('❌ Error: ' + err.message));
               }}>
                 
-                <div className="form-group">
-                  <label>Tipo</label>
-                  <select 
-                    value={formularioModal.tipo || 'cambio'}
-                    onChange={(e) => setFormularioModal({...formularioModal, tipo: e.target.value})}
-                  >
-                    <option value="cambio">Cambio</option>
-                    <option value="alerta">Alerta</option>
-                  </select>
+                <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px'}}>
+                  <div className="form-group">
+                    <label>Tipo *</label>
+                    <select 
+                      value={formularioModal.tipo || 'cambio'}
+                      onChange={(e) => setFormularioModal({...formularioModal, tipo: e.target.value})}
+                      required
+                    >
+                      <option value="cambio">Cambio</option>
+                      <option value="alerta">Alerta</option>
+                    </select>
+                  </div>
+
+                  <div className="form-group">
+                    <label>Cliente *</label>
+                    <select 
+                      value={formularioModal.cliente || 'Banco de Chile'}
+                      onChange={(e) => setFormularioModal({...formularioModal, cliente: e.target.value})}
+                      required
+                    >
+                      <option value="Banco de Chile">Banco de Chile</option>
+                      <option value="Interno">Interno</option>
+                    </select>
+                  </div>
                 </div>
 
                 <div className="form-group">
@@ -1590,21 +1608,102 @@ function App() {
                     onChange={(e) => setFormularioModal({...formularioModal, descripcion: e.target.value})}
                     placeholder="Describe el cambio o alerta..."
                     required
+                    style={{minHeight: '80px'}}
                   />
                 </div>
 
-                <div className="form-group">
-                  <label>Horas</label>
-                  <input 
-                    type="number"
-                    value={formularioModal.horas || 0}
-                    onChange={(e) => setFormularioModal({...formularioModal, horas: parseFloat(e.target.value)})}
-                  />
+                <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px'}}>
+                  <div className="form-group">
+                    <label>Especialidad *</label>
+                    <select 
+                      value={formularioModal.especialidad || ''}
+                      onChange={(e) => setFormularioModal({...formularioModal, especialidad: e.target.value})}
+                      required
+                    >
+                      <option value="">Selecciona...</option>
+                      <option value="middleware">Middleware</option>
+                      <option value="operaciones">Operaciones Cloud</option>
+                    </select>
+                  </div>
+
+                  <div className="form-group">
+                    <label>Interno/Cliente *</label>
+                    <select 
+                      value={formularioModal.interno_cliente || 'interno'}
+                      onChange={(e) => setFormularioModal({...formularioModal, interno_cliente: e.target.value})}
+                      required
+                    >
+                      <option value="interno">Interno</option>
+                      <option value="cliente">Cliente</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px'}}>
+                  <div className="form-group">
+                    <label>Fecha Inicio *</label>
+                    <input 
+                      type="date"
+                      value={formularioModal.fechaInicio ? formularioModal.fechaInicio.toISOString().split('T')[0] : ''}
+                      onChange={(e) => {
+                        const fecha = new Date(e.target.value);
+                        setFormularioModal({
+                          ...formularioModal, 
+                          fechaInicio: fecha,
+                          horas: calcularHoras(fecha, formularioModal.fechaFin)
+                        });
+                      }}
+                      required
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label>Fecha Fin *</label>
+                    <input 
+                      type="date"
+                      value={formularioModal.fechaFin ? formularioModal.fechaFin.toISOString().split('T')[0] : ''}
+                      onChange={(e) => {
+                        const fecha = new Date(e.target.value);
+                        setFormularioModal({
+                          ...formularioModal, 
+                          fechaFin: fecha,
+                          horas: calcularHoras(formularioModal.fechaInicio, fecha)
+                        });
+                      }}
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px'}}>
+                  <div className="form-group">
+                    <label>Horas (calculadas automáticamente)</label>
+                    <input 
+                      type="number"
+                      value={formularioModal.horas || 0}
+                      onChange={(e) => setFormularioModal({...formularioModal, horas: parseFloat(e.target.value)})}
+                      step="0.5"
+                      disabled
+                      style={{background: '#f5f5f5', cursor: 'not-allowed'}}
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label>¿Genera OVT? *</label>
+                    <select 
+                      value={formularioModal.genera_ovt || 'si'}
+                      onChange={(e) => setFormularioModal({...formularioModal, genera_ovt: e.target.value})}
+                      required
+                    >
+                      <option value="si">Sí</option>
+                      <option value="no">No</option>
+                    </select>
+                  </div>
                 </div>
 
                 <div style={{display: 'flex', gap: '10px', marginTop: '20px'}}>
                   <button type="submit" className="btn-guardar" style={{flex: 1}}>
-                    ✅ Guardar y Reenvirar
+                    ✅ Guardar y Reenvirar para Aprobación
                   </button>
                   <button 
                     type="button" 
