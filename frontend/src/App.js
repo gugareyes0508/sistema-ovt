@@ -224,7 +224,7 @@ function App() {
       }
       
       // Si es fallido (rechazado) y está en la vista resumen, abrir modal
-      if (registro.estado === 'fallido' && vista === 'resumen') {
+      if (registro.estado === 'fallido' && vista === 'mi-resumen') {
         console.log('🔓 Abriendo modal de edición');
         alert('ℹ️ Editando registro rechazado.\n\nPuedes corregir y volver a enviarlo para aprobación.');
         
@@ -420,7 +420,7 @@ function App() {
     if (r.createdBy !== usuario.usuario) return false;
     
     // Filtrar por mes/año si está en "Mi Resumen"
-    if (vista === 'resumen') {
+    if (vista === 'mi-resumen') {
       try {
         let fecha;
         if (r.fechaInicio.toDate && typeof r.fechaInicio.toDate === 'function') {
@@ -545,7 +545,7 @@ function App() {
 
         {usuario.rol === 'especialista' && (
           <button 
-            className={vista === 'resumen' ? 'nav-btn active' : 'nav-btn'} 
+            className={vista === 'mi-resumen' ? 'nav-btn active' : 'nav-btn'} 
             onClick={() => setVista('resumen')}
           >
             📊 Mi Resumen
@@ -851,7 +851,7 @@ function App() {
         )}
 
         {/* SECCIÓN: MI RESUMEN (Especialista) */}
-        {vista === 'resumen' && usuario.rol === 'especialista' && (
+        {vista === 'mi-resumen' && usuario.rol === 'especialista' && (
           <section className="seccion">
             <h2>📊 Mi Resumen</h2>
             
