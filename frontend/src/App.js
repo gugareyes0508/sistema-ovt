@@ -27,13 +27,6 @@ function App() {
     especialidad: 'operaciones'
   });
 
-  const [dashboard, setDashboard] = useState({
-    totalRegistros: 0,
-    totalHoras: 0,
-    horasEsteMes: 0,
-    registrosPendientes: 0
-  });
-
   const [filtros, setFiltros] = useState({
     mes: new Date().getMonth() + 1,
     anio: new Date().getFullYear(),
@@ -55,13 +48,15 @@ function App() {
   }, [token]);
 
   // Cargar dashboard
+  // Cargar dashboard (datos no usados actualmente)
   const cargarDashboard = useCallback(async () => {
     if (!token) return;
     try {
       const response = await axios.get(`${API_URL}/api/dashboard/resumen`, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      setDashboard(response.data || {});
+      // Datos no usados en UI - usamos registros directamente
+      // setDashboard(response.data || {});
     } catch (err) {
       console.error('Error:', err.message);
     }
