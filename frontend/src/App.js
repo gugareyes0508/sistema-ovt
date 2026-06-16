@@ -269,11 +269,10 @@ function App() {
 
   // Debug: mostrar en consola
   React.useEffect(() => {
-    console.log(`[Dashboard] Filtros: mes=${filtros.mes}, año=${filtros.anio}`);
-    console.log(`[Dashboard] Total registros: ${registros.length}`);
-    console.log(`[Dashboard] Registros filtrados: ${registrosFiltrados.length}`);
-    console.log(`[Dashboard] Primeros 3 registros:`, registros.slice(0, 3));
-  }, [filtros.mes, filtros.anio, registros]);
+    if (registros.length > 0) {
+      console.log(`[Dashboard] Total registros: ${registros.length}`);
+    }
+  }, [registros.length]);
 
   // Contar estados del mes filtrado
   const pendientes = registrosFiltrados.filter(r => r.estado === 'pendiente').length;
