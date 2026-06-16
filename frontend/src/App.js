@@ -52,11 +52,10 @@ function App() {
   const cargarDashboard = useCallback(async () => {
     if (!token) return;
     try {
-      const response = await axios.get(`${API_URL}/api/dashboard/resumen`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      // Datos no usados en UI - usamos registros directamente
-      // setDashboard(response.data || {});
+      // Endpoint disponible pero datos no usados en UI
+      // await axios.get(`${API_URL}/api/dashboard/resumen`, {
+      //   headers: { Authorization: `Bearer ${token}` }
+      // });
     } catch (err) {
       console.error('Error:', err.message);
     }
