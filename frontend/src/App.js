@@ -232,17 +232,28 @@ function App() {
     try {
       let date;
       
+      // Firestore Timestamp con método toDate()
       if (fecha.toDate && typeof fecha.toDate === 'function') {
         date = fecha.toDate();
-      } else if (typeof fecha === 'string') {
-        date = new Date(fecha);
-      } else if (typeof fecha === 'number') {
-        date = new Date(fecha);
-      } else if (fecha instanceof Date) {
-        date = fecha;
-      } else if (fecha._seconds !== undefined) {
+      }
+      // Firestore Timestamp plano: {_seconds, _nanoseconds}
+      else if (typeof fecha === 'object' && fecha._seconds !== undefined) {
         date = new Date(fecha._seconds * 1000);
-      } else {
+      }
+      // String ISO
+      else if (typeof fecha === 'string') {
+        date = new Date(fecha);
+      }
+      // Número (timestamp ms)
+      else if (typeof fecha === 'number') {
+        date = new Date(fecha);
+      }
+      // Ya es Date
+      else if (fecha instanceof Date) {
+        date = fecha;
+      }
+      // Último recurso: intentar convertir directamente
+      else {
         date = new Date(fecha);
       }
       
@@ -262,9 +273,33 @@ function App() {
   
   const registrosFiltrados = registros.filter(r => {
     if (!r.fechaInicio) return false;
-    const fecha = r.fechaInicio.toDate?.() || new Date(r.fechaInicio);
-    const match = fecha.getMonth() === filtros.mes - 1 && fecha.getFullYear() === filtros.anio;
-    return match;
+    
+    try {
+      let fecha;
+      
+      // Manejar Firestore Timestamp con método toDate()
+      if (r.fechaInicio.toDate && typeof r.fechaInicio.toDate === 'function') {
+        fecha = r.fechaInicio.toDate();
+      }
+      // Manejar objeto plano de Firestore {_seconds, _nanoseconds}
+      else if (typeof r.fechaInicio === 'object' && r.fechaInicio._seconds !== undefined) {
+        fecha = new Date(r.fechaInicio._seconds * 1000);
+      }
+      // Otros formatos
+      else {
+        fecha = new Date(r.fechaInicio);
+      }
+      
+      // Validar que la fecha sea válida
+      if (isNaN(fecha.getTime())) {
+        return false;
+      }
+      
+      const match = fecha.getMonth() === filtros.mes - 1 && fecha.getFullYear() === filtros.anio;
+      return match;
+    } catch (err) {
+      return false;
+    }
   });
 
   // Debug: mostrar en consola
@@ -288,7 +323,7 @@ function App() {
     .filter(r => r.estado === 'exitoso')
     .forEach(r => {
       const esp = r.especialidad || 'Sin especialidad';
-      porEspecialidad[esp] = (porEspecialidad[esp] || 0) + r.horas;
+      porEspecialidad[esp] = (porEspecialidad[esp] || 0) + (r.horas || 0);
     });
 
   const datosEspecialidad = Object.entries(porEspecialidad).map(([name, value]) => ({
@@ -301,8 +336,8 @@ function App() {
   registrosFiltrados
     .filter(r => r.estado === 'exitoso')
     .forEach(r => {
-      const esp = r.createdByNombre || r.especialista;
-      porEspecialista[esp] = (porEspecialista[esp] || 0) + r.horas;
+      const esp = r.createdByNombre || r.especialista || 'Sin nombre';
+      porEspecialista[esp] = (porEspecialista[esp] || 0) + (r.horas || 0);
     });
 
   const datosEspecialista = Object.entries(porEspecialista)
