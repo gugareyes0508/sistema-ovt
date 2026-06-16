@@ -1301,68 +1301,132 @@ function App() {
             </div>
 
             {/* SECCIÓN: RESETEAR CONTRASEÑA */}
-            <h3 style={{marginTop: '40px', borderTop: '2px solid #ddd', paddingTop: '20px'}}>🔐 Resetear Contraseña de Usuarios</h3>
+            <h3 style={{marginTop: '40px', borderTop: '2px solid #ddd', paddingTop: '20px'}}>🔐 Gestionar Usuarios</h3>
             
+            <div className="form-group">
+              <label>🔍 Buscar Usuario</label>
+              <input 
+                type="text"
+                placeholder="Busca por usuario, nombre o departamento..."
+                onChange={(e) => {
+                  const busqueda = e.target.value.toLowerCase();
+                  const lista = document.querySelectorAll('[data-usuario]');
+                  lista.forEach(item => {
+                    const coincide = item.getAttribute('data-usuario').includes(busqueda) || 
+                                    item.getAttribute('data-nombre').toLowerCase().includes(busqueda) ||
+                                    item.getAttribute('data-dept').toLowerCase().includes(busqueda);
+                    item.style.display = coincide ? 'flex' : 'none';
+                  });
+                }}
+                style={{
+                  width: '100%',
+                  padding: '10px',
+                  fontSize: '14px',
+                  borderRadius: '6px',
+                  border: '1px solid #ddd',
+                  marginBottom: '15px'
+                }}
+              />
+            </div>
+
             {[
-              { usuario: 'miguel.padilla', nombre: 'Miguel Padilla' },
-              { usuario: 'hugo.araya', nombre: 'Hugo Araya' },
-              { usuario: 'gustavo.reyes', nombre: 'Gustavo Reyes' },
-              { usuario: 'najeeb.escobar', nombre: 'Najeeb Escobar' },
-              { usuario: 'john.estrada', nombre: 'john Estrada' },
-              { usuario: 'danilo.isla', nombre: 'Danilo Isla' },
-              { usuario: 'maria.admin', nombre: 'Coordinador (maria.admin)' }
+              { usuario: 'miguel.padilla', nombre: 'Miguel Padilla', dept: 'DPE', rol: 'admin' },
+              { usuario: 'hugo.araya', nombre: 'Hugo Araya', dept: 'DPE', rol: 'admin' },
+              { usuario: 'gustavo.reyes', nombre: 'Gustavo Reyes', dept: 'Squad', rol: 'admin' },
+              { usuario: 'najeeb.escobar', nombre: 'Najeeb Escobar', dept: 'TL', rol: 'admin' },
+              { usuario: 'john.estrada', nombre: 'john Estrada', dept: 'TL', rol: 'admin' },
+              { usuario: 'danilo.isla', nombre: 'Danilo Isla', dept: 'ITSM', rol: 'itsm' },
+              { usuario: 'maria.admin', nombre: 'Coordinador (maria.admin)', dept: 'Coordinación', rol: 'coordinador' }
             ].map(u => (
-              <div key={u.usuario} style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                padding: '12px',
-                background: '#f9f9f9',
-                borderRadius: '6px',
-                marginBottom: '8px',
-                border: '1px solid #eee'
-              }}>
+              <div 
+                key={u.usuario} 
+                data-usuario={u.usuario}
+                data-nombre={u.nombre}
+                data-dept={u.dept}
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  padding: '12px',
+                  background: '#f9f9f9',
+                  borderRadius: '6px',
+                  marginBottom: '8px',
+                  border: '1px solid #eee'
+                }}
+              >
                 <div>
                   <strong>{u.nombre}</strong><br/>
-                  <small style={{color: '#666'}}>@{u.usuario}</small>
+                  <small style={{color: '#666'}}>@{u.usuario} • {u.dept}</small>
                 </div>
-                <button
-                  onClick={() => {
-                    const nuevaContraseña = prompt(`Ingresa nueva contraseña para ${u.nombre}:\n(mínimo 4 caracteres)`, 'demo123');
-                    
-                    if (!nuevaContraseña) return;
-                    if (nuevaContraseña.length < 4) {
-                      alert('❌ La contraseña debe tener mínimo 4 caracteres');
-                      return;
-                    }
+                <div style={{display: 'flex', gap: '8px'}}>
+                  <button
+                    onClick={() => {
+                      const nuevaContraseña = prompt(`Ingresa nueva contraseña para ${u.nombre}:\n(mínimo 4 caracteres)`, 'demo123');
+                      
+                      if (!nuevaContraseña) return;
+                      if (nuevaContraseña.length < 4) {
+                        alert('❌ La contraseña debe tener mínimo 4 caracteres');
+                        return;
+                      }
 
-                    axios.post(`${API_URL}/api/admin/resetear-contrasena`, 
-                      { 
-                        usuario: u.usuario, 
-                        contraseñaNueva: nuevaContraseña 
-                      },
-                      { headers: { Authorization: `Bearer ${token}` } }
-                    )
-                    .then(res => {
-                      alert(`✅ Contraseña reseteada para ${u.nombre}\nNueva contraseña: ${nuevaContraseña}`);
-                    })
-                    .catch(err => {
-                      alert('❌ Error: ' + (err.response?.data?.error || err.message));
-                    });
-                  }}
-                  style={{
-                    padding: '8px 16px',
-                    background: '#FF9800',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '6px',
-                    cursor: 'pointer',
-                    fontSize: '12px',
-                    fontWeight: '600'
-                  }}
-                >
-                  🔐 Resetear
-                </button>
+                      axios.post(`${API_URL}/api/admin/resetear-contrasena`, 
+                        { 
+                          usuario: u.usuario, 
+                          contraseñaNueva: nuevaContraseña 
+                        },
+                        { headers: { Authorization: `Bearer ${token}` } }
+                      )
+                      .then(res => {
+                        alert(`✅ Contraseña reseteada\nNueva: ${nuevaContraseña}`);
+                      })
+                      .catch(err => {
+                        alert('❌ Error: ' + (err.response?.data?.error || err.message));
+                      });
+                    }}
+                    style={{
+                      padding: '8px 16px',
+                      background: '#FF9800',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '6px',
+                      cursor: 'pointer',
+                      fontSize: '12px',
+                      fontWeight: '600'
+                    }}
+                  >
+                    🔐 Resetear
+                  </button>
+                  
+                  <button
+                    onClick={() => {
+                      if (!window.confirm(`¿Eliminar a ${u.nombre}? Esta acción no se puede deshacer.`)) return;
+
+                      axios.post(`${API_URL}/api/admin/eliminar-usuario`, 
+                        { usuario: u.usuario },
+                        { headers: { Authorization: `Bearer ${token}` } }
+                      )
+                      .then(res => {
+                        alert(`✅ Usuario ${u.nombre} eliminado`);
+                        window.location.reload();
+                      })
+                      .catch(err => {
+                        alert('❌ Error: ' + (err.response?.data?.error || err.message));
+                      });
+                    }}
+                    style={{
+                      padding: '8px 16px',
+                      background: '#f44336',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '6px',
+                      cursor: 'pointer',
+                      fontSize: '12px',
+                      fontWeight: '600'
+                    }}
+                  >
+                    🗑️ Eliminar
+                  </button>
+                </div>
               </div>
             ))}
 
@@ -1375,10 +1439,10 @@ function App() {
               borderLeft: '4px solid #FF9800'
             }}>
               <strong>⚠️ Importante:</strong><br/>
-              • Ingresa la nueva contraseña que deseas asignar<br/>
-              • El usuario recibirá la nueva contraseña<br/>
-              • Puede cambiarla después de iniciar sesión<br/>
-              • Se registra en auditoría cada reseteo
+              • 🔐 Resetear: Asigna nueva contraseña al usuario<br/>
+              • 🗑️ Eliminar: Elimina permanentemente el usuario<br/>
+              • Se registra cada acción en auditoría<br/>
+              • El usuario puede cambiar su contraseña después de login
             </div>
           </section>
         )}

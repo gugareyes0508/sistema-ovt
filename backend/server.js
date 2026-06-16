@@ -239,12 +239,71 @@ app.post('/api/admin/resetear-contrasena', verificarToken, async (req, res) => {
     // Cambiar contraseña
     usuarios[usuario].contrasena = contraseñaNueva;
 
+    // Registrar en auditoría
+    await db.collection('auditoria').add({
+      accion: 'RESETEO_CONTRASENA',
+      usuarioAdminNombre: req.usuario.nombre,
+      usuarioAfectado: usuario,
+      timestamp: new Date(),
+      detalles: `Reseteo de contraseña realizado por admin`
+    });
+
     res.json({ 
       success: true, 
-      message: `Contraseña de ${usuario} reseteada a: ${contraseñaNueva}`
+      message: `Contraseña de ${usuario} reseteada correctamente`
     });
   } catch (err) {
     console.error('Error reseteando contraseña:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ============================================
+// ADMIN: Eliminar usuario
+// ============================================
+app.post('/api/admin/eliminar-usuario', verificarToken, async (req, res) => {
+  try {
+    // Solo admin original puede eliminar usuarios
+    if (req.usuario.usuario !== 'admin') {
+      return res.status(403).json({ error: 'No tienes permisos para eliminar usuarios' });
+    }
+
+    const { usuario } = req.body;
+
+    if (!usuario) {
+      return res.status(400).json({ error: 'Usuario requerido' });
+    }
+
+    // No permitir eliminar al admin original
+    if (usuario === 'admin') {
+      return res.status(400).json({ error: 'No se puede eliminar al admin original' });
+    }
+
+    if (!usuarios[usuario]) {
+      return res.status(404).json({ error: 'Usuario no encontrado' });
+    }
+
+    const nombreUsuario = usuarios[usuario].nombre;
+
+    // Eliminar usuario
+    delete usuarios[usuario];
+
+    // Registrar en auditoría
+    await db.collection('auditoria').add({
+      accion: 'ELIMINAR_USUARIO',
+      usuarioAdminNombre: req.usuario.nombre,
+      usuarioEliminado: usuario,
+      usuarioEliminadoNombre: nombreUsuario,
+      timestamp: new Date(),
+      detalles: `Usuario eliminado por admin`
+    });
+
+    res.json({ 
+      success: true, 
+      message: `Usuario ${usuario} (${nombreUsuario}) eliminado correctamente`
+    });
+  } catch (err) {
+    console.error('Error eliminando usuario:', err);
     res.status(500).json({ error: err.message });
   }
 });
