@@ -1520,38 +1520,35 @@ function App() {
         )}
 
         {/* MODAL: EDICIÓN EN LÍNEA */}
-        {modalEdicion.abierto && (
+        {modalEdicion.abierto && modalEdicion.registro && (
           <div style={{
             position: 'fixed',
             top: 0,
             left: 0,
             right: 0,
             bottom: 0,
-            background: 'rgba(0,0,0,0.5)',
+            background: 'rgba(0,0,0,0.6)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             zIndex: 9999,
-            overflowY: 'auto'
+            padding: '20px'
           }}>
             <div style={{
               background: 'white',
-              padding: '30px',
-              borderRadius: '12px',
-              maxWidth: '700px',
-              width: '95%',
-              maxHeight: '95vh',
+              padding: '25px',
+              borderRadius: '10px',
+              maxWidth: '650px',
+              width: '100%',
+              maxHeight: '85vh',
               overflowY: 'auto',
-              boxShadow: '0 4px 20px rgba(0,0,0,0.3)',
-              margin: '20px auto'
+              boxShadow: '0 5px 25px rgba(0,0,0,0.3)'
             }}>
-              <h2>✏️ Editar Registro Rechazado</h2>
-              <p style={{color: '#666', fontSize: '13px'}}>Modifica los campos necesarios. El registro se enviará nuevamente para aprobación.</p>
+              <h2 style={{marginTop: 0}}>✏️ Editar Registro Rechazado</h2>
               
               <form onSubmit={(e) => {
                 e.preventDefault();
                 
-                // Actualizar registro a pendiente
                 axios.patch(`${API_URL}/api/registros/${modalEdicion.registro.id}`, {
                   tipo: formularioModal.tipo,
                   descripcion: formularioModal.descripcion,
@@ -1563,62 +1560,62 @@ function App() {
                   interno_cliente: formularioModal.interno_cliente,
                   genera_ovt: formularioModal.genera_ovt,
                   especialidad: formularioModal.especialidad,
-                  estado: 'pendiente' // Volver a pendiente
+                  estado: 'pendiente'
                 }, {
                   headers: { Authorization: `Bearer ${token}` }
                 })
                 .then(() => {
-                  alert('✅ Registro actualizado y enviado para aprobación');
+                  alert('✅ Registro guardado y enviado para aprobación');
                   setModalEdicion({ abierto: false, registro: null });
                   cargarRegistros();
                 })
-                .catch(err => alert('❌ Error: ' + err.message));
+                .catch(err => {
+                  alert('❌ Error: ' + (err.response?.data?.error || err.message));
+                });
               }}>
                 
-                <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px'}}>
-                  <div className="form-group">
-                    <label>Tipo *</label>
-                    <select 
-                      value={formularioModal.tipo || 'cambio'}
-                      onChange={(e) => setFormularioModal({...formularioModal, tipo: e.target.value})}
-                      required
-                    >
-                      <option value="cambio">Cambio</option>
-                      <option value="alerta">Alerta</option>
-                    </select>
-                  </div>
-
-                  <div className="form-group">
-                    <label>Cliente *</label>
-                    <select 
-                      value={formularioModal.cliente || 'Banco de Chile'}
-                      onChange={(e) => setFormularioModal({...formularioModal, cliente: e.target.value})}
-                      required
-                    >
-                      <option value="Banco de Chile">Banco de Chile</option>
-                      <option value="Interno">Interno</option>
-                    </select>
-                  </div>
+                <div style={{marginBottom: '15px'}}>
+                  <label style={{display: 'block', marginBottom: '5px', fontWeight: '600'}}>Tipo</label>
+                  <select 
+                    value={formularioModal.tipo || 'cambio'}
+                    onChange={(e) => setFormularioModal({...formularioModal, tipo: e.target.value})}
+                    style={{width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ddd'}}
+                  >
+                    <option value="cambio">Cambio</option>
+                    <option value="alerta">Alerta</option>
+                  </select>
                 </div>
 
-                <div className="form-group">
-                  <label>Descripción *</label>
+                <div style={{marginBottom: '15px'}}>
+                  <label style={{display: 'block', marginBottom: '5px', fontWeight: '600'}}>Cliente</label>
+                  <select 
+                    value={formularioModal.cliente || 'Banco de Chile'}
+                    onChange={(e) => setFormularioModal({...formularioModal, cliente: e.target.value})}
+                    style={{width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ddd'}}
+                  >
+                    <option value="Banco de Chile">Banco de Chile</option>
+                    <option value="Interno">Interno</option>
+                  </select>
+                </div>
+
+                <div style={{marginBottom: '15px'}}>
+                  <label style={{display: 'block', marginBottom: '5px', fontWeight: '600'}}>Descripción *</label>
                   <textarea
                     value={formularioModal.descripcion || ''}
                     onChange={(e) => setFormularioModal({...formularioModal, descripcion: e.target.value})}
-                    placeholder="Describe el cambio o alerta..."
                     required
-                    style={{minHeight: '80px'}}
+                    style={{width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ddd', minHeight: '80px', fontFamily: 'inherit'}}
                   />
                 </div>
 
-                <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px'}}>
-                  <div className="form-group">
-                    <label>Especialidad *</label>
+                <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', marginBottom: '15px'}}>
+                  <div>
+                    <label style={{display: 'block', marginBottom: '5px', fontWeight: '600'}}>Especialidad</label>
                     <select 
                       value={formularioModal.especialidad || ''}
                       onChange={(e) => setFormularioModal({...formularioModal, especialidad: e.target.value})}
                       required
+                      style={{width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ddd'}}
                     >
                       <option value="">Selecciona...</option>
                       <option value="middleware">Middleware</option>
@@ -1626,12 +1623,13 @@ function App() {
                     </select>
                   </div>
 
-                  <div className="form-group">
-                    <label>Interno/Cliente *</label>
+                  <div>
+                    <label style={{display: 'block', marginBottom: '5px', fontWeight: '600'}}>Interno/Cliente</label>
                     <select 
                       value={formularioModal.interno_cliente || 'interno'}
                       onChange={(e) => setFormularioModal({...formularioModal, interno_cliente: e.target.value})}
                       required
+                      style={{width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ddd'}}
                     >
                       <option value="interno">Interno</option>
                       <option value="cliente">Cliente</option>
@@ -1639,87 +1637,114 @@ function App() {
                   </div>
                 </div>
 
-                <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px'}}>
-                  <div className="form-group">
-                    <label>Fecha Inicio *</label>
+                <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', marginBottom: '15px'}}>
+                  <div>
+                    <label style={{display: 'block', marginBottom: '5px', fontWeight: '600'}}>Fecha Inicio *</label>
                     <input 
                       type="date"
-                      value={
-                        formularioModal.fechaInicio && !isNaN(formularioModal.fechaInicio.getTime())
-                          ? formularioModal.fechaInicio.toISOString().split('T')[0]
-                          : ''
-                      }
+                      value={formularioModal.fechaInicio ? formularioModal.fechaInicio.toISOString().split('T')[0] : ''}
                       onChange={(e) => {
                         if (!e.target.value) return;
-                        const [year, month, day] = e.target.value.split('-');
-                        const fecha = new Date(year, month - 1, day, 12, 0, 0);
-                        
+                        const fecha = new Date(e.target.value + 'T12:00:00');
                         const fin = formularioModal.fechaFin;
-                        let horas = formularioModal.horas || 0;
-                        if (fin && !isNaN(fin.getTime())) {
+                        let horas = formularioModal.horas;
+                        if (fin && !isNaN(fin.getTime()) && !isNaN(fecha.getTime())) {
                           horas = parseFloat(Math.max(0, ((fin - fecha) / (1000 * 60 * 60)).toFixed(2)));
                         }
-                        
-                        setFormularioModal({
-                          ...formularioModal, 
-                          fechaInicio: fecha,
-                          horas: horas
-                        });
+                        setFormularioModal({...formularioModal, fechaInicio: fecha, horas});
                       }}
                       required
+                      style={{width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ddd'}}
                     />
                   </div>
 
-                  <div className="form-group">
-                    <label>Fecha Fin *</label>
+                  <div>
+                    <label style={{display: 'block', marginBottom: '5px', fontWeight: '600'}}>Hora Inicio (HH:MM) *</label>
                     <input 
-                      type="date"
-                      value={
-                        formularioModal.fechaFin && !isNaN(formularioModal.fechaFin.getTime())
-                          ? formularioModal.fechaFin.toISOString().split('T')[0]
-                          : ''
-                      }
+                      type="time"
+                      value={formularioModal.fechaInicio ? formularioModal.fechaInicio.toTimeString().slice(0, 5) : ''}
                       onChange={(e) => {
-                        if (!e.target.value) return;
-                        const [year, month, day] = e.target.value.split('-');
-                        const fecha = new Date(year, month - 1, day, 12, 0, 0);
+                        if (!e.target.value || !formularioModal.fechaInicio) return;
+                        const [h, m] = e.target.value.split(':');
+                        const fecha = new Date(formularioModal.fechaInicio);
+                        fecha.setHours(parseInt(h), parseInt(m), 0);
                         
-                        const inicio = formularioModal.fechaInicio;
-                        let horas = formularioModal.horas || 0;
-                        if (inicio && !isNaN(inicio.getTime())) {
-                          horas = parseFloat(Math.max(0, ((fecha - inicio) / (1000 * 60 * 60)).toFixed(2)));
+                        const fin = formularioModal.fechaFin;
+                        let horas = formularioModal.horas;
+                        if (fin && !isNaN(fin.getTime()) && !isNaN(fecha.getTime())) {
+                          horas = parseFloat(Math.max(0, ((fin - fecha) / (1000 * 60 * 60)).toFixed(2)));
                         }
-                        
-                        setFormularioModal({
-                          ...formularioModal, 
-                          fechaFin: fecha,
-                          horas: horas
-                        });
+                        setFormularioModal({...formularioModal, fechaInicio: fecha, horas});
                       }}
                       required
+                      style={{width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ddd'}}
                     />
                   </div>
                 </div>
 
-                <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px'}}>
-                  <div className="form-group">
-                    <label>Horas (calculadas automáticamente)</label>
+                <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', marginBottom: '15px'}}>
+                  <div>
+                    <label style={{display: 'block', marginBottom: '5px', fontWeight: '600'}}>Fecha Fin *</label>
                     <input 
-                      type="number"
-                      value={formularioModal.horas || 0}
-                      onChange={(e) => setFormularioModal({...formularioModal, horas: parseFloat(e.target.value)})}
-                      step="0.5"
-                      disabled
-                      style={{background: '#f5f5f5', cursor: 'not-allowed'}}
+                      type="date"
+                      value={formularioModal.fechaFin ? formularioModal.fechaFin.toISOString().split('T')[0] : ''}
+                      onChange={(e) => {
+                        if (!e.target.value) return;
+                        const fecha = new Date(e.target.value + 'T12:00:00');
+                        const inicio = formularioModal.fechaInicio;
+                        let horas = formularioModal.horas;
+                        if (inicio && !isNaN(inicio.getTime()) && !isNaN(fecha.getTime())) {
+                          horas = parseFloat(Math.max(0, ((fecha - inicio) / (1000 * 60 * 60)).toFixed(2)));
+                        }
+                        setFormularioModal({...formularioModal, fechaFin: fecha, horas});
+                      }}
+                      required
+                      style={{width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ddd'}}
                     />
                   </div>
 
-                  <div className="form-group">
-                    <label>¿Genera OVT? *</label>
+                  <div>
+                    <label style={{display: 'block', marginBottom: '5px', fontWeight: '600'}}>Hora Fin (HH:MM) *</label>
+                    <input 
+                      type="time"
+                      value={formularioModal.fechaFin ? formularioModal.fechaFin.toTimeString().slice(0, 5) : ''}
+                      onChange={(e) => {
+                        if (!e.target.value || !formularioModal.fechaFin) return;
+                        const [h, m] = e.target.value.split(':');
+                        const fecha = new Date(formularioModal.fechaFin);
+                        fecha.setHours(parseInt(h), parseInt(m), 0);
+                        
+                        const inicio = formularioModal.fechaInicio;
+                        let horas = formularioModal.horas;
+                        if (inicio && !isNaN(inicio.getTime()) && !isNaN(fecha.getTime())) {
+                          horas = parseFloat(Math.max(0, ((fecha - inicio) / (1000 * 60 * 60)).toFixed(2)));
+                        }
+                        setFormularioModal({...formularioModal, fechaFin: fecha, horas});
+                      }}
+                      required
+                      style={{width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ddd'}}
+                    />
+                  </div>
+                </div>
+
+                <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', marginBottom: '20px'}}>
+                  <div>
+                    <label style={{display: 'block', marginBottom: '5px', fontWeight: '600'}}>Horas (Auto)</label>
+                    <input 
+                      type="number"
+                      value={formularioModal.horas || 0}
+                      disabled
+                      style={{width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ddd', background: '#f5f5f5'}}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{display: 'block', marginBottom: '5px', fontWeight: '600'}}>¿Genera OVT?</label>
                     <select 
                       value={formularioModal.genera_ovt || 'si'}
                       onChange={(e) => setFormularioModal({...formularioModal, genera_ovt: e.target.value})}
                       required
+                      style={{width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ddd'}}
                     >
                       <option value="si">Sí</option>
                       <option value="no">No</option>
@@ -1727,22 +1752,36 @@ function App() {
                   </div>
                 </div>
 
-                <div style={{display: 'flex', gap: '10px', marginTop: '20px'}}>
-                  <button type="submit" className="btn-guardar" style={{flex: 1}}>
-                    ✅ Guardar y Reenvirar para Aprobación
+                <div style={{display: 'flex', gap: '10px'}}>
+                  <button 
+                    type="submit"
+                    style={{
+                      flex: 1,
+                      padding: '12px',
+                      background: '#2196F3',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '6px',
+                      cursor: 'pointer',
+                      fontWeight: '600',
+                      fontSize: '14px'
+                    }}
+                  >
+                    ✅ Guardar y Reenvirar
                   </button>
                   <button 
-                    type="button" 
+                    type="button"
                     onClick={() => setModalEdicion({ abierto: false, registro: null })}
                     style={{
                       flex: 1,
-                      padding: '10px',
+                      padding: '12px',
                       background: '#999',
                       color: 'white',
                       border: 'none',
                       borderRadius: '6px',
                       cursor: 'pointer',
-                      fontWeight: '600'
+                      fontWeight: '600',
+                      fontSize: '14px'
                     }}
                   >
                     ✗ Cancelar
