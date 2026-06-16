@@ -1529,7 +1529,7 @@ function App() {
               <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px'}}>
                 <div>
                   <span style={{color: '#666', display: 'block', marginBottom: '4px', fontWeight: '500'}}>Especialista</span>
-                  <span>{modalEdicion.registro.especialista || 'N/A'}</span>
+                  <span>{modalEdicion?.registro?.especialista || 'N/A'}</span>
                 </div>
                 <div>
                   <span style={{color: '#666', display: 'block', marginBottom: '4px', fontWeight: '500'}}>Estado Actual</span>
@@ -1537,13 +1537,17 @@ function App() {
                 </div>
                 <div>
                   <span style={{color: '#666', display: 'block', marginBottom: '4px', fontWeight: '500'}}>Cliente</span>
-                  <span>{modalEdicion.registro.cliente || 'N/A'}</span>
+                  <span>{modalEdicion?.registro?.cliente || 'N/A'}</span>
                 </div>
               </div>
             </div>
 
             <form onSubmit={(e) => {
               e.preventDefault();
+              if (!modalEdicion?.registro?.id) {
+                alert('Error: No se pudo obtener el ID del registro');
+                return;
+              }
               axios.patch(`${API_URL}/api/registros/${modalEdicion.registro.id}`, 
                 {...formularioModal, estado: 'pendiente'},
                 {headers: {Authorization: `Bearer ${token}`}}
