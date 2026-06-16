@@ -416,8 +416,12 @@ function App() {
 
   // Filtrar registros del usuario actual (especialista)
   const misRegistrosFiltrados = registros.filter(r => {
-    // Solo registros del usuario actual
-    if (r.createdBy !== usuario.usuario) return false;
+    // Para especialistas: mostrar registros que creo (sin validar createdBy si no existe)
+    // Para admins: mostrar todos
+    if (usuario.rol === 'especialista') {
+      // Si el registro tiene createdBy, validar que sea del usuario
+      if (r.createdBy && r.createdBy !== usuario.usuario) return false;
+    }
     
     // Filtrar por mes/año si está en "Mi Resumen"
     if (vista === 'mi-resumen') {
