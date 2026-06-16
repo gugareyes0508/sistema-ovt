@@ -49,30 +49,40 @@ const db = admin.firestore();
 // ============================================
 
 const usuarios = {
-  'jorge.maureira': { nombre: 'Jorge Maureira', rol: 'especialista', contrasena: 'demo123' },
-  'jhon.estrada': { nombre: 'Jhon Estrada', rol: 'especialista', contrasena: 'demo123' },
-  'luis.vasquez': { nombre: 'Luis Vasquez', rol: 'especialista', contrasena: 'demo123' },
-  'moises.junco': { nombre: 'Moises Junco', rol: 'especialista', contrasena: 'demo123' },
-  'manuel.urbina': { nombre: 'Manuel Urbina Hernández', rol: 'especialista', contrasena: 'demo123' },
-  'benjamin.fierro': { nombre: 'Benjamín Fierro', rol: 'especialista', contrasena: 'demo123' },
-  'mauricio.serrano': { nombre: 'Mauricio Antonio Serrano Gonzalez', rol: 'especialista', contrasena: 'demo123' },
-  'ricardo.rojas': { nombre: 'Ricardo Andrés Rojas Ramos', rol: 'especialista', contrasena: 'demo123' },
-  'ariel.garate': { nombre: 'Ariel Garate', rol: 'especialista', contrasena: 'demo123' },
-  'najeeb.escobar': { nombre: 'Najeeb Ency Escobar Perez', rol: 'especialista', contrasena: 'demo123' },
-  'rodrigo.sanhueza': { nombre: 'Rodrigo Alejandro Sanhueza', rol: 'especialista', contrasena: 'demo123' },
-  'sebastian.arroyo': { nombre: 'Sebastian Arroyo Vigouroux', rol: 'especialista', contrasena: 'demo123' },
-  'cristian.madariaga': { nombre: 'Cristian Madariaga', rol: 'especialista', contrasena: 'demo123' },
-  'miguel.martinez': { nombre: 'Miguel Martinez', rol: 'especialista', contrasena: 'demo123' },
-  'fabian.tobar': { nombre: 'Fabian Tobar', rol: 'especialista', contrasena: 'demo123' },
-  'gustavo.perolo': { nombre: 'Gustavo Perolo', rol: 'especialista', contrasena: 'demo123' },
-  'leonardo.silva': { nombre: 'Leonardo Silva', rol: 'especialista', contrasena: 'demo123' },
-  'cristian.lecaros': { nombre: 'Cristian Lecaros', rol: 'especialista', contrasena: 'demo123' },
-  'rodrigo.escobedo': { nombre: 'Rodrigo Escobedo', rol: 'especialista', contrasena: 'demo123' },
-  'alexis.alfonzo': { nombre: 'Alexis José Alfonzo', rol: 'especialista', contrasena: 'demo123' },
-  'danilo.isla': { nombre: 'Danilo Isla', rol: 'especialista', contrasena: 'demo123' },
-  'gustavo.reyes': { nombre: 'Gustavo Reyes', rol: 'especialista', contrasena: 'demo123' },
-  'maria.admin': { nombre: 'Maria Admin', rol: 'coordinador', contrasena: 'demo123' },
-  'admin': { nombre: 'Administrador', rol: 'admin', contrasena: 'demo123' }
+  // ADMINS
+  'admin': { nombre: 'Administrador', rol: 'admin', departamento: 'Admin', contrasena: 'demo123' },
+  'miguel.padilla': { nombre: 'Miguel Padilla', rol: 'admin', departamento: 'DPE', contrasena: 'demo123' },
+  'hugo.araya': { nombre: 'Hugo Araya', rol: 'admin', departamento: 'DPE', contrasena: 'demo123' },
+  'gustavo.reyes': { nombre: 'Gustavo Reyes', rol: 'admin', departamento: 'Squad', contrasena: 'demo123' },
+  'najeeb.escobar': { nombre: 'Najeeb Escobar', rol: 'admin', departamento: 'TL', contrasena: 'demo123' },
+  'john.estrada': { nombre: 'john Estrada', rol: 'admin', departamento: 'TL', contrasena: 'demo123' },
+  
+  // COORDINADOR
+  'maria.admin': { nombre: 'Maria Admin', rol: 'coordinador', departamento: 'Coordinación', contrasena: 'demo123' },
+  
+  // ITSM
+  'danilo.isla': { nombre: 'Danilo Isla', rol: 'itsm', departamento: 'ITSM', contrasena: 'demo123' },
+  
+  // ESPECIALISTAS
+  'jorge.maureira': { nombre: 'Jorge Maureira', rol: 'especialista', departamento: 'Middleware', contrasena: 'demo123' },
+  'jhon.estrada': { nombre: 'Jhon Estrada', rol: 'especialista', departamento: 'Operaciones Cloud', contrasena: 'demo123' },
+  'luis.vasquez': { nombre: 'Luis Vasquez', rol: 'especialista', departamento: 'Middleware', contrasena: 'demo123' },
+  'moises.junco': { nombre: 'Moises Junco', rol: 'especialista', departamento: 'Operaciones Cloud', contrasena: 'demo123' },
+  'manuel.urbina': { nombre: 'Manuel Urbina Hernández', rol: 'especialista', departamento: 'Middleware', contrasena: 'demo123' },
+  'benjamin.fierro': { nombre: 'Benjamín Fierro', rol: 'especialista', departamento: 'Operaciones Cloud', contrasena: 'demo123' },
+  'mauricio.serrano': { nombre: 'Mauricio Antonio Serrano Gonzalez', rol: 'especialista', departamento: 'Middleware', contrasena: 'demo123' },
+  'ricardo.rojas': { nombre: 'Ricardo Andrés Rojas Ramos', rol: 'especialista', departamento: 'Operaciones Cloud', contrasena: 'demo123' },
+  'ariel.garate': { nombre: 'Ariel Garate', rol: 'especialista', departamento: 'Middleware', contrasena: 'demo123' },
+  'rodrigo.sanhueza': { nombre: 'Rodrigo Alejandro Sanhueza', rol: 'especialista', departamento: 'Middleware', contrasena: 'demo123' },
+  'sebastian.arroyo': { nombre: 'Sebastian Arroyo Vigouroux', rol: 'especialista', departamento: 'Operaciones Cloud', contrasena: 'demo123' },
+  'cristian.madariaga': { nombre: 'Cristian Madariaga', rol: 'especialista', departamento: 'Middleware', contrasena: 'demo123' },
+  'miguel.martinez': { nombre: 'Miguel Martinez', rol: 'especialista', departamento: 'Operaciones Cloud', contrasena: 'demo123' },
+  'fabian.tobar': { nombre: 'Fabian Tobar', rol: 'especialista', departamento: 'Middleware', contrasena: 'demo123' },
+  'gustavo.perolo': { nombre: 'Gustavo Perolo', rol: 'especialista', departamento: 'Operaciones Cloud', contrasena: 'demo123' },
+  'leonardo.silva': { nombre: 'Leonardo Silva', rol: 'especialista', departamento: 'Middleware', contrasena: 'demo123' },
+  'cristian.lecaros': { nombre: 'Cristian Lecaros', rol: 'especialista', departamento: 'Operaciones Cloud', contrasena: 'demo123' },
+  'rodrigo.escobedo': { nombre: 'Rodrigo Escobedo', rol: 'especialista', departamento: 'Middleware', contrasena: 'demo123' },
+  'alexis.alfonzo': { nombre: 'Alexis José Alfonzo', rol: 'especialista', departamento: 'Operaciones Cloud', contrasena: 'demo123' }
 };
 
 // ============================================
