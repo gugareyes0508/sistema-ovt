@@ -273,7 +273,7 @@ function App() {
     console.log(`[Dashboard] Total registros: ${registros.length}`);
     console.log(`[Dashboard] Registros filtrados: ${registrosFiltrados.length}`);
     console.log(`[Dashboard] Primeros 3 registros:`, registros.slice(0, 3));
-  }, [filtros.mes, filtros.anio, registros.length, registrosFiltrados.length]);
+  }, [filtros.mes, filtros.anio, registros]);
 
   // Contar estados del mes filtrado
   const pendientes = registrosFiltrados.filter(r => r.estado === 'pendiente').length;
