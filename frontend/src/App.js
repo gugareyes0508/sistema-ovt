@@ -1299,6 +1299,87 @@ function App() {
               • Contraseña inicial: Se puede cambiar después de login<br/>
               • Se registra cada creación en auditoría
             </div>
+
+            {/* SECCIÓN: RESETEAR CONTRASEÑA */}
+            <h3 style={{marginTop: '40px', borderTop: '2px solid #ddd', paddingTop: '20px'}}>🔐 Resetear Contraseña de Usuarios</h3>
+            
+            {[
+              { usuario: 'miguel.padilla', nombre: 'Miguel Padilla' },
+              { usuario: 'hugo.araya', nombre: 'Hugo Araya' },
+              { usuario: 'gustavo.reyes', nombre: 'Gustavo Reyes' },
+              { usuario: 'najeeb.escobar', nombre: 'Najeeb Escobar' },
+              { usuario: 'john.estrada', nombre: 'john Estrada' },
+              { usuario: 'danilo.isla', nombre: 'Danilo Isla' },
+              { usuario: 'maria.admin', nombre: 'Coordinador (maria.admin)' }
+            ].map(u => (
+              <div key={u.usuario} style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                padding: '12px',
+                background: '#f9f9f9',
+                borderRadius: '6px',
+                marginBottom: '8px',
+                border: '1px solid #eee'
+              }}>
+                <div>
+                  <strong>{u.nombre}</strong><br/>
+                  <small style={{color: '#666'}}>@{u.usuario}</small>
+                </div>
+                <button
+                  onClick={() => {
+                    const nuevaContraseña = prompt(`Ingresa nueva contraseña para ${u.nombre}:\n(mínimo 4 caracteres)`, 'demo123');
+                    
+                    if (!nuevaContraseña) return;
+                    if (nuevaContraseña.length < 4) {
+                      alert('❌ La contraseña debe tener mínimo 4 caracteres');
+                      return;
+                    }
+
+                    axios.post(`${API_URL}/api/admin/resetear-contrasena`, 
+                      { 
+                        usuario: u.usuario, 
+                        contraseñaNueva: nuevaContraseña 
+                      },
+                      { headers: { Authorization: `Bearer ${token}` } }
+                    )
+                    .then(res => {
+                      alert(`✅ Contraseña reseteada para ${u.nombre}\nNueva contraseña: ${nuevaContraseña}`);
+                    })
+                    .catch(err => {
+                      alert('❌ Error: ' + (err.response?.data?.error || err.message));
+                    });
+                  }}
+                  style={{
+                    padding: '8px 16px',
+                    background: '#FF9800',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '6px',
+                    cursor: 'pointer',
+                    fontSize: '12px',
+                    fontWeight: '600'
+                  }}
+                >
+                  🔐 Resetear
+                </button>
+              </div>
+            ))}
+
+            <div style={{
+              background: '#fff3cd',
+              padding: '12px',
+              borderRadius: '6px',
+              marginTop: '15px',
+              fontSize: '12px',
+              borderLeft: '4px solid #FF9800'
+            }}>
+              <strong>⚠️ Importante:</strong><br/>
+              • Ingresa la nueva contraseña que deseas asignar<br/>
+              • El usuario recibirá la nueva contraseña<br/>
+              • Puede cambiarla después de iniciar sesión<br/>
+              • Se registra en auditoría cada reseteo
+            </div>
           </section>
         )}
 
