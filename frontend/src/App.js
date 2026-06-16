@@ -1647,10 +1647,15 @@ function App() {
                       value={formularioModal.fechaInicio ? formularioModal.fechaInicio.toISOString().split('T')[0] : ''}
                       onChange={(e) => {
                         const fecha = new Date(e.target.value);
+                        const fin = formularioModal.fechaFin;
+                        let horas = 0;
+                        if (fin) {
+                          horas = Math.max(0, ((fin - fecha) / (1000 * 60 * 60)).toFixed(2));
+                        }
                         setFormularioModal({
                           ...formularioModal, 
                           fechaInicio: fecha,
-                          horas: calcularHoras(fecha, formularioModal.fechaFin)
+                          horas: horas
                         });
                       }}
                       required
@@ -1664,10 +1669,15 @@ function App() {
                       value={formularioModal.fechaFin ? formularioModal.fechaFin.toISOString().split('T')[0] : ''}
                       onChange={(e) => {
                         const fecha = new Date(e.target.value);
+                        const inicio = formularioModal.fechaInicio;
+                        let horas = 0;
+                        if (inicio) {
+                          horas = Math.max(0, ((fecha - inicio) / (1000 * 60 * 60)).toFixed(2));
+                        }
                         setFormularioModal({
                           ...formularioModal, 
                           fechaFin: fecha,
-                          horas: calcularHoras(formularioModal.fechaInicio, fecha)
+                          horas: horas
                         });
                       }}
                       required
