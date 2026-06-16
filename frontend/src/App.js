@@ -9,21 +9,11 @@ function App() {
   const [token, setToken] = useState(localStorage.getItem('token'));
   const [vista, setVista] = useState('mi-resumen');
   const [registros, setRegistros] = useState([]);
-  const [mes, setMes] = useState(new Date().toLocaleString('es-ES', { month: '2-digit', year: 'numeric' }).split('/').reverse().join('-'));
-  const [ano, setAno] = useState(new Date().getFullYear());
   const [estado, setEstado] = useState('Todos');
   const [formulario, setFormulario] = useState({tipo: 'cambio', descripcion: '', cliente: 'Banco de Chile', fechaInicio: new Date(), fechaFin: new Date(), horas: 0, especialidad: '', interno_cliente: 'interno', genera_ovt: 'si'});
   const [editandoId, setEditandoId] = useState(null);
   const [modalEdicion, setModalEdicion] = useState({abierto: false, registro: null});
   const [formularioModal, setFormularioModal] = useState({});
-
-  useEffect(() => {
-    if (token) {
-      const payload = JSON.parse(atob(token.split('.')[1]));
-      setUsuario(payload);
-      cargarRegistros();
-    }
-  }, [token]);
 
   const cargarRegistros = useCallback(() => {
     if (!token) return;
@@ -31,6 +21,14 @@ function App() {
       .then(res => setRegistros(res.data))
       .catch(err => console.error('Error cargando registros:', err));
   }, [token]);
+
+  useEffect(() => {
+    if (token) {
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      setUsuario(payload);
+      cargarRegistros();
+    }
+  }, [token, cargarRegistros]);
 
   const handleLogin = (e) => {
     e.preventDefault();
