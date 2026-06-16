@@ -1520,7 +1520,7 @@ function App() {
         )}
 
         {/* MODAL MEJORADO - EDICIÓN COMPLETA */}
-        {modalEdicion && modalEdicion.abierto && modalEdicion.registro && (
+        {modalEdicion && modalEdicion.abierto && (
           <div style={{position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', background: 'white', padding: '30px', borderRadius: '12px', zIndex: 9999, width: '95%', maxWidth: '600px', boxShadow: '0 10px 40px rgba(0,0,0,0.3)', maxHeight: '90vh', overflowY: 'auto'}}>
             <h2 style={{marginTop: 0, marginBottom: '20px'}}>✏️ Editar Registro Rechazado</h2>
             
