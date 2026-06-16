@@ -139,6 +139,117 @@ app.post('/api/auth/login', async (req, res) => {
 });
 
 // ============================================
+// ADMIN: Crear nuevos usuarios admin
+// ============================================
+app.post('/api/admin/crear-usuario', verificarToken, async (req, res) => {
+  try {
+    // Solo el admin original puede crear nuevos usuarios
+    if (req.usuario.usuario !== 'admin') {
+      return res.status(403).json({ error: 'No tienes permisos para crear usuarios' });
+    }
+
+    const { usuario, nombre, rol, departamento, contrasena } = req.body;
+
+    if (!usuario || !nombre || !contrasena) {
+      return res.status(400).json({ error: 'Faltan campos requeridos' });
+    }
+
+    // Agregar usuario a la lista en memoria
+    usuarios[usuario] = {
+      nombre,
+      contrasena,
+      rol: rol || 'admin',
+      departamento: departamento || ''
+    };
+
+    res.json({ 
+      success: true, 
+      message: `Usuario ${usuario} creado correctamente`,
+      usuario: { usuario, nombre, rol: rol || 'admin' }
+    });
+  } catch (err) {
+    console.error('Error creando usuario:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ============================================
+// CAMBIAR CONTRASEÑA (Cualquier usuario autenticado)
+// ============================================
+app.post('/api/auth/cambiar-contrasena', verificarToken, async (req, res) => {
+  try {
+    const { contrasenaActual, contraseñaNueva } = req.body;
+
+    if (!contrasenaActual || !contraseñaNueva) {
+      return res.status(400).json({ error: 'Faltan campos requeridos' });
+    }
+
+    if (contraseñaNueva.length < 4) {
+      return res.status(400).json({ error: 'La contraseña debe tener al menos 4 caracteres' });
+    }
+
+    // Verificar contraseña actual
+    const user = usuarios[req.usuario.usuario];
+    if (!user || user.contrasena !== contrasenaActual) {
+      return res.status(401).json({ error: 'Contraseña actual incorrecta' });
+    }
+
+    // Cambiar contraseña
+    usuarios[req.usuario.usuario].contrasena = contraseñaNueva;
+
+    // Registrar en auditoría
+    await db.collection('auditoria').add({
+      accion: 'CAMBIO_CONTRASEÑA',
+      usuarioNombre: req.usuario.nombre,
+      usuarioRol: req.usuario.rol,
+      timestamp: new Date(),
+      detalles: 'Cambio de contraseña exitoso'
+    });
+
+    res.json({ 
+      success: true, 
+      message: 'Contraseña cambiada correctamente'
+    });
+  } catch (err) {
+    console.error('Error cambiando contraseña:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ============================================
+// ADMIN: Resetear contraseña de otro usuario
+// ============================================
+app.post('/api/admin/resetear-contrasena', verificarToken, async (req, res) => {
+  try {
+    // Solo admin puede resetear contraseñas
+    if (req.usuario.usuario !== 'admin') {
+      return res.status(403).json({ error: 'No tienes permisos para resetear contraseñas' });
+    }
+
+    const { usuario, contraseñaNueva } = req.body;
+
+    if (!usuario || !contraseñaNueva) {
+      return res.status(400).json({ error: 'Faltan campos requeridos' });
+    }
+
+    if (!usuarios[usuario]) {
+      return res.status(404).json({ error: 'Usuario no encontrado' });
+    }
+
+    // Cambiar contraseña
+    usuarios[usuario].contrasena = contraseñaNueva;
+
+    res.json({ 
+      success: true, 
+      message: `Contraseña de ${usuario} reseteada a: ${contraseñaNueva}`
+    });
+  } catch (err) {
+    console.error('Error reseteando contraseña:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ============================================
 // RUTAS: REGISTROS MEJORADOS
 // ============================================
 
