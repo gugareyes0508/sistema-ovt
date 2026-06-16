@@ -204,76 +204,27 @@ function App() {
 
   // Cargar registro para editar
   const cargarParaEditar = (registro) => {
-    console.log('📝 Cargando para editar:', registro, 'Vista:', vista, 'Rol:', usuario.rol);
-    
-    // Admin puede editar cualquier registro, especialista solo los suyos
-    if (usuario.rol === 'especialista' && registro.createdBy !== usuario.usuario) {
-      alert('❌ Solo puedes editar tus propios registros');
-      return;
-    }
-    
-    // Especialista: No puede editar si está pendiente o aprobado
-    if (usuario.rol === 'especialista') {
-      if (registro.estado === 'pendiente') {
-        alert('❌ No puedes editar este registro mientras está pendiente de aprobación.\n\nEspera a que el administrador lo apruebe o rechace.');
-        return;
-      }
-      if (registro.estado === 'exitoso') {
-        alert('❌ No puedes editar este registro porque ya ha sido aprobado.\n\nSolo puedes editar registros rechazados.');
+    try {
+      if (registro.estado !== "fallido") {
+        alert("❌ Solo puedes editar registros rechazados");
         return;
       }
       
-      // Si es fallido (rechazado) y está en la vista mi-resumen, abrir modal
-      if (registro.estado === 'fallido' && vista === 'mi-resumen') {
-        console.log('🔓 Abriendo modal de edición');
-        alert('ℹ️ Editando registro rechazado.\n\nPuedes corregir y volver a enviarlo para aprobación.');
-        
-        const fechaInicioObj = registro.fechaInicio?.toDate ? registro.fechaInicio.toDate() : new Date(registro.fechaInicio);
-        const fechaFinObj = registro.fechaFin?.toDate ? registro.fechaFin.toDate() : new Date(registro.fechaFin);
-        
-        setModalEdicion({ abierto: true, registro });
-        setFormularioModal({
-          tipo: registro.tipo || 'cambio',
-          descripcion: registro.descripcion || '',
-          cliente: registro.cliente || 'Banco de Chile',
-          fechaInicio: fechaInicioObj,
-          fechaFin: fechaFinObj,
-          horas: registro.horas || 0,
-          especialista: registro.especialista || usuario.nombre,
-          interno_cliente: registro.interno_cliente || 'interno',
-          genera_ovt: registro.genera_ovt || 'si',
-          especialidad: registro.especialidad || ''
-        });
-        return;
-      }
+      alert("ℹ️ Editando registro rechazado.\n\nPuedes corregir y volver a enviarlo para aprobación.");
+      
+      setModalEdicion({ abierto: true, registro });
+      setFormularioModal({
+        tipo: registro.tipo || "cambio",
+        descripcion: registro.descripcion || "",
+        cliente: registro.cliente || "Banco de Chile",
+        fechaInicio: registro.fechaInicio,
+        fechaFin: registro.fechaFin,
+        horas: registro.horas || 0
+      });
+    } catch (err) {
+      console.error("Error en cargarParaEditar:", err);
+      alert("❌ Error al abrir modal: " + err.message);
     }
-    
-    // Si es admin o edición en otra vista, cambiar vista
-    setVista('registrar');
-    setEditandoId(registro.id);
-    
-    const fechaInicioObj = registro.fechaInicio?.toDate ? registro.fechaInicio.toDate() : new Date(registro.fechaInicio);
-    const fechaFinObj = registro.fechaFin?.toDate ? registro.fechaFin.toDate() : new Date(registro.fechaFin);
-    
-    setFormulario({
-      tipo: registro.tipo || 'cambio',
-      descripcion: registro.descripcion || '',
-      cliente: registro.cliente || 'Banco de Chile',
-      fechaInicio: fechaInicioObj,
-      fechaFin: fechaFinObj,
-      horas: registro.horas || 0,
-      especialista: registro.especialista || usuario.nombre,
-      interno_cliente: registro.interno_cliente || 'interno',
-      genera_ovt: registro.genera_ovt || 'si',
-      estado: registro.estado || 'pendiente',
-      especialidad: registro.especialidad || ''
-    });
-    
-    console.log('✅ Formulario cargado para admin');
-    
-    setTimeout(() => {
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    }, 100);
   };
 
   // Cancelar edición
