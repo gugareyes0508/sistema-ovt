@@ -1644,14 +1644,22 @@ function App() {
                     <label>Fecha Inicio *</label>
                     <input 
                       type="date"
-                      value={formularioModal.fechaInicio ? formularioModal.fechaInicio.toISOString().split('T')[0] : ''}
+                      value={
+                        formularioModal.fechaInicio && !isNaN(formularioModal.fechaInicio.getTime())
+                          ? formularioModal.fechaInicio.toISOString().split('T')[0]
+                          : ''
+                      }
                       onChange={(e) => {
-                        const fecha = new Date(e.target.value);
+                        if (!e.target.value) return;
+                        const [year, month, day] = e.target.value.split('-');
+                        const fecha = new Date(year, month - 1, day, 12, 0, 0);
+                        
                         const fin = formularioModal.fechaFin;
-                        let horas = 0;
-                        if (fin) {
-                          horas = Math.max(0, ((fin - fecha) / (1000 * 60 * 60)).toFixed(2));
+                        let horas = formularioModal.horas || 0;
+                        if (fin && !isNaN(fin.getTime())) {
+                          horas = parseFloat(Math.max(0, ((fin - fecha) / (1000 * 60 * 60)).toFixed(2)));
                         }
+                        
                         setFormularioModal({
                           ...formularioModal, 
                           fechaInicio: fecha,
@@ -1666,14 +1674,22 @@ function App() {
                     <label>Fecha Fin *</label>
                     <input 
                       type="date"
-                      value={formularioModal.fechaFin ? formularioModal.fechaFin.toISOString().split('T')[0] : ''}
+                      value={
+                        formularioModal.fechaFin && !isNaN(formularioModal.fechaFin.getTime())
+                          ? formularioModal.fechaFin.toISOString().split('T')[0]
+                          : ''
+                      }
                       onChange={(e) => {
-                        const fecha = new Date(e.target.value);
+                        if (!e.target.value) return;
+                        const [year, month, day] = e.target.value.split('-');
+                        const fecha = new Date(year, month - 1, day, 12, 0, 0);
+                        
                         const inicio = formularioModal.fechaInicio;
-                        let horas = 0;
-                        if (inicio) {
-                          horas = Math.max(0, ((fecha - inicio) / (1000 * 60 * 60)).toFixed(2));
+                        let horas = formularioModal.horas || 0;
+                        if (inicio && !isNaN(inicio.getTime())) {
+                          horas = parseFloat(Math.max(0, ((fecha - inicio) / (1000 * 60 * 60)).toFixed(2)));
                         }
+                        
                         setFormularioModal({
                           ...formularioModal, 
                           fechaFin: fecha,
