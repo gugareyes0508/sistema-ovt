@@ -1569,7 +1569,20 @@ function App() {
                     value={formularioModal.fechaInicio ? (formularioModal.fechaInicio instanceof Date ? toDateString(formularioModal.fechaInicio) : formularioModal.fechaInicio) : ''}
                     onChange={(e) => {
                       if (!e.target.value) return;
+                      
+                      // Validar que el formato sea correcto (YYYY-MM-DD)
+                      const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+                      if (!dateRegex.test(e.target.value)) {
+                        console.warn('Formato de fecha inválido:', e.target.value);
+                        return;
+                      }
+                      
                       const fecha = new Date(e.target.value + 'T12:00:00');
+                      if (isNaN(fecha.getTime())) {
+                        console.warn('Fecha inválida:', e.target.value);
+                        return;
+                      }
+                      
                       const fin = formularioModal.fechaFin;
                       let horas = formularioModal.horas;
                       if (fin && !isNaN(fin.getTime()) && !isNaN(fecha.getTime())) {
@@ -1611,7 +1624,20 @@ function App() {
                     value={formularioModal.fechaFin ? (formularioModal.fechaFin instanceof Date ? toDateString(formularioModal.fechaFin) : formularioModal.fechaFin) : ''}
                     onChange={(e) => {
                       if (!e.target.value) return;
+                      
+                      // Validar que el formato sea correcto (YYYY-MM-DD)
+                      const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+                      if (!dateRegex.test(e.target.value)) {
+                        console.warn('Formato de fecha inválido:', e.target.value);
+                        return;
+                      }
+                      
                       const fecha = new Date(e.target.value + 'T12:00:00');
+                      if (isNaN(fecha.getTime())) {
+                        console.warn('Fecha inválida:', e.target.value);
+                        return;
+                      }
+                      
                       const inicio = formularioModal.fechaInicio;
                       let horas = formularioModal.horas;
                       if (inicio && !isNaN(inicio.getTime()) && !isNaN(fecha.getTime())) {
