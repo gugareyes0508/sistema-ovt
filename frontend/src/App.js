@@ -931,8 +931,8 @@ function App() {
 
             {/* Tabla de registros */}
             <h3>Mis Registros</h3>
-            {registros.length === 0 ? (
-              <p className="sin-datos">No hay registros</p>
+            {misRegistrosFiltrados.length === 0 ? (
+              <p className="sin-datos">No hay registros para este período</p>
             ) : (
               <table className="tabla">
                 <thead>
@@ -948,7 +948,7 @@ function App() {
                   </tr>
                 </thead>
                 <tbody>
-                  {registros.map(r => (
+                  {misRegistrosFiltrados.map(r => (
                     <tr key={r.id}>
                       <td><strong>{r.tipo}</strong></td>
                       <td>{r.descripcion?.substring(0, 25)}</td>
