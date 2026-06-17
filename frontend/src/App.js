@@ -955,9 +955,9 @@ function App() {
                       <td>{r.descripcion?.substring(0, 25)}</td>
                       <td>{r.cliente}</td>
                       <td>{parseDate(r.fechaInicio)}</td>
-                      <td>{r.fechaInicio instanceof Date ? toTimeString(r.fechaInicio) : '00:00'}</td>
+                      <td>{toTimeString(toDate(r.fechaInicio))}</td>
                       <td>{parseDate(r.fechaFin)}</td>
-                      <td>{r.fechaFin instanceof Date ? toTimeString(r.fechaFin) : '00:00'}</td>
+                      <td>{toTimeString(toDate(r.fechaFin))}</td>
                       <td className="numero">{r.horas}h</td>
                       <td>
                         <span className={`badge badge-${r.estado}`}>
