@@ -7,16 +7,30 @@ const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
 // FUNCIONES HELPER PARA FECHAS
 const toDate = (fecha) => {
   if (fecha instanceof Date) return fecha;
+  
   if (typeof fecha === 'string') {
-    // Si es formato YYYY-MM-DD, parsear sin zona horaria
+    // Si es formato YYYY-MM-DD sin hora, preservar 00:00
     if (fecha.match(/^\d{4}-\d{2}-\d{2}$/)) {
       const [year, month, day] = fecha.split('-').map(Number);
-      return new Date(year, month - 1, day, 12, 0, 0);
+      return new Date(year, month - 1, day, 0, 0, 0);
+    }
+    // Si es ISO string con hora, parsear correctamente
+    if (fecha.includes('T')) {
+      return new Date(fecha);
     }
     return new Date(fecha);
   }
-  if (fecha && fecha.toDate && typeof fecha.toDate === 'function') return fecha.toDate();
-  if (fecha && fecha._seconds) return new Date(fecha._seconds * 1000);
+  
+  // Firebase Timestamp
+  if (fecha && fecha.toDate && typeof fecha.toDate === 'function') {
+    return fecha.toDate();
+  }
+  
+  // Firebase Firestore timestamp object
+  if (fecha && fecha._seconds) {
+    return new Date(fecha._seconds * 1000);
+  }
+  
   return new Date();
 };
 
@@ -1595,7 +1609,10 @@ function App() {
                         return;
                       }
                       
-                      const fecha = new Date(e.target.value + 'T12:00:00');
+                      const horaActual = formularioModal.fechaInicio instanceof Date ? formularioModal.fechaInicio.getHours() : 0;
+                      const minActual = formularioModal.fechaInicio instanceof Date ? formularioModal.fechaInicio.getMinutes() : 0;
+                      const [year, month, day] = e.target.value.split('-').map(Number);
+                      const fecha = new Date(year, month - 1, day, horaActual, minActual, 0);
                       if (isNaN(fecha.getTime())) {
                         console.warn('Fecha inválida:', e.target.value);
                         return;
@@ -1650,7 +1667,10 @@ function App() {
                         return;
                       }
                       
-                      const fecha = new Date(e.target.value + 'T12:00:00');
+                      const horaActual = formularioModal.fechaInicio instanceof Date ? formularioModal.fechaInicio.getHours() : 0;
+                      const minActual = formularioModal.fechaInicio instanceof Date ? formularioModal.fechaInicio.getMinutes() : 0;
+                      const [year, month, day] = e.target.value.split('-').map(Number);
+                      const fecha = new Date(year, month - 1, day, horaActual, minActual, 0);
                       if (isNaN(fecha.getTime())) {
                         console.warn('Fecha inválida:', e.target.value);
                         return;
