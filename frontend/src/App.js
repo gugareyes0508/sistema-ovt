@@ -939,6 +939,9 @@ function App() {
                     <th>Descripción</th>
                     <th>Cliente</th>
                     <th>Fecha Inicio</th>
+                    <th>Hora Inicio</th>
+                    <th>Fecha Fin</th>
+                    <th>Hora Fin</th>
                     <th>Horas</th>
                     <th>Estado</th>
                     <th>Genera OVT</th>
@@ -952,6 +955,9 @@ function App() {
                       <td>{r.descripcion?.substring(0, 25)}</td>
                       <td>{r.cliente}</td>
                       <td>{parseDate(r.fechaInicio)}</td>
+                      <td>{r.fechaInicio instanceof Date ? toTimeString(r.fechaInicio) : '00:00'}</td>
+                      <td>{parseDate(r.fechaFin)}</td>
+                      <td>{r.fechaFin instanceof Date ? toTimeString(r.fechaFin) : '00:00'}</td>
                       <td className="numero">{r.horas}h</td>
                       <td>
                         <span className={`badge badge-${r.estado}`}>
