@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
+import TestGroq from './TestGroq';
 import './App.css';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
@@ -583,6 +584,12 @@ function App() {
               onClick={() => setVista('auditoria')}
             >
               🔍 Auditoría
+            </button>
+            <button 
+              className={vista === 'test-groq' ? 'nav-btn active' : 'nav-btn'} 
+              onClick={() => setVista('test-groq')}
+            >
+              🧪 Test GROQ
             </button>
           </>
         )}
@@ -1774,6 +1781,9 @@ function App() {
             </form>
           </div>
         )}
+
+        {/* Test GROQ */}
+        {vista === 'test-groq' && <TestGroq />}
       </main>
 
       {/* FOOTER */}
