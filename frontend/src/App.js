@@ -7,7 +7,14 @@ const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
 // FUNCIONES HELPER PARA FECHAS
 const toDate = (fecha) => {
   if (fecha instanceof Date) return fecha;
-  if (typeof fecha === 'string') return new Date(fecha);
+  if (typeof fecha === 'string') {
+    // Si es formato YYYY-MM-DD, parsear sin zona horaria
+    if (fecha.match(/^\d{4}-\d{2}-\d{2}$/)) {
+      const [year, month, day] = fecha.split('-').map(Number);
+      return new Date(year, month - 1, day, 12, 0, 0);
+    }
+    return new Date(fecha);
+  }
   if (fecha && fecha.toDate && typeof fecha.toDate === 'function') return fecha.toDate();
   if (fecha && fecha._seconds) return new Date(fecha._seconds * 1000);
   return new Date();
@@ -16,7 +23,10 @@ const toDate = (fecha) => {
 const toDateString = (fecha) => {
   try {
     const d = toDate(fecha);
-    return d.toISOString().split('T')[0];
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
   } catch {
     return '';
   }
@@ -653,7 +663,7 @@ function App() {
                   <input
                     type="date"
                     value={formulario.fechaInicio instanceof Date ? 
-                      (formulario.fechaInicio instanceof Date ? formulario.fechaInicio.toISOString().split('T')[0] : formulario.fechaInicio)
+                      (formulario.fechaInicio instanceof Date ? toDateString(formulario.fechaInicio) : formulario.fechaInicio)
                       : ''
                     }
                     onChange={(e) => {
@@ -692,7 +702,7 @@ function App() {
                   <input
                     type="date"
                     value={formulario.fechaFin instanceof Date ? 
-                      (formulario.fechaFin instanceof Date ? formulario.fechaFin.toISOString().split('T')[0] : formulario.fechaFin)
+                      (formulario.fechaFin instanceof Date ? toDateString(formulario.fechaFin) : formulario.fechaFin)
                       : ''
                     }
                     onChange={(e) => {
