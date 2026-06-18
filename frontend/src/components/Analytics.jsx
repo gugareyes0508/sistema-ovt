@@ -270,24 +270,30 @@ Sé conciso y específico.`;
       legend: {
         display: true,
         position: 'bottom',
-        labels: { padding: 15, font: { size: 12 } }
+        labels: { 
+          padding: 20, 
+          font: { size: 13, weight: 'bold' },
+          boxWidth: 15,
+          usePointStyle: false
+        }
       },
       tooltip: {
-        backgroundColor: 'rgba(0,0,0,0.7)',
+        backgroundColor: 'rgba(0,0,0,0.8)',
         padding: 12,
-        titleFont: { size: 13 },
-        bodyFont: { size: 12 }
+        titleFont: { size: 14, weight: 'bold' },
+        bodyFont: { size: 12 },
+        cornerRadius: 6
       }
     },
     scales: {
       y: {
         beginAtZero: true,
-        grid: { color: 'rgba(0,0,0,0.05)' },
-        ticks: { font: { size: 11 } }
+        grid: { color: 'rgba(0,0,0,0.08)' },
+        ticks: { font: { size: 12 }, padding: 10 }
       },
       x: {
         grid: { display: false },
-        ticks: { font: { size: 11 } }
+        ticks: { font: { size: 12 }, padding: 10 }
       }
     }
   };
@@ -393,16 +399,16 @@ Sé conciso y específico.`;
 
       {/* Tab: Resumen */}
       {activeTab === 'resumen' && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '20px' }}>
-          <div style={{ background: 'white', padding: '20px', borderRadius: '8px', border: '1px solid #eee' }}>
-            <h3>HHEE por Tipo</h3>
-            <div style={{ position: 'relative', height: '250px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '30px', marginTop: '20px' }}>
+          <div style={{ background: 'white', padding: '25px', borderRadius: '10px', border: '1px solid #e0e0e0', boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }}>
+            <h3 style={{ margin: '0 0 20px 0', color: '#333', fontSize: '16px', fontWeight: '600' }}>📊 HHEE por Tipo</h3>
+            <div style={{ position: 'relative', height: '300px' }}>
               <Doughnut data={chartPorTipo} options={chartOptions} />
             </div>
           </div>
-          <div style={{ background: 'white', padding: '20px', borderRadius: '8px', border: '1px solid #eee' }}>
-            <h3>HHEE por Especialidad</h3>
-            <div style={{ position: 'relative', height: '250px' }}>
+          <div style={{ background: 'white', padding: '25px', borderRadius: '10px', border: '1px solid #e0e0e0', boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }}>
+            <h3 style={{ margin: '0 0 20px 0', color: '#333', fontSize: '16px', fontWeight: '600' }}>📈 HHEE por Especialidad</h3>
+            <div style={{ position: 'relative', height: '300px' }}>
               <Bar data={chartPorEspecialidad} options={chartOptions} />
             </div>
           </div>
@@ -411,16 +417,16 @@ Sé conciso y específico.`;
 
       {/* Tab: Tendencias */}
       {activeTab === 'tendencias' && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '20px' }}>
-          <div style={{ background: 'white', padding: '20px', borderRadius: '8px', border: '1px solid #eee' }}>
-            <h3>Evolución Semana a Semana</h3>
-            <div style={{ position: 'relative', height: '300px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(450px, 1fr))', gap: '30px', marginTop: '20px' }}>
+          <div style={{ background: 'white', padding: '25px', borderRadius: '10px', border: '1px solid #e0e0e0', boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }}>
+            <h3 style={{ margin: '0 0 20px 0', color: '#333', fontSize: '16px', fontWeight: '600' }}>📈 Evolución Semana a Semana</h3>
+            <div style={{ position: 'relative', height: '350px' }}>
               <Line data={chartSemanal} options={chartOptions} />
             </div>
           </div>
-          <div style={{ background: 'white', padding: '20px', borderRadius: '8px', border: '1px solid #eee' }}>
-            <h3>HHEE por Día de Semana</h3>
-            <div style={{ position: 'relative', height: '300px' }}>
+          <div style={{ background: 'white', padding: '25px', borderRadius: '10px', border: '1px solid #e0e0e0', boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }}>
+            <h3 style={{ margin: '0 0 20px 0', color: '#333', fontSize: '16px', fontWeight: '600' }}>📊 HHEE por Día de Semana</h3>
+            <div style={{ position: 'relative', height: '350px' }}>
               <Bar data={chartPorDia} options={chartOptions} />
             </div>
           </div>
@@ -429,9 +435,9 @@ Sé conciso y específico.`;
 
       {/* Tab: Por Persona */}
       {activeTab === 'persona' && (
-        <div style={{ background: 'white', padding: '20px', borderRadius: '8px', border: '1px solid #eee' }}>
-          <h3>Top Especialistas - HHEE</h3>
-          <div style={{ position: 'relative', height: '400px' }}>
+        <div style={{ background: 'white', padding: '25px', borderRadius: '10px', border: '1px solid #e0e0e0', boxShadow: '0 2px 8px rgba(0,0,0,0.05)', marginTop: '20px' }}>
+          <h3 style={{ margin: '0 0 20px 0', color: '#333', fontSize: '16px', fontWeight: '600' }}>👥 Top 10 Especialistas - HHEE</h3>
+          <div style={{ position: 'relative', height: '450px' }}>
             <Bar data={chartTopEspecialistas} options={{ ...chartOptions, indexAxis: 'y' }} />
           </div>
         </div>
@@ -439,24 +445,24 @@ Sé conciso y específico.`;
 
       {/* Tab: Por Área */}
       {activeTab === 'area' && (
-        <div style={{ background: 'white', padding: '20px', borderRadius: '8px', border: '1px solid #eee' }}>
-          <h3>Desglose por Especialidad</h3>
-          <table style={{ width: '100%', marginTop: '15px', borderCollapse: 'collapse' }}>
+        <div style={{ background: 'white', padding: '25px', borderRadius: '10px', border: '1px solid #e0e0e0', boxShadow: '0 2px 8px rgba(0,0,0,0.05)', marginTop: '20px' }}>
+          <h3 style={{ margin: '0 0 20px 0', color: '#333', fontSize: '16px', fontWeight: '600' }}>🏢 Desglose por Especialidad</h3>
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
-              <tr style={{ borderBottom: '2px solid #ddd' }}>
-                <th style={{ padding: '10px', textAlign: 'left', fontWeight: 'bold' }}>Especialidad</th>
-                <th style={{ padding: '10px', textAlign: 'right', fontWeight: 'bold' }}>Horas</th>
-                <th style={{ padding: '10px', textAlign: 'right', fontWeight: 'bold' }}>% del Total</th>
+              <tr style={{ background: '#f5f5f5', borderBottom: '2px solid #ddd' }}>
+                <th style={{ padding: '15px', textAlign: 'left', fontWeight: '600', color: '#333' }}>Especialidad</th>
+                <th style={{ padding: '15px', textAlign: 'right', fontWeight: '600', color: '#333' }}>Horas</th>
+                <th style={{ padding: '15px', textAlign: 'right', fontWeight: '600', color: '#333' }}>% del Total</th>
               </tr>
             </thead>
             <tbody>
               {Object.entries(datos.porEspecialidad)
                 .sort((a, b) => b[1] - a[1])
-                .map(([especialidad, horas]) => (
-                  <tr key={especialidad} style={{ borderBottom: '1px solid #eee' }}>
-                    <td style={{ padding: '10px' }}>{especialidad}</td>
-                    <td style={{ padding: '10px', textAlign: 'right', fontWeight: 'bold' }}>{horas.toFixed(1)}h</td>
-                    <td style={{ padding: '10px', textAlign: 'right' }}>
+                .map(([especialidad, horas], idx) => (
+                  <tr key={especialidad} style={{ borderBottom: '1px solid #eee', background: idx % 2 === 0 ? '#fafafa' : 'white' }}>
+                    <td style={{ padding: '15px', color: '#333' }}><strong>{especialidad}</strong></td>
+                    <td style={{ padding: '15px', textAlign: 'right', fontWeight: '600', color: '#2196F3' }}>{horas.toFixed(1)}h</td>
+                    <td style={{ padding: '15px', textAlign: 'right', color: '#666' }}>
                       {((horas / datos.total) * 100).toFixed(1)}%
                     </td>
                   </tr>
@@ -468,16 +474,16 @@ Sé conciso y específico.`;
 
       {/* Tab: IA Insights */}
       {activeTab === 'ia-insights' && (
-        <div style={{ background: 'white', padding: '20px', borderRadius: '8px', border: '1px solid #eee' }}>
-          <h3>🤖 Análisis Inteligente</h3>
+        <div style={{ background: 'white', padding: '25px', borderRadius: '10px', border: '1px solid #e0e0e0', boxShadow: '0 2px 8px rgba(0,0,0,0.05)', marginTop: '20px' }}>
+          <h3 style={{ margin: '0 0 20px 0', color: '#333', fontSize: '16px', fontWeight: '600' }}>🤖 Análisis Inteligente con IA</h3>
           {loading && (
-            <p style={{ color: '#666', fontStyle: 'italic' }}>⏳ Analizando datos con IA...</p>
+            <p style={{ color: '#2196F3', fontStyle: 'italic', fontSize: '14px' }}>⏳ Analizando datos con IA GROQ...</p>
           )}
           {error && (
-            <p style={{ color: '#e24b4a', fontStyle: 'italic' }}>❌ {error}</p>
+            <p style={{ color: '#e24b4a', fontStyle: 'italic', fontSize: '14px' }}>❌ {error}</p>
           )}
           {insights && (
-            <div style={{ whiteSpace: 'pre-wrap', fontFamily: 'monospace', fontSize: '13px', lineHeight: '1.6', color: '#333', background: '#f9f9f9', padding: '15px', borderRadius: '6px' }}>
+            <div style={{ whiteSpace: 'pre-wrap', fontFamily: 'monospace', fontSize: '13px', lineHeight: '1.8', color: '#333', background: '#f0f7ff', padding: '20px', borderRadius: '8px', border: '1px solid #e3f2fd' }}>
               {insights}
             </div>
           )}
@@ -485,17 +491,20 @@ Sé conciso y específico.`;
             <button
               onClick={generarInsights}
               style={{
-                padding: '10px 20px',
-                background: '#3266ad',
+                padding: '12px 24px',
+                background: '#2196F3',
                 color: 'white',
                 border: 'none',
-                borderRadius: '4px',
+                borderRadius: '6px',
                 cursor: 'pointer',
                 fontSize: '14px',
-                fontWeight: 'bold'
+                fontWeight: '600',
+                transition: 'all 0.3s'
               }}
+              onMouseOver={(e) => e.target.style.background = '#1976D2'}
+              onMouseOut={(e) => e.target.style.background = '#2196F3'}
             >
-              🚀 Generar Análisis IA
+              🚀 Generar Análisis con IA
             </button>
           )}
         </div>
