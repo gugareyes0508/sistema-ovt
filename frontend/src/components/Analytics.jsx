@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Bar, Line, Doughnut } from 'react-chartjs-2';
 import {
   Chart as ChartJS,
@@ -119,7 +119,7 @@ const Analytics = ({ registros = [], usuarios = [], token }) => {
   };
 
   // Generar Insights con IA (GROQ)
-  const generarInsights = async () => {
+  const generarInsights = useCallback(async () => {
     setLoading(true);
     setError(null);
 
@@ -173,13 +173,13 @@ Sé conciso y específico.`;
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     if (activeTab === 'ia-insights' && !insights && !loading) {
       generarInsights();
     }
-  }, [activeTab, insights, loading]);
+  }, [activeTab, insights, loading, generarInsights]);
 
   const datos = procesarDatos();
 
