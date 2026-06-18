@@ -1,10 +1,18 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
 const TestGroq = () => {
   const [respuesta, setRespuesta] = useState('');
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState('');
-  const [modelo, setModelo] = useState('llama-3.1-70b-versatile');
+  const [modelo, setModelo] = useState('mixtral-8x7b-32768');
+  const [modelosDisponibles, setModelosDisponibles] = useState([
+    { id: 'mixtral-8x7b-32768', nombre: 'Mixtral 8x7B' },
+    { id: 'llama-3.1-70b-versatile', nombre: 'Llama 3.1 70B' },
+    { id: 'llama-3.1-8b-instant', nombre: 'Llama 3.1 8B' },
+    { id: 'gemma-2-9b-it', nombre: 'Gemma 2 9B' },
+    { id: 'llama-3.2-90b-vision-preview', nombre: 'Llama 3.2 90B Vision' },
+    { id: 'llama-3.2-11b-vision-preview', nombre: 'Llama 3.2 11B Vision' }
+  ]);
 
   const llamarGroq = async () => {
     setCargando(true);
@@ -39,7 +47,15 @@ const TestGroq = () => {
       if (!response.ok) {
         const errorData = await response.json();
         console.error('Error response:', errorData);
-        throw new Error(`Error ${response.status}: ${errorData.error?.message || response.statusText}`);
+        
+        let mensaje = errorData.error?.message || response.statusText;
+        
+        // Si el modelo fue deprecado, sugerir probar otro
+        if (mensaje.includes('decommissioned') || mensaje.includes('deprecated')) {
+          mensaje += '\n\n💡 Este modelo fue deprecado. Intenta con otro modelo de la lista.';
+        }
+        
+        throw new Error(`Error ${response.status}: ${mensaje}`);
       }
 
       const data = await response.json();
@@ -79,10 +95,13 @@ const TestGroq = () => {
             fontFamily: 'Arial'
           }}
         >
-          <option value="llama-3.1-70b-versatile">llama-3.1-70b-versatile (⭐ Recomendado)</option>
-          <option value="llama-3.1-8b-instant">llama-3.1-8b-instant (⚡ Rápido)</option>
-          <option value="gemma-2-9b-it">gemma-2-9b-it (💪 Poderoso)</option>
+          {modelosDisponibles.map(m => (
+            <option key={m.id} value={m.id}>{m.nombre}</option>
+          ))}
         </select>
+        <p style={{ margin: '8px 0 0', fontSize: '11px', color: '#999' }}>
+          💡 Si un modelo no funciona, intenta con otro
+        </p>
       </div>
 
       {/* Botón Principal */}
@@ -122,12 +141,13 @@ const TestGroq = () => {
           border: '1px solid #ef5350',
           marginBottom: '20px',
           fontSize: '13px',
-          lineHeight: '1.6'
+          lineHeight: '1.6',
+          whiteSpace: 'pre-wrap'
         }}>
           <p style={{ margin: '0 0 8px', fontWeight: 'bold' }}>❌ Error</p>
           {error}
           <p style={{ margin: '8px 0 0', fontSize: '12px', color: '#999' }}>
-            💡 Verifica que tu API Key esté correcta en .env
+            💡 Si ves "decommissioned", elige otro modelo de la lista arriba
           </p>
         </div>
       )}
@@ -142,7 +162,7 @@ const TestGroq = () => {
           marginBottom: '20px'
         }}>
           <p style={{ margin: '0 0 10px', fontWeight: 'bold', color: '#2e7d32', fontSize: '13px' }}>
-            ✅ Respuesta de GROQ:
+            ✅ Respuesta de GROQ (Modelo: {modelo}):
           </p>
           <div style={{
             padding: '12px',
@@ -174,7 +194,8 @@ const TestGroq = () => {
           <li><strong>Límite:</strong> 30 requests/minuto (suficiente para tu caso)</li>
           <li><strong>Velocidad:</strong> ⚡⚡⚡⚡⚡ Ultra rápida</li>
           <li><strong>Costo:</strong> $0 (100% gratis)</li>
-          <li><strong>Modelo actual:</strong> {modelo}</li>
+          <li><strong>Modelos:</strong> 6 opciones disponibles</li>
+          <li><strong>Consejo:</strong> Si un modelo falla, intenta otro</li>
         </ul>
       </div>
 
