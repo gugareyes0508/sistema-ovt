@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Bar, Line, Pie, Doughnut } from 'react-chartjs-2';
+import { Bar, Line, Doughnut } from 'react-chartjs-2';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -176,10 +176,10 @@ Sé conciso y específico.`;
   };
 
   useEffect(() => {
-    if (activeTab === 'ia-insights' && !insights) {
+    if (activeTab === 'ia-insights' && !insights && !loading) {
       generarInsights();
     }
-  }, [activeTab]);
+  }, [activeTab, insights, loading]);
 
   const datos = procesarDatos();
 
