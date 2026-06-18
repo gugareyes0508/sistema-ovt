@@ -27,6 +27,15 @@ ChartJS.register(
   Filler
 );
 
+// Función auxiliar fuera del componente
+const getWeekNumber = (date) => {
+  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+  const dayNum = d.getUTCDay() || 7;
+  d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+};
+
 const Analytics = ({ registros = [], usuarios = [], token }) => {
   const [activeTab, setActiveTab] = useState('resumen');
   const [insights, setInsights] = useState(null);
@@ -50,7 +59,7 @@ const Analytics = ({ registros = [], usuarios = [], token }) => {
   };
 
   // Procesar datos
-  const procesarDatos = () => {
+  const procesarDatos = useCallback(() => {
     if (!registros || registros.length === 0) {
       return {
         total: 0,
@@ -108,15 +117,7 @@ const Analytics = ({ registros = [], usuarios = [], token }) => {
     });
 
     return datos;
-  };
-
-  const getWeekNumber = (date) => {
-    const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
-    const dayNum = d.getUTCDay() || 7;
-    d.setUTCDate(d.getUTCDate() + 4 - dayNum);
-    const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
-    return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
-  };
+  }, [registros]);
 
   // Generar Insights con IA (GROQ)
   const generarInsights = useCallback(async () => {
@@ -173,7 +174,7 @@ Sé conciso y específico.`;
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [procesarDatos]);
 
   useEffect(() => {
     if (activeTab === 'ia-insights' && !insights && !loading) {
