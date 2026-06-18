@@ -41,6 +41,8 @@ const Analytics = ({ registros = [], usuarios = [], token }) => {
   const [insights, setInsights] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [mesFiltro, setMesFiltro] = useState(new Date().getMonth() + 1);
+  const [anioFiltro, setAnioFiltro] = useState(new Date().getFullYear());
 
   // Convertir fecha a Date
   const toDate = (fecha) => {
@@ -71,12 +73,12 @@ const Analytics = ({ registros = [], usuarios = [], token }) => {
       };
     }
 
-    const hoy = new Date();
-    const hace4Semanas = new Date(hoy.getTime() - 28 * 24 * 60 * 60 * 1000);
-
+    // Filtrar por mes y año seleccionados
     let registrosFiltrados = registros.filter(r => {
       const fecha = toDate(r.fechaInicio);
-      return fecha >= hace4Semanas && fecha <= hoy && r.estado === 'exitoso';
+      return fecha.getMonth() === mesFiltro - 1 && 
+             fecha.getFullYear() === anioFiltro && 
+             r.estado === 'exitoso';
     });
 
     const datos = {
@@ -117,7 +119,7 @@ const Analytics = ({ registros = [], usuarios = [], token }) => {
     });
 
     return datos;
-  }, [registros]);
+  }, [registros, mesFiltro, anioFiltro]);
 
   // Generar Insights con IA (GROQ)
   const generarInsights = useCallback(async () => {
@@ -311,6 +313,53 @@ Sé conciso y específico.`;
         <div style={{ background: '#f5f5f5', padding: '15px', borderRadius: '8px', textAlign: 'center' }}>
           <p style={{ margin: 0, fontSize: '12px', color: '#666', fontWeight: 'bold' }}>Registros</p>
           <p style={{ margin: '8px 0 0', fontSize: '24px', fontWeight: 'bold', color: '#1d9e75' }}>{datos.registrosFiltrados.length}</p>
+        </div>
+      </div>
+
+      {/* Filtros */}
+      <div style={{ marginBottom: '20px', display: 'flex', gap: '15px', alignItems: 'flex-end', flexWrap: 'wrap', background: '#f9f9f9', padding: '15px', borderRadius: '8px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+          <label style={{ fontSize: '12px', fontWeight: 'bold', color: '#666' }}>Mes</label>
+          <select
+            value={mesFiltro}
+            onChange={(e) => setMesFiltro(parseInt(e.target.value))}
+            style={{
+              padding: '8px 12px',
+              border: '1px solid #ddd',
+              borderRadius: '6px',
+              fontSize: '14px',
+              cursor: 'pointer',
+              minWidth: '150px'
+            }}
+          >
+            {[...Array(12)].map((_, i) => (
+              <option key={i + 1} value={i + 1}>
+                {new Date(2024, i).toLocaleString('es-CL', { month: 'long' })}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+          <label style={{ fontSize: '12px', fontWeight: 'bold', color: '#666' }}>Año</label>
+          <select
+            value={anioFiltro}
+            onChange={(e) => setAnioFiltro(parseInt(e.target.value))}
+            style={{
+              padding: '8px 12px',
+              border: '1px solid #ddd',
+              borderRadius: '6px',
+              fontSize: '14px',
+              cursor: 'pointer',
+              minWidth: '150px'
+            }}
+          >
+            <option value="2023">2023</option>
+            <option value="2024">2024</option>
+            <option value="2025">2025</option>
+            <option value="2026">2026</option>
+            <option value="2027">2027</option>
+          </select>
         </div>
       </div>
 
