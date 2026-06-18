@@ -399,17 +399,22 @@ Sé conciso y específico.`;
 
       {/* Tab: Resumen */}
       {activeTab === 'resumen' && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '30px', marginTop: '20px' }}>
-          <div style={{ background: 'white', padding: '25px', borderRadius: '10px', border: '1px solid #e0e0e0', boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }}>
-            <h3 style={{ margin: '0 0 20px 0', color: '#333', fontSize: '16px', fontWeight: '600' }}>📊 HHEE por Tipo</h3>
-            <div style={{ position: 'relative', height: '300px' }}>
-              <Doughnut data={chartPorTipo} options={chartOptions} />
+        <div style={{ marginTop: '20px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '30px', marginBottom: '30px' }}>
+            {/* Gráfico 1: Dona */}
+            <div style={{ background: 'white', padding: '25px', borderRadius: '10px', border: '1px solid #e0e0e0', boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }}>
+              <h3 style={{ margin: '0 0 25px 0', color: '#333', fontSize: '16px', fontWeight: '600', textAlign: 'center' }}>📊 HHEE por Tipo</h3>
+              <div style={{ position: 'relative', height: '320px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Doughnut data={chartPorTipo} options={{...chartOptions, maintainAspectRatio: false}} />
+              </div>
             </div>
-          </div>
-          <div style={{ background: 'white', padding: '25px', borderRadius: '10px', border: '1px solid #e0e0e0', boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }}>
-            <h3 style={{ margin: '0 0 20px 0', color: '#333', fontSize: '16px', fontWeight: '600' }}>📈 HHEE por Especialidad</h3>
-            <div style={{ position: 'relative', height: '300px' }}>
-              <Bar data={chartPorEspecialidad} options={chartOptions} />
+
+            {/* Gráfico 2: Barras */}
+            <div style={{ background: 'white', padding: '25px', borderRadius: '10px', border: '1px solid #e0e0e0', boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }}>
+              <h3 style={{ margin: '0 0 25px 0', color: '#333', fontSize: '16px', fontWeight: '600', textAlign: 'center' }}>📈 HHEE por Especialidad</h3>
+              <div style={{ position: 'relative', height: '320px' }}>
+                <Bar data={chartPorEspecialidad} options={{...chartOptions, maintainAspectRatio: false}} />
+              </div>
             </div>
           </div>
         </div>
@@ -417,17 +422,22 @@ Sé conciso y específico.`;
 
       {/* Tab: Tendencias */}
       {activeTab === 'tendencias' && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(450px, 1fr))', gap: '30px', marginTop: '20px' }}>
-          <div style={{ background: 'white', padding: '25px', borderRadius: '10px', border: '1px solid #e0e0e0', boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }}>
-            <h3 style={{ margin: '0 0 20px 0', color: '#333', fontSize: '16px', fontWeight: '600' }}>📈 Evolución Semana a Semana</h3>
-            <div style={{ position: 'relative', height: '350px' }}>
-              <Line data={chartSemanal} options={chartOptions} />
+        <div style={{ marginTop: '20px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '30px' }}>
+            {/* Gráfico Linea */}
+            <div style={{ background: 'white', padding: '25px', borderRadius: '10px', border: '1px solid #e0e0e0', boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }}>
+              <h3 style={{ margin: '0 0 25px 0', color: '#333', fontSize: '16px', fontWeight: '600', textAlign: 'center' }}>📈 Evolución Semana a Semana</h3>
+              <div style={{ position: 'relative', height: '340px' }}>
+                <Line data={chartSemanal} options={{...chartOptions, maintainAspectRatio: false}} />
+              </div>
             </div>
-          </div>
-          <div style={{ background: 'white', padding: '25px', borderRadius: '10px', border: '1px solid #e0e0e0', boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }}>
-            <h3 style={{ margin: '0 0 20px 0', color: '#333', fontSize: '16px', fontWeight: '600' }}>📊 HHEE por Día de Semana</h3>
-            <div style={{ position: 'relative', height: '350px' }}>
-              <Bar data={chartPorDia} options={chartOptions} />
+
+            {/* Gráfico Barras Día */}
+            <div style={{ background: 'white', padding: '25px', borderRadius: '10px', border: '1px solid #e0e0e0', boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }}>
+              <h3 style={{ margin: '0 0 25px 0', color: '#333', fontSize: '16px', fontWeight: '600', textAlign: 'center' }}>📊 HHEE por Día de Semana</h3>
+              <div style={{ position: 'relative', height: '340px' }}>
+                <Bar data={chartPorDia} options={{...chartOptions, maintainAspectRatio: false}} />
+              </div>
             </div>
           </div>
         </div>
@@ -436,9 +446,9 @@ Sé conciso y específico.`;
       {/* Tab: Por Persona */}
       {activeTab === 'persona' && (
         <div style={{ background: 'white', padding: '25px', borderRadius: '10px', border: '1px solid #e0e0e0', boxShadow: '0 2px 8px rgba(0,0,0,0.05)', marginTop: '20px' }}>
-          <h3 style={{ margin: '0 0 20px 0', color: '#333', fontSize: '16px', fontWeight: '600' }}>👥 Top 10 Especialistas - HHEE</h3>
-          <div style={{ position: 'relative', height: '450px' }}>
-            <Bar data={chartTopEspecialistas} options={{ ...chartOptions, indexAxis: 'y' }} />
+          <h3 style={{ margin: '0 0 25px 0', color: '#333', fontSize: '16px', fontWeight: '600', textAlign: 'center' }}>👥 Top 10 Especialistas - HHEE</h3>
+          <div style={{ position: 'relative', height: '480px' }}>
+            <Bar data={chartTopEspecialistas} options={{ ...chartOptions, indexAxis: 'y', maintainAspectRatio: false }} />
           </div>
         </div>
       )}
