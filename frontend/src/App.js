@@ -175,8 +175,16 @@ function App() {
   const calcularHoras = (inicio, fin) => {
     if (!inicio || !fin) return 0;
     const diff = (fin - inicio) / (1000 * 60 * 60);
-    // Redondear correctamente para evitar decimales pequeños (24.02 → 24.00)
-    return Math.max(0, Math.round(diff * 100) / 100);
+    const rounded = parseFloat(diff.toFixed(2));
+    
+    // Si está muy cerca de un número entero (dentro de 0.015),
+    // redondear al entero para evitar 24.01 → 24.00
+    const integer = Math.round(diff);
+    if (Math.abs(diff - integer) < 0.015) {
+      return Math.max(0, integer);
+    }
+    
+    return Math.max(0, rounded);
   };
 
   // Manejar cambio de fechas
