@@ -104,7 +104,7 @@ const Analytics = ({ registros = [], usuarios = [], token }) => {
       datos.porEspecialidad[especialidad] = (datos.porEspecialidad[especialidad] || 0) + horas;
 
       // Por Persona
-      const persona = r.especialista || 'Sin especialista';
+      const persona = r.createdByNombre || r.especialista || 'Sin especialista';
       datos.porPersona[persona] = (datos.porPersona[persona] || 0) + horas;
 
       // Por Semana
