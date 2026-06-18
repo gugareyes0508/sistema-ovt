@@ -1,112 +1,112 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 
 const TestGroq = () => {
   const [respuesta, setRespuesta] = useState('');
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState('');
-  const [modelo, setModelo] = useState('mixtral-8x7b-32768');
-  const [modelosDisponibles, setModelosDisponibles] = useState([
-    { id: 'mixtral-8x7b-32768', nombre: 'Mixtral 8x7B' },
-    { id: 'llama-3.1-70b-versatile', nombre: 'Llama 3.1 70B' },
-    { id: 'llama-3.1-8b-instant', nombre: 'Llama 3.1 8B' },
-    { id: 'gemma-2-9b-it', nombre: 'Gemma 2 9B' },
-    { id: 'llama-3.2-90b-vision-preview', nombre: 'Llama 3.2 90B Vision' },
-    { id: 'llama-3.2-11b-vision-preview', nombre: 'Llama 3.2 11B Vision' }
-  ]);
+  const [modeloUsado, setModeloUsado] = useState('');
 
-  const llamarGroq = async () => {
+  // Lista de modelos a probar en orden de preferencia
+  const modelosAProbar = [
+    'llama-3.2-90b-vision-preview',
+    'llama-3.2-11b-vision-preview',
+    'llama-3.1-70b-versatile',
+    'llama-3.1-8b-instant',
+    'gemma-2-9b-it',
+    'mixtral-8x7b-32768'
+  ];
+
+  const llamarGroqConModelos = async () => {
     setCargando(true);
     setError('');
     setRespuesta('');
+    setModeloUsado('');
 
-    try {
-      console.log('📡 Llamando a GROQ con modelo:', modelo);
-      console.log('API Key:', process.env.REACT_APP_GROQ_API_KEY ? '✅ Cargada' : '❌ No cargada');
+    let ultimoError = '';
 
-      const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${process.env.REACT_APP_GROQ_API_KEY}`
-        },
-        body: JSON.stringify({
-          model: modelo,
-          messages: [
-            {
-              role: 'user',
-              content: '¿Cuál es el propósito principal de las horas extra en una empresa? Responde en 2-3 líneas.'
-            }
-          ],
-          temperature: 0.7,
-          max_tokens: 200
-        })
-      });
+    // Intenta cada modelo hasta que uno funcione
+    for (let modelo of modelosAProbar) {
+      try {
+        console.log(`📡 Intentando con modelo: ${modelo}`);
 
-      console.log('Status:', response.status);
+        const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${process.env.REACT_APP_GROQ_API_KEY}`
+          },
+          body: JSON.stringify({
+            model: modelo,
+            messages: [
+              {
+                role: 'user',
+                content: '¿Cuál es el propósito principal de las horas extra en una empresa? Responde en 2-3 líneas.'
+              }
+            ],
+            temperature: 0.7,
+            max_tokens: 200
+          })
+        });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        console.error('Error response:', errorData);
-        
-        let mensaje = errorData.error?.message || response.statusText;
-        
-        // Si el modelo fue deprecado, sugerir probar otro
-        if (mensaje.includes('decommissioned') || mensaje.includes('deprecated')) {
-          mensaje += '\n\n💡 Este modelo fue deprecado. Intenta con otro modelo de la lista.';
+        console.log(`Status ${modelo}:`, response.status);
+
+        if (response.ok) {
+          const data = await response.json();
+          const textoRespuesta = data.choices[0].message.content;
+          
+          setRespuesta(textoRespuesta);
+          setModeloUsado(modelo);
+          console.log(`✅ Éxito con modelo: ${modelo}`);
+          setCargando(false);
+          return; // Éxito, salir
+        } else {
+          const errorData = await response.json();
+          ultimoError = errorData.error?.message || response.statusText;
+          console.warn(`❌ ${modelo} falló: ${ultimoError}`);
+          // Continuar con el siguiente modelo
         }
-        
-        throw new Error(`Error ${response.status}: ${mensaje}`);
+      } catch (err) {
+        console.warn(`❌ Error con ${modelo}:`, err.message);
+        ultimoError = err.message;
+        // Continuar con el siguiente modelo
       }
-
-      const data = await response.json();
-      console.log('✅ Respuesta recibida:', data);
-      
-      const textoRespuesta = data.choices[0].message.content;
-      setRespuesta(textoRespuesta);
-    } catch (err) {
-      console.error('❌ Error completo:', err);
-      setError(err.message);
-    } finally {
-      setCargando(false);
     }
+
+    // Si llegamos aquí, ningún modelo funcionó
+    setError(`Ningún modelo disponible funcionó. Último error: ${ultimoError}\n\nModelos probados: ${modelosAProbar.join(', ')}`);
+    setCargando(false);
   };
 
   return (
     <div style={{ padding: '30px', maxWidth: '700px', margin: '0 auto', fontFamily: 'Arial, sans-serif' }}>
       <div style={{ marginBottom: '30px' }}>
         <h2 style={{ margin: '0 0 10px', color: '#333', fontSize: '24px' }}>🧪 Test GROQ API</h2>
-        <p style={{ margin: '0', color: '#999', fontSize: '13px' }}>Verifica que la conexión con GROQ funciona correctamente</p>
+        <p style={{ margin: '0', color: '#999', fontSize: '13px' }}>Auto-detección de modelo disponible</p>
       </div>
 
-      {/* Selector de Modelo */}
-      <div style={{ marginBottom: '20px', padding: '15px', background: '#f9f9f9', borderRadius: '6px', border: '1px solid #ddd' }}>
-        <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold', fontSize: '13px', color: '#333' }}>
-          📌 Selecciona Modelo:
-        </label>
-        <select 
-          value={modelo}
-          onChange={(e) => setModelo(e.target.value)}
-          style={{
-            width: '100%',
-            padding: '10px',
-            borderRadius: '4px',
-            border: '1px solid #ddd',
-            fontSize: '13px',
-            fontFamily: 'Arial'
-          }}
-        >
-          {modelosDisponibles.map(m => (
-            <option key={m.id} value={m.id}>{m.nombre}</option>
-          ))}
-        </select>
-        <p style={{ margin: '8px 0 0', fontSize: '11px', color: '#999' }}>
-          💡 Si un modelo no funciona, intenta con otro
-        </p>
+      {/* Info */}
+      <div style={{
+        padding: '15px',
+        background: '#e3f2fd',
+        borderRadius: '6px',
+        border: '1px solid #90caf9',
+        fontSize: '12px',
+        color: '#1565c0',
+        lineHeight: '1.6',
+        marginBottom: '20px'
+      }}>
+        <p style={{ margin: '0 0 10px', fontWeight: 'bold' }}>⚙️ Cómo funciona:</p>
+        <ul style={{ margin: 0, paddingLeft: '20px' }}>
+          <li>Click en el botón y probará 6 modelos automáticamente</li>
+          <li>Si uno falla, intenta el siguiente</li>
+          <li>Muestra cuál modelo funcionó ✅</li>
+          <li>Totalmente automático, sin selecciones manuales</li>
+        </ul>
       </div>
 
       {/* Botón Principal */}
       <button 
-        onClick={llamarGroq}
+        onClick={llamarGroqConModelos}
         disabled={cargando}
         style={{
           width: '100%',
@@ -125,11 +125,27 @@ const TestGroq = () => {
         onMouseOut={(e) => !cargando && (e.target.style.background = '#FF6B6B')}
       >
         {cargando ? (
-          <>⏳ Esperando respuesta de GROQ...</>
+          <>⏳ Probando modelos...</>
         ) : (
-          <>🚀 Llamar a GROQ</>
+          <>🚀 Llamar a GROQ (Auto-detección)</>
         )}
       </button>
+
+      {/* Modelo Usado */}
+      {modeloUsado && (
+        <div style={{
+          padding: '12px',
+          background: '#e8f5e9',
+          borderRadius: '6px',
+          border: '1px solid #4caf50',
+          marginBottom: '15px',
+          fontSize: '12px',
+          color: '#2e7d32',
+          fontWeight: 'bold'
+        }}>
+          ✅ Modelo activo: <span style={{ fontFamily: 'monospace' }}>{modeloUsado}</span>
+        </div>
+      )}
 
       {/* Error */}
       {error && (
@@ -142,13 +158,11 @@ const TestGroq = () => {
           marginBottom: '20px',
           fontSize: '13px',
           lineHeight: '1.6',
-          whiteSpace: 'pre-wrap'
+          whiteSpace: 'pre-wrap',
+          fontFamily: 'monospace'
         }}>
           <p style={{ margin: '0 0 8px', fontWeight: 'bold' }}>❌ Error</p>
           {error}
-          <p style={{ margin: '8px 0 0', fontSize: '12px', color: '#999' }}>
-            💡 Si ves "decommissioned", elige otro modelo de la lista arriba
-          </p>
         </div>
       )}
 
@@ -162,7 +176,7 @@ const TestGroq = () => {
           marginBottom: '20px'
         }}>
           <p style={{ margin: '0 0 10px', fontWeight: 'bold', color: '#2e7d32', fontSize: '13px' }}>
-            ✅ Respuesta de GROQ (Modelo: {modelo}):
+            ✅ Respuesta de GROQ:
           </p>
           <div style={{
             padding: '12px',
@@ -171,39 +185,37 @@ const TestGroq = () => {
             fontSize: '13px',
             lineHeight: '1.6',
             color: '#333',
-            border: '1px solid #c8e6c9',
-            fontFamily: 'monospace'
+            border: '1px solid #c8e6c9'
           }}>
             {respuesta}
           </div>
         </div>
       )}
 
-      {/* Info */}
+      {/* Modelos a Probar */}
       <div style={{
         padding: '15px',
-        background: '#e3f2fd',
+        background: '#f5f5f5',
         borderRadius: '6px',
-        border: '1px solid #90caf9',
+        border: '1px solid #ddd',
         fontSize: '12px',
-        color: '#1565c0',
-        lineHeight: '1.6'
+        color: '#666'
       }}>
-        <p style={{ margin: '0 0 10px', fontWeight: 'bold' }}>📌 Información</p>
-        <ul style={{ margin: 0, paddingLeft: '20px' }}>
-          <li><strong>Límite:</strong> 30 requests/minuto (suficiente para tu caso)</li>
-          <li><strong>Velocidad:</strong> ⚡⚡⚡⚡⚡ Ultra rápida</li>
-          <li><strong>Costo:</strong> $0 (100% gratis)</li>
-          <li><strong>Modelos:</strong> 6 opciones disponibles</li>
-          <li><strong>Consejo:</strong> Si un modelo falla, intenta otro</li>
-        </ul>
+        <p style={{ margin: '0 0 10px', fontWeight: 'bold' }}>📋 Modelos que serán probados:</p>
+        <div style={{ fontFamily: 'monospace', fontSize: '11px', lineHeight: '1.8' }}>
+          {modelosAProbar.map((m, i) => (
+            <div key={m} style={{ padding: '4px 0', color: '#999' }}>
+              {i + 1}. {m}
+            </div>
+          ))}
+        </div>
       </div>
 
       {/* Debug Info */}
       <div style={{
         marginTop: '20px',
         padding: '12px',
-        background: '#f5f5f5',
+        background: '#f9f9f9',
         borderRadius: '4px',
         fontSize: '11px',
         color: '#999',
@@ -212,8 +224,7 @@ const TestGroq = () => {
       }}>
         <p style={{ margin: '0 0 8px' }}>🔧 Debug:</p>
         <p style={{ margin: '0' }}>API Key cargada: {process.env.REACT_APP_GROQ_API_KEY ? '✅ Sí' : '❌ No'}</p>
-        <p style={{ margin: '4px 0' }}>Endpoint: https://api.groq.com/openai/v1/chat/completions</p>
-        <p style={{ margin: '4px 0' }}>Abre la consola (F12) para ver detalles</p>
+        <p style={{ margin: '4px 0' }}>Abre consola (F12) para ver cuál modelo está siendo probado</p>
       </div>
     </div>
   );
