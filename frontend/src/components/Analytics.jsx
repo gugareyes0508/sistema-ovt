@@ -314,7 +314,7 @@ Sé conciso y específico.`;
       </div>
 
       {/* Tabs */}
-      <div style={{ marginBottom: '20px', borderBottom: '1px solid #ddd', display: 'flex', gap: '10px' }}>
+      <div style={{ marginBottom: '20px', borderBottom: '1px solid #ddd', display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
         {[
           { id: 'resumen', label: '📊 Resumen' },
           { id: 'tendencias', label: '📈 Tendencias' },
@@ -421,13 +421,13 @@ Sé conciso y específico.`;
         <div style={{ background: 'white', padding: '20px', borderRadius: '8px', border: '1px solid #eee' }}>
           <h3>🤖 Análisis Inteligente</h3>
           {loading && (
-            <p style={{ color: '#666', fontStyle: 'italic' }}>Analizando datos con IA...</p>
+            <p style={{ color: '#666', fontStyle: 'italic' }}>⏳ Analizando datos con IA...</p>
           )}
           {error && (
-            <p style={{ color: '#e24b4a', fontStyle: 'italic' }}>{error}</p>
+            <p style={{ color: '#e24b4a', fontStyle: 'italic' }}>❌ {error}</p>
           )}
           {insights && (
-            <div style={{ whiteSpace: 'pre-wrap', fontFamily: 'monospace', fontSize: '13px', lineHeight: '1.6', color: '#333' }}>
+            <div style={{ whiteSpace: 'pre-wrap', fontFamily: 'monospace', fontSize: '13px', lineHeight: '1.6', color: '#333', background: '#f9f9f9', padding: '15px', borderRadius: '6px' }}>
               {insights}
             </div>
           )}
@@ -445,7 +445,7 @@ Sé conciso y específico.`;
                 fontWeight: 'bold'
               }}
             >
-              Generar Análisis IA
+              🚀 Generar Análisis IA
             </button>
           )}
         </div>
