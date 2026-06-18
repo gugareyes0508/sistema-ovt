@@ -4,7 +4,7 @@ const TestGroq = () => {
   const [respuesta, setRespuesta] = useState('');
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState('');
-  const [modelo, setModelo] = useState('mixtral-8x7b-32768');
+  const [modelo, setModelo] = useState('llama-3.1-70b-versatile');
 
   const llamarGroq = async () => {
     setCargando(true);
@@ -79,9 +79,9 @@ const TestGroq = () => {
             fontFamily: 'Arial'
           }}
         >
-          <option value="mixtral-8x7b-32768">mixtral-8x7b-32768 (⭐ Recomendado - Equilibrado)</option>
-          <option value="gemma2-9b-it">gemma2-9b-it (⚡ Ultra rápido)</option>
-          <option value="llama2-70b-4096">llama2-70b-4096 (💪 Más poderoso)</option>
+          <option value="llama-3.1-70b-versatile">llama-3.1-70b-versatile (⭐ Recomendado)</option>
+          <option value="llama-3.1-8b-instant">llama-3.1-8b-instant (⚡ Rápido)</option>
+          <option value="gemma-2-9b-it">gemma-2-9b-it (💪 Poderoso)</option>
         </select>
       </div>
 
