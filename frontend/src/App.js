@@ -175,7 +175,8 @@ function App() {
   const calcularHoras = (inicio, fin) => {
     if (!inicio || !fin) return 0;
     const diff = (fin - inicio) / (1000 * 60 * 60);
-    return Math.max(0, diff.toFixed(2));
+    // Redondear correctamente para evitar decimales pequeños (24.02 → 24.00)
+    return Math.max(0, Math.round(diff * 100) / 100);
   };
 
   // Manejar cambio de fechas
