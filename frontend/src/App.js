@@ -1227,7 +1227,318 @@ function App() {
         {vista === 'usuarios' && usuario.rol === 'admin' && (
           <section className="seccion">
             <h2>👥 Gestión de Perfiles y Usuarios</h2>
-            <p className="sin-datos">Funcionalidad de gestión de usuarios disponible</p>
+
+            {/* Formulario Crear Usuario */}
+            <div className="form-container">
+              <h3>➕ Crear Nuevo Usuario</h3>
+              
+              <form onSubmit={(e) => {
+                e.preventDefault();
+                
+                const nuevoUsuario = {
+                  usuario: e.target.usuario.value,
+                  nombre: e.target.nombre.value,
+                  rol: e.target.rol.value,
+                  departamento: e.target.departamento.value,
+                  contrasena: e.target.contrasena.value
+                };
+
+                if (!nuevoUsuario.usuario || !nuevoUsuario.nombre || !nuevoUsuario.contrasena || !nuevoUsuario.rol) {
+                  alert('❌ Todos los campos son requeridos');
+                  return;
+                }
+
+                axios.post(`${API_URL}/api/admin/crear-usuario`, nuevoUsuario, {
+                  headers: { Authorization: `Bearer ${token}` }
+                })
+                .then(res => {
+                  alert(`✅ ${res.data.message}`);
+                  e.target.reset();
+                  cargarUsuarios();
+                })
+                .catch(err => {
+                  alert('❌ Error: ' + (err.response?.data?.error || err.message));
+                });
+              }}>
+                
+                <div className="form-group">
+                  <label>Rol * (Selecciona el tipo de usuario)</label>
+                  <select name="rol" defaultValue="especialista" required onChange={(e) => {
+                    const rol = e.target.value;
+                    const deptField = e.target.closest('form').querySelector('[name="departamento"]');
+                    if (rol === 'admin') {
+                      deptField.disabled = false;
+                    } else if (rol === 'itsm') {
+                      deptField.value = 'ITSM';
+                      deptField.disabled = true;
+                    } else {
+                      deptField.value = 'Especialista';
+                      deptField.disabled = true;
+                    }
+                  }}>
+                    <option value="admin">🔑 Admin</option>
+                    <option value="especialista">👤 Especialista</option>
+                    <option value="itsm">🛠️ ITSM</option>
+                  </select>
+                </div>
+
+                <div className="form-group">
+                  <label>Usuario * (ej: miguel.padilla)</label>
+                  <input 
+                    type="text" 
+                    name="usuario"
+                    placeholder="usuario_sin_espacios"
+                    required
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label>Nombre Completo *</label>
+                  <input 
+                    type="text" 
+                    name="nombre"
+                    placeholder="ej: Miguel Padilla"
+                    required
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label>Departamento/Equipo</label>
+                  <select name="departamento" defaultValue="Especialista">
+                    <optgroup label="Admin">
+                      <option value="DPE">DPE</option>
+                      <option value="Squad">Squad</option>
+                      <option value="TL">Team Lead (TL)</option>
+                    </optgroup>
+                    <optgroup label="Especialista">
+                      <option value="Middleware">Middleware</option>
+                      <option value="Operaciones Cloud">Operaciones Cloud</option>
+                    </optgroup>
+                    <optgroup label="ITSM">
+                      <option value="ITSM">ITSM</option>
+                    </optgroup>
+                  </select>
+                </div>
+
+                <div className="form-group">
+                  <label>Contraseña Inicial *</label>
+                  <input 
+                    type="password" 
+                    name="contrasena"
+                    placeholder="ej: demo123"
+                    required
+                  />
+                  <small>Mínimo 4 caracteres. El usuario puede cambiarla después.</small>
+                </div>
+
+                <button type="submit" className="btn-guardar">
+                  ✅ Crear Usuario
+                </button>
+              </form>
+            </div>
+
+            {/* Tabla de usuarios por rol */}
+            <div style={{marginTop: '30px'}}>
+              <h3>📋 Usuarios Creados</h3>
+              
+              <div style={{display: 'flex', gap: '20px', marginTop: '15px', flexWrap: 'wrap'}}>
+                {/* Admins */}
+                <div style={{flex: 1, minWidth: '280px', background: '#f5f5f5', padding: '15px', borderRadius: '8px', border: '2px solid #2196F3'}}>
+                  <h4 style={{color: '#2196F3', marginTop: 0}}>🔑 Admins</h4>
+                  <p style={{fontSize: '12px', color: '#666'}}>
+                    • Miguel Padilla (DPE)<br/>
+                    • Hugo Araya (DPE)<br/>
+                    • Gustavo Reyes (Squad)<br/>
+                    • Najeeb Escobar (TL)<br/>
+                    • john Estrada (TL)
+                  </p>
+                </div>
+
+                {/* Especialistas */}
+                <div style={{flex: 1, minWidth: '280px', background: '#f5f5f5', padding: '15px', borderRadius: '8px', border: '2px solid #4CAF50'}}>
+                  <h4 style={{color: '#4CAF50', marginTop: 0}}>👤 Especialistas</h4>
+                  <p style={{fontSize: '12px', color: '#666'}}>
+                    • Jorge Maureira<br/>
+                    • Jhon Estrada<br/>
+                    • Luis Vasquez<br/>
+                    • ... (22 especialistas en total)
+                  </p>
+                </div>
+
+                {/* ITSM */}
+                <div style={{flex: 1, minWidth: '280px', background: '#f5f5f5', padding: '15px', borderRadius: '8px', border: '2px solid #FF9800'}}>
+                  <h4 style={{color: '#FF9800', marginTop: 0}}>🛠️ ITSM</h4>
+                  <p style={{fontSize: '12px', color: '#666'}}>
+                    • Danilo Isla
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Info útil */}
+            <div style={{
+              background: '#e3f2fd',
+              padding: '15px',
+              borderRadius: '8px',
+              marginTop: '20px',
+              fontSize: '13px',
+              borderLeft: '4px solid #2196F3'
+            }}>
+              <strong>ℹ️ Información:</strong><br/>
+              <strong>🔑 Admin:</strong> Ve Dashboard, Mantenedor, Gestión de Usuarios, Auditoría<br/>
+              <strong>👤 Especialista:</strong> Ve Registrar Cambios/Alertas, Mi Resumen<br/>
+              <strong>🛠️ ITSM:</strong> Ve Dashboard ITSM (próximamente), Auditoría<br/>
+              • Contraseña inicial: Se puede cambiar después de login<br/>
+              • Se registra cada creación en auditoría
+            </div>
+
+            {/* SECCIÓN: RESETEAR CONTRASEÑA */}
+            <h3 style={{marginTop: '40px', borderTop: '2px solid #ddd', paddingTop: '20px'}}>🔐 Gestionar Usuarios</h3>
+            
+            <div className="form-group">
+              <label>🔍 Buscar Usuario</label>
+              <input 
+                type="text"
+                id="buscador-usuarios"
+                placeholder="Busca por usuario, nombre o departamento..."
+                onChange={(e) => {
+                  const busqueda = e.target.value.toLowerCase();
+                  const lista = document.querySelectorAll('[data-usuario-item]');
+                  lista.forEach(item => {
+                    const coincide = item.getAttribute('data-usuario-item').includes(busqueda) || 
+                                    item.getAttribute('data-nombre-item').toLowerCase().includes(busqueda) ||
+                                    item.getAttribute('data-dept-item').toLowerCase().includes(busqueda);
+                    item.style.display = coincide ? 'flex' : 'none';
+                  });
+                }}
+                style={{
+                  width: '100%',
+                  padding: '10px',
+                  fontSize: '14px',
+                  borderRadius: '6px',
+                  border: '1px solid #ddd',
+                  marginBottom: '15px'
+                }}
+              />
+            </div>
+
+            <div id="lista-usuarios-container">
+              {usuarioList && usuarioList.length > 0 ? (
+                usuarioList.map(u => (
+                  <div 
+                    key={u.usuario} 
+                    data-usuario-item={u.usuario}
+                    data-nombre-item={u.nombre}
+                    data-dept-item={u.departamento}
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      padding: '12px',
+                      background: '#f9f9f9',
+                      borderRadius: '6px',
+                      marginBottom: '8px',
+                      border: '1px solid #eee'
+                    }}
+                  >
+                    <div>
+                      <strong>{u.nombre}</strong><br/>
+                      <small style={{color: '#666'}}>@{u.usuario} • {u.rol} • {u.departamento}</small>
+                    </div>
+                    <div style={{display: 'flex', gap: '8px'}}>
+                      <button
+                        onClick={() => {
+                          const nuevaContraseña = prompt(`Ingresa nueva contraseña para ${u.nombre}:\n(mínimo 4 caracteres)`, 'demo123');
+                          
+                          if (!nuevaContraseña) return;
+                          if (nuevaContraseña.length < 4) {
+                            alert('❌ La contraseña debe tener mínimo 4 caracteres');
+                            return;
+                          }
+
+                          axios.post(`${API_URL}/api/admin/resetear-contrasena`, 
+                            { 
+                              usuario: u.usuario, 
+                              contraseñaNueva: nuevaContraseña 
+                            },
+                            { headers: { Authorization: `Bearer ${token}` } }
+                          )
+                          .then(res => {
+                            alert(`✅ Contraseña reseteada\nNueva: ${nuevaContraseña}`);
+                          })
+                          .catch(err => {
+                            alert('❌ Error: ' + (err.response?.data?.error || err.message));
+                          });
+                        }}
+                        style={{
+                          padding: '8px 16px',
+                          background: '#FF9800',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '6px',
+                          cursor: 'pointer',
+                          fontSize: '12px',
+                          fontWeight: '600'
+                        }}
+                      >
+                        🔐 Resetear
+                      </button>
+                      
+                      <button
+                        onClick={() => {
+                          if (u.usuario === 'admin') {
+                            alert('❌ No se puede eliminar al admin original');
+                            return;
+                          }
+                          if (!window.confirm(`¿Eliminar a ${u.nombre}? Esta acción no se puede deshacer.`)) return;
+
+                          axios.post(`${API_URL}/api/admin/eliminar-usuario`, 
+                            { usuario: u.usuario },
+                            { headers: { Authorization: `Bearer ${token}` } }
+                          )
+                          .then(res => {
+                            alert(`✅ Usuario ${u.nombre} eliminado`);
+                            cargarUsuarios();
+                          })
+                          .catch(err => {
+                            alert('❌ Error: ' + (err.response?.data?.error || err.message));
+                          });
+                        }}
+                        style={{
+                          padding: '8px 16px',
+                          background: '#f44336',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '6px',
+                          cursor: 'pointer',
+                          fontSize: '12px',
+                          fontWeight: '600'
+                        }}
+                      >
+                        🗑️ Eliminar
+                      </button>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <p style={{textAlign: 'center', color: '#999'}}>Cargando usuarios...</p>
+              )}
+            </div>
+
+            <div style={{
+              background: '#fff3cd',
+              padding: '12px',
+              borderRadius: '6px',
+              marginTop: '15px',
+              fontSize: '12px',
+              borderLeft: '4px solid #FF9800'
+            }}>
+              <strong>⚠️ Importante:</strong><br/>
+              • 🔐 Resetear: Asigna nueva contraseña al usuario<br/>
+              • 🗑️ Eliminar: Elimina permanentemente el usuario<br/>
+              • Se registra cada acción en auditoría<br/>
+              • El usuario puede cambiar su contraseña después de login
+            </div>
           </section>
         )}
 
