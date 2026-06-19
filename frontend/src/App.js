@@ -981,10 +981,8 @@ function App() {
                     <th>Tipo</th>
                     <th>Descripción</th>
                     <th>Cliente</th>
-                    <th>Fecha Inicio</th>
-                    <th>Hora Inicio</th>
-                    <th>Fecha Fin</th>
-                    <th>Hora Fin</th>
+                    <th>Inicio (Fecha - Hora)</th>
+                    <th>Fin (Fecha - Hora)</th>
                     <th>Horas</th>
                     <th>Estado</th>
                     <th>Genera OVT</th>
@@ -997,14 +995,12 @@ function App() {
                       <td><strong>{r.tipo}</strong></td>
                       <td>{r.descripcion?.substring(0, 25)}</td>
                       <td>{r.cliente}</td>
-                      <td>{parseDate(r.fechaInicio)}</td>
-                      <td>{toTimeString(toDate(r.fechaInicio))}</td>
-                      <td>{parseDate(r.fechaFin)}</td>
-                      <td>{toTimeString(toDate(r.fechaFin))}</td>
+                      <td style={{fontSize: '13px'}}>{parseDate(r.fechaInicio)} <strong>{toTimeString(toDate(r.fechaInicio))}</strong></td>
+                      <td style={{fontSize: '13px'}}>{parseDate(r.fechaFin)} <strong>{toTimeString(toDate(r.fechaFin))}</strong></td>
                       <td className="numero">{r.horas}h</td>
                       <td>
                         <span className={`badge badge-${r.estado}`}>
-                          {r.estado === 'pendiente' ? 'Pendiente de Aprobación' : r.estado === 'exitoso' ? 'Aprobado' : 'Rechazado'}
+                          {r.estado === 'pendiente' ? 'Pendiente' : r.estado === 'exitoso' ? 'Aprobado' : 'Rechazado'}
                         </span>
                       </td>
                       <td>{r.genera_ovt === 'si' ? '✓' : '✗'}</td>
