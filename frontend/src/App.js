@@ -284,7 +284,7 @@ function App() {
         cliente: registro.cliente || "Banco de Chile",
         fechaInicio: toDate(registro.fechaInicio),
         fechaFin: toDate(registro.fechaFin),
-        horas: registro.horas || 0,
+        horas: Math.max(0, Math.round((registro.horas || 0) * 20) / 20),
         especialista: registro.especialista || usuario.nombre || "",
         especialidad: registro.especialidad || "operaciones",
         interno_cliente: registro.interno_cliente || "interno",
