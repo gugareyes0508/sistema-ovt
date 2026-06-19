@@ -1188,17 +1188,26 @@ function App() {
               <table className="tabla">
                 <thead>
                   <tr>
+                    <th>Tipo</th>
+                    <th>Descripción</th>
                     <th>Especialista</th>
+                    <th>Cliente</th>
+                    <th>Inicio (Fecha - Hora)</th>
+                    <th>Fin (Fecha - Hora)</th>
                     <th>Horas</th>
                     <th>Especialidad</th>
                     <th>Estado</th>
-                    <th>Fecha</th>
                   </tr>
                 </thead>
                 <tbody>
                   {registrosFiltrados.filter(r => r.estado !== 'pendiente').map(r => (
                     <tr key={r.id}>
+                      <td><strong>{r.tipo}</strong></td>
+                      <td>{r.descripcion?.substring(0, 25)}</td>
                       <td>{r.createdByNombre || r.especialista}</td>
+                      <td>{r.cliente}</td>
+                      <td style={{fontSize: '13px'}}>{parseDate(r.fechaInicio)} <strong>{toTimeString(toDate(r.fechaInicio))}</strong></td>
+                      <td style={{fontSize: '13px'}}>{parseDate(r.fechaFin)} <strong>{toTimeString(toDate(r.fechaFin))}</strong></td>
                       <td className="numero">{r.horas}h</td>
                       <td>{r.especialidad}</td>
                       <td>
@@ -1206,7 +1215,6 @@ function App() {
                           {r.estado === 'exitoso' ? '✅ Aprobado' : '❌ Rechazado'}
                         </span>
                       </td>
-                      <td>{parseDate(r.fechaInicio)}</td>
                     </tr>
                   ))}
                 </tbody>
