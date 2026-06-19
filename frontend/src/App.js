@@ -1096,7 +1096,7 @@ function App() {
               </div>
               <div className="card card-yellow">
                 <h3>📈 Total Horas Aprobadas</h3>
-                <p className="numero">{totalHorasAprobadas}h</p>
+                <p className="numero">{totalHorasAprobadas.toFixed(2)}h</p>
               </div>
             </div>
 
