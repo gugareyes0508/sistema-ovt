@@ -918,7 +918,7 @@ function App() {
               </div>
               <div className="card card-green">
                 <h3>✅ Horas Aprobadas</h3>
-                <p className="numero">{misRegistrosFiltrados.filter(r => r.estado === 'exitoso').reduce((sum, r) => sum + (r.horas || 0), 0)}h</p>
+                <p className="numero">{misRegistrosFiltrados.filter(r => r.estado === 'exitoso').reduce((sum, r) => sum + (r.horas || 0), 0).toFixed(2)}h</p>
               </div>
               <div className="card card-yellow">
                 <h3>⏳ Registros Pendientes</h3>
