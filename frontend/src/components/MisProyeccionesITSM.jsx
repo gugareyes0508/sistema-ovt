@@ -26,6 +26,20 @@ const toTimeString = (fecha) => {
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 };
 
+const toDateString = (fecha) => {
+  const d = toDate(fecha);
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+const calcularHorasModal = (inicio, fin) => {
+  if (!inicio || !fin) return 0;
+  const diff = (fin - inicio) / (1000 * 60 * 60);
+  return Math.max(0, Math.round(diff * 20) / 20);
+};
+
 const parseDateDisplay = (fecha) => {
   try { return toDate(fecha).toLocaleDateString('es-CL'); } catch { return 'Sin fecha'; }
 };
@@ -120,9 +134,17 @@ const MisProyeccionesITSM = ({ token, apiUrl }) => {
   const editar = (p) => {
     setEditandoId(p.id);
     setForm({
+      tipo: p.tipo || 'cambio',
+      cliente: p.cliente || 'Banco de Chile',
       descripcion: p.descripcion || '',
+      fechaInicio: toDate(p.fechaInicio),
+      fechaFin: toDate(p.fechaFin),
       horas: p.horas || 0,
-      probabilidad: p.probabilidad || 'media'
+      especialidad: p.especialidad || 'operaciones',
+      interno_cliente: p.interno_cliente || 'interno',
+      genera_ovt: p.genera_ovt || 'si',
+      probabilidad: p.probabilidad || 'media',
+      numeroTicket: p.numeroTicket || ''
     });
   };
 
@@ -207,34 +229,139 @@ const MisProyeccionesITSM = ({ token, apiUrl }) => {
       </div>
 
       {editandoId && form && (
-        <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', background: 'white', padding: '30px', borderRadius: '12px', zIndex: 9999, width: '95%', maxWidth: '500px', boxShadow: '0 10px 40px rgba(0,0,0,0.3)' }}>
-          <h2 style={{ marginTop: 0 }}>✏️ Editar Proyección</h2>
+        <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', background: 'white', padding: '30px', borderRadius: '12px', zIndex: 9999, width: '95%', maxWidth: '600px', boxShadow: '0 10px 40px rgba(0,0,0,0.3)', maxHeight: '90vh', overflowY: 'auto' }}>
+          <h2 style={{ marginTop: 0, marginBottom: '20px' }}>✏️ Editar Proyección</h2>
+
           <form onSubmit={guardarEdicion}>
             <div style={{ marginBottom: '15px' }}>
-              <label style={{ display: 'block', fontWeight: '600', marginBottom: '5px', fontSize: '14px' }}>Descripción</label>
-              <textarea value={form.descripcion} onChange={(e) => setForm({ ...form, descripcion: e.target.value })}
-                style={{ width: '100%', minHeight: '70px', padding: '8px', borderRadius: '4px', border: '1px solid #ddd' }} />
+              <label style={{ display: 'block', fontWeight: '600', marginBottom: '5px', fontSize: '14px' }}>N° de Ticket</label>
+              <input type="text" value={form.numeroTicket} onChange={(e) => setForm({ ...form, numeroTicket: e.target.value })}
+                style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ddd', fontSize: '14px' }} />
             </div>
+
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '15px' }}>
               <div>
-                <label style={{ display: 'block', fontWeight: '600', marginBottom: '5px', fontSize: '14px' }}>Horas estimadas</label>
-                <input type="number" step="0.05" value={form.horas}
-                  onChange={(e) => setForm({ ...form, horas: parseFloat(e.target.value) || 0 })}
-                  style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ddd' }} />
+                <label style={{ display: 'block', fontWeight: '600', marginBottom: '5px', fontSize: '14px' }}>Tipo *</label>
+                <select value={form.tipo} onChange={(e) => setForm({ ...form, tipo: e.target.value })}
+                  style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ddd', fontSize: '14px' }}>
+                  <option value="cambio">Cambio</option>
+                  <option value="alerta">Alerta</option>
+                </select>
               </div>
               <div>
-                <label style={{ display: 'block', fontWeight: '600', marginBottom: '5px', fontSize: '14px' }}>Probabilidad</label>
+                <label style={{ display: 'block', fontWeight: '600', marginBottom: '5px', fontSize: '14px' }}>Cliente *</label>
+                <select value={form.cliente} onChange={(e) => setForm({ ...form, cliente: e.target.value })}
+                  style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ddd', fontSize: '14px' }}>
+                  <option value="Banco de Chile">Banco de Chile</option>
+                  <option value="Banco Santander">Banco Santander</option>
+                  <option value="Banco BCI">Banco BCI</option>
+                  <option value="Banco Estado">Banco Estado</option>
+                  <option value="Otro">Otro</option>
+                </select>
+              </div>
+            </div>
+
+            <div style={{ marginBottom: '15px' }}>
+              <label style={{ display: 'block', fontWeight: '600', marginBottom: '5px', fontSize: '14px' }}>Descripción *</label>
+              <textarea value={form.descripcion} onChange={(e) => setForm({ ...form, descripcion: e.target.value })}
+                style={{ width: '100%', minHeight: '80px', padding: '8px', borderRadius: '4px', border: '1px solid #ddd', fontFamily: 'inherit', fontSize: '14px' }} />
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '15px' }}>
+              <div>
+                <label style={{ display: 'block', fontWeight: '600', marginBottom: '5px', fontSize: '14px' }}>Fecha Inicio *</label>
+                <input type="date" value={toDateString(form.fechaInicio)}
+                  onChange={(e) => {
+                    if (!e.target.value) return;
+                    const [y, m, d] = e.target.value.split('-').map(Number);
+                    const f = new Date(y, m - 1, d, form.fechaInicio.getHours(), form.fechaInicio.getMinutes());
+                    const horas = calcularHorasModal(f, form.fechaFin);
+                    setForm({ ...form, fechaInicio: f, horas });
+                  }}
+                  style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ddd', fontSize: '14px' }} />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontWeight: '600', marginBottom: '5px', fontSize: '14px' }}>Hora Inicio *</label>
+                <input type="time" value={toTimeString(form.fechaInicio)}
+                  onChange={(e) => {
+                    const [h, mi] = e.target.value.split(':');
+                    const f = new Date(form.fechaInicio);
+                    f.setHours(parseInt(h), parseInt(mi));
+                    const horas = calcularHorasModal(f, form.fechaFin);
+                    setForm({ ...form, fechaInicio: f, horas });
+                  }}
+                  style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ddd', fontSize: '14px' }} />
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '15px' }}>
+              <div>
+                <label style={{ display: 'block', fontWeight: '600', marginBottom: '5px', fontSize: '14px' }}>Fecha Fin *</label>
+                <input type="date" value={toDateString(form.fechaFin)}
+                  onChange={(e) => {
+                    if (!e.target.value) return;
+                    const [y, m, d] = e.target.value.split('-').map(Number);
+                    const f = new Date(y, m - 1, d, form.fechaFin.getHours(), form.fechaFin.getMinutes());
+                    const horas = calcularHorasModal(form.fechaInicio, f);
+                    setForm({ ...form, fechaFin: f, horas });
+                  }}
+                  style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ddd', fontSize: '14px' }} />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontWeight: '600', marginBottom: '5px', fontSize: '14px' }}>Hora Fin *</label>
+                <input type="time" value={toTimeString(form.fechaFin)}
+                  onChange={(e) => {
+                    const [h, mi] = e.target.value.split(':');
+                    const f = new Date(form.fechaFin);
+                    f.setHours(parseInt(h), parseInt(mi));
+                    const horas = calcularHorasModal(form.fechaInicio, f);
+                    setForm({ ...form, fechaFin: f, horas });
+                  }}
+                  style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ddd', fontSize: '14px' }} />
+              </div>
+            </div>
+
+            <div style={{ marginBottom: '15px' }}>
+              <label style={{ display: 'block', fontWeight: '600', marginBottom: '5px', fontSize: '14px' }}>Horas (Calculadas Automáticamente)</label>
+              <input type="number" value={form.horas} disabled
+                style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ddd', background: '#f5f5f5', color: '#999', fontSize: '14px' }} />
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '15px' }}>
+              <div>
+                <label style={{ display: 'block', fontWeight: '600', marginBottom: '5px', fontSize: '14px' }}>Especialidad *</label>
+                <select value={form.especialidad} onChange={(e) => setForm({ ...form, especialidad: e.target.value })}
+                  style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ddd', fontSize: '14px' }}>
+                  <option value="middleware">Middleware</option>
+                  <option value="operaciones">Operaciones Cloud</option>
+                  <option value="ambas">Ambas</option>
+                </select>
+              </div>
+              <div>
+                <label style={{ display: 'block', fontWeight: '600', marginBottom: '5px', fontSize: '14px' }}>⭐ Probabilidad *</label>
                 <select value={form.probabilidad} onChange={(e) => setForm({ ...form, probabilidad: e.target.value })}
-                  style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ddd' }}>
+                  style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #fbbf24', background: '#fef3c7', fontSize: '14px' }}>
                   <option value="alta">Alta</option>
                   <option value="media">Media</option>
                   <option value="baja">Baja</option>
                 </select>
               </div>
             </div>
-            <div style={{ display: 'flex', gap: '10px' }}>
-              <button type="submit" className="btn-primary" style={{ flex: 1 }}>Guardar Cambios</button>
-              <button type="button" className="btn-cancelar" style={{ flex: 1 }} onClick={() => { setEditandoId(null); setForm(null); }}>Cancelar</button>
+
+            <div style={{ display: 'flex', gap: '10px', marginTop: '20px' }}>
+              <button
+                type="submit"
+                style={{ flex: 1, padding: '12px', background: '#2196F3', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '600', fontSize: '14px' }}
+              >
+                ✅ Guardar Cambios
+              </button>
+              <button
+                type="button"
+                onClick={() => { setEditandoId(null); setForm(null); }}
+                style={{ flex: 1, padding: '12px', background: '#999', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '600', fontSize: '14px' }}
+              >
+                ✗ Cancelar
+              </button>
             </div>
           </form>
         </div>
