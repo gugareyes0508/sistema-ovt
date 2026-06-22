@@ -1586,12 +1586,7 @@ function App() {
                     <tr key={log.id}>
                       <td><strong>{log.accion}</strong></td>
                       <td>{log.usuarioNombre || '-'}</td>
-                      <td>
-                        {log.timestamp ? 
-                          new Date(log.timestamp.toDate?.() || log.timestamp).toLocaleString('es-CL')
-                          : '-'
-                        }
-                      </td>
+                      <td>{parseDate(log.timestamp) !== 'Sin fecha' ? new Date(log.timestamp?.toDate?.() || (log.timestamp?._seconds ? log.timestamp._seconds * 1000 : log.timestamp)).toLocaleString('es-CL') : '-'}</td>
                       <td>{log.camposModificados ? JSON.stringify(log.camposModificados).substring(0, 50) : '-'}</td>
                     </tr>
                   ))}
