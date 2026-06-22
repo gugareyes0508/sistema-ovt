@@ -115,6 +115,18 @@ const MisProyeccionesITSM = ({ token, apiUrl }) => {
     }]
   };
 
+  // Distribución por especialista asignado
+  const porEspecialista = {};
+  filtradas.forEach(p => {
+    const nombre = p.especialistaAsignado || 'Sin asignar';
+    porEspecialista[nombre] = (porEspecialista[nombre] || 0) + (p.horas || 0);
+  });
+  const especialistasOrdenados = Object.entries(porEspecialista).sort((a, b) => b[1] - a[1]);
+  const chartPorEspecialista = {
+    labels: especialistasOrdenados.map(([nombre]) => nombre),
+    datasets: [{ label: 'Horas', data: especialistasOrdenados.map(([, h]) => h), backgroundColor: '#1d9e75' }]
+  };
+
   const chartOptions = {
     responsive: true, maintainAspectRatio: false,
     plugins: {
@@ -141,6 +153,7 @@ const MisProyeccionesITSM = ({ token, apiUrl }) => {
       fechaFin: toDate(p.fechaFin),
       horas: p.horas || 0,
       especialidad: p.especialidad || 'operaciones',
+      especialistaAsignado: p.especialistaAsignado || '',
       interno_cliente: p.interno_cliente || 'interno',
       genera_ovt: p.genera_ovt || 'si',
       probabilidad: p.probabilidad || 'media',
@@ -224,6 +237,12 @@ const MisProyeccionesITSM = ({ token, apiUrl }) => {
           <h4 style={{ marginTop: 0 }}>Distribución por Equipo</h4>
           <div style={{ position: 'relative', height: '260px', overflow: 'hidden' }}>
             <Doughnut data={chartEquipo} options={chartOptionsDoughnut} />
+          </div>
+        </div>
+        <div style={{ background: '#fff', border: '1px solid #eee', borderRadius: '8px', padding: '20px', gridColumn: '1 / -1' }}>
+          <h4 style={{ marginTop: 0 }}>Distribución por Especialista Asignado</h4>
+          <div style={{ position: 'relative', height: '280px', overflow: 'hidden' }}>
+            <Bar data={chartPorEspecialista} options={{ ...chartOptions, indexAxis: 'y' }} />
           </div>
         </div>
       </div>
@@ -338,6 +357,29 @@ const MisProyeccionesITSM = ({ token, apiUrl }) => {
                 </select>
               </div>
               <div>
+                <label style={{ display: 'block', fontWeight: '600', marginBottom: '5px', fontSize: '14px' }}>Especialista Asignado</label>
+                <select value={form.especialistaAsignado} onChange={(e) => setForm({ ...form, especialistaAsignado: e.target.value })}
+                  style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ddd', fontSize: '14px' }}>
+                  <option value="">Sin asignar</option>
+                  <option value="Jorge Maureira">Jorge Maureira</option>
+                  <option value="Jhon Estrada">Jhon Estrada</option>
+                  <option value="Luis Vasquez">Luis Vasquez</option>
+                  <option value="Moises Junco">Moises Junco</option>
+                  <option value="Benjamín Fierro">Benjamín Fierro</option>
+                  <option value="Ariel Garate">Ariel Garate</option>
+                  <option value="Cristian Madariaga">Cristian Madariaga</option>
+                  <option value="Miguel Martinez">Miguel Martinez</option>
+                  <option value="Fabian Tobar">Fabian Tobar</option>
+                  <option value="Gustavo Perolo">Gustavo Perolo</option>
+                  <option value="Leonardo Silva">Leonardo Silva</option>
+                  <option value="Cristian Lecaros">Cristian Lecaros</option>
+                  <option value="Rodrigo Escobedo">Rodrigo Escobedo</option>
+                </select>
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '15px' }}>
+              <div>
                 <label style={{ display: 'block', fontWeight: '600', marginBottom: '5px', fontSize: '14px' }}>⭐ Probabilidad *</label>
                 <select value={form.probabilidad} onChange={(e) => setForm({ ...form, probabilidad: e.target.value })}
                   style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #fbbf24', background: '#fef3c7', fontSize: '14px' }}>
@@ -374,7 +416,7 @@ const MisProyeccionesITSM = ({ token, apiUrl }) => {
         <table className="tabla">
           <thead>
             <tr>
-              <th>N° Ticket</th><th>Cliente</th><th>Descripción</th><th>Especialidad</th>
+              <th>N° Ticket</th><th>Cliente</th><th>Descripción</th><th>Especialidad</th><th>Especialista Asignado</th>
               <th>Inicio</th><th>Fin</th><th>Horas</th><th>Probabilidad</th><th>Estado</th><th>Acciones</th>
             </tr>
           </thead>
@@ -385,6 +427,7 @@ const MisProyeccionesITSM = ({ token, apiUrl }) => {
                 <td>{p.cliente}</td>
                 <td style={{ maxWidth: '200px', whiteSpace: 'normal', wordBreak: 'break-word' }}>{p.descripcion}</td>
                 <td>{p.especialidad}</td>
+                <td>{p.especialistaAsignado || 'Sin asignar'}</td>
                 <td style={{ fontSize: '12px' }}>{parseDateDisplay(p.fechaInicio)} {toTimeString(p.fechaInicio)}</td>
                 <td style={{ fontSize: '12px' }}>{parseDateDisplay(p.fechaFin)} {toTimeString(p.fechaFin)}</td>
                 <td className="numero">{p.horas}h</td>

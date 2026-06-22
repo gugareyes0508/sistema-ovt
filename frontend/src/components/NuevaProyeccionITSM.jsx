@@ -42,6 +42,7 @@ const vacio = {
   interno_cliente: 'interno',
   genera_ovt: 'si',
   especialidad: 'operaciones',
+  especialistaAsignado: '',
   probabilidad: 'media',
   numeroTicket: ''
 };
@@ -113,6 +114,32 @@ const NuevaProyeccionITSM = ({ token, apiUrl, onGuardado }) => {
               <option value="ambas">Ambas</option>
             </select>
           </div>
+        </div>
+
+        <div className="form-group">
+          <label>Especialista Asignado</label>
+          <select value={form.especialistaAsignado} onChange={(e) => setForm({ ...form, especialistaAsignado: e.target.value })}>
+            <option value="">Sin asignar</option>
+            <option value="Jorge Maureira">Jorge Maureira</option>
+            <option value="Jhon Estrada">Jhon Estrada</option>
+            <option value="Luis Vasquez">Luis Vasquez</option>
+            <option value="Moises Junco">Moises Junco</option>
+            <option value="Manuel Urbina Hernández">Manuel Urbina Hernández</option>
+            <option value="Benjamín Fierro">Benjamín Fierro</option>
+            <option value="Mauricio Antonio Serrano Gonzalez">Mauricio Serrano</option>
+            <option value="Ricardo Andrés Rojas Ramos">Ricardo Rojas</option>
+            <option value="Ariel Garate">Ariel Garate</option>
+            <option value="Rodrigo Alejandro Sanhueza">Rodrigo Sanhueza</option>
+            <option value="Sebastian Arroyo Vigouroux">Sebastian Arroyo</option>
+            <option value="Cristian Madariaga">Cristian Madariaga</option>
+            <option value="Miguel Martinez">Miguel Martinez</option>
+            <option value="Fabian Tobar">Fabian Tobar</option>
+            <option value="Gustavo Perolo">Gustavo Perolo</option>
+            <option value="Leonardo Silva">Leonardo Silva</option>
+            <option value="Cristian Lecaros">Cristian Lecaros</option>
+            <option value="Rodrigo Escobedo">Rodrigo Escobedo</option>
+            <option value="Alexis José Alfonzo">Alexis Alfonzo</option>
+          </select>
         </div>
 
         <div className="form-group">
