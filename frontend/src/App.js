@@ -620,6 +620,16 @@ function App() {
             <h2>📋 {editandoId ? '✏️ Editar Cambio/Alerta' : 'Registrar Cambio o Alerta'}</h2>
             
             <form onSubmit={manejarRegistro} className="formulario-mejorado">
+              <div className="form-group">
+                <label>N° de Ticket</label>
+                <input
+                  type="text"
+                  placeholder="Ej: INC0012345"
+                  value={formulario.numeroTicket}
+                  onChange={(e) => setFormulario({ ...formulario, numeroTicket: e.target.value })}
+                />
+              </div>
+
               <div className="form-row">
                 <div className="form-group">
                   <label>Tipo de Registro *</label>
@@ -656,16 +666,6 @@ function App() {
                   onChange={(e) => setFormulario({ ...formulario, descripcion: e.target.value })}
                   required
                   rows="3"
-                />
-              </div>
-
-              <div className="form-group">
-                <label>N° de Ticket</label>
-                <input
-                  type="text"
-                  placeholder="Ej: INC0012345"
-                  value={formulario.numeroTicket}
-                  onChange={(e) => setFormulario({ ...formulario, numeroTicket: e.target.value })}
                 />
               </div>
 
@@ -856,9 +856,9 @@ function App() {
                 <table className="tabla tabla-acciones">
                   <thead>
                     <tr>
+                      <th>N° Ticket</th>
                       <th>Tipo</th>
                       <th>Especialista</th>
-                      <th>N° Ticket</th>
                       <th>Descripción</th>
                       <th>Horas</th>
                       <th>Estado</th>
@@ -868,9 +868,9 @@ function App() {
                   <tbody>
                     {registros.map(r => (
                       <tr key={r.id}>
+                        <td>{r.numeroTicket || '—'}</td>
                         <td><strong>{r.tipo}</strong></td>
                         <td>{r.especialista}</td>
-                        <td>{r.numeroTicket || '—'}</td>
                         <td style={{maxWidth: '250px', whiteSpace: 'normal', wordBreak: 'break-word'}}>{r.descripcion}</td>
                         <td className="numero">{r.horas}h</td>
                         <td>
@@ -994,8 +994,8 @@ function App() {
               <table className="tabla">
                 <thead>
                   <tr>
-                    <th>Tipo</th>
                     <th>N° Ticket</th>
+                    <th>Tipo</th>
                     <th>Descripción</th>
                     <th>Cliente</th>
                     <th>Inicio (Fecha - Hora)</th>
@@ -1009,8 +1009,8 @@ function App() {
                 <tbody>
                   {misRegistrosFiltrados.map(r => (
                     <tr key={r.id}>
-                      <td><strong>{r.tipo}</strong></td>
                       <td>{r.numeroTicket || '—'}</td>
+                      <td><strong>{r.tipo}</strong></td>
                       <td style={{maxWidth: '220px', whiteSpace: 'normal', wordBreak: 'break-word'}}>{r.descripcion}</td>
                       <td>{r.cliente}</td>
                       <td style={{fontSize: '13px'}}>{parseDate(r.fechaInicio)} <strong>{toTimeString(toDate(r.fechaInicio))}</strong></td>
@@ -1122,9 +1122,9 @@ function App() {
               <table className="tabla">
                 <thead>
                   <tr>
+                    <th>N° Ticket</th>
                     <th>Especialista</th>
                     <th>Tipo</th>
-                    <th>N° Ticket</th>
                     <th>Descripción</th>
                     <th>Fecha</th>
                     <th>Horas</th>
@@ -1135,9 +1135,9 @@ function App() {
                 <tbody>
                   {registrosFiltrados.filter(r => r.estado === 'pendiente').map(r => (
                     <tr key={r.id}>
+                      <td>{r.numeroTicket || '—'}</td>
                       <td><strong>{r.createdByNombre || r.especialista}</strong></td>
                       <td>{r.tipo}</td>
-                      <td>{r.numeroTicket || '—'}</td>
                       <td style={{maxWidth: '220px', whiteSpace: 'normal', wordBreak: 'break-word'}}>{r.descripcion}</td>
                       <td>{parseDate(r.fechaInicio)}</td>
                       <td className="numero">{r.horas}h</td>
@@ -1208,8 +1208,8 @@ function App() {
               <table className="tabla">
                 <thead>
                   <tr>
-                    <th>Tipo</th>
                     <th>N° Ticket</th>
+                    <th>Tipo</th>
                     <th>Descripción</th>
                     <th>Especialista</th>
                     <th>Cliente</th>
@@ -1223,8 +1223,8 @@ function App() {
                 <tbody>
                   {registrosFiltrados.filter(r => r.estado !== 'pendiente').map(r => (
                     <tr key={r.id}>
-                      <td><strong>{r.tipo}</strong></td>
                       <td>{r.numeroTicket || '—'}</td>
+                      <td><strong>{r.tipo}</strong></td>
                       <td style={{maxWidth: '220px', whiteSpace: 'normal', wordBreak: 'break-word'}}>{r.descripcion}</td>
                       <td>{r.createdByNombre || r.especialista}</td>
                       <td>{r.cliente}</td>
@@ -1605,6 +1605,10 @@ function App() {
             <div style={{background: '#f5f5f5', padding: '12px', borderRadius: '8px', marginBottom: '20px', fontSize: '13px'}}>
               <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px'}}>
                 <div>
+                  <span style={{color: '#666', display: 'block', marginBottom: '4px', fontWeight: '500'}}>N° de Ticket</span>
+                  <span>{modalEdicion?.registro?.numeroTicket || 'Sin ticket'}</span>
+                </div>
+                <div>
                   <span style={{color: '#666', display: 'block', marginBottom: '4px', fontWeight: '500'}}>Especialista</span>
                   <span>{modalEdicion?.registro?.especialista || 'N/A'}</span>
                 </div>
@@ -1615,10 +1619,6 @@ function App() {
                 <div>
                   <span style={{color: '#666', display: 'block', marginBottom: '4px', fontWeight: '500'}}>Cliente</span>
                   <span>{modalEdicion?.registro?.cliente || 'N/A'}</span>
-                </div>
-                <div>
-                  <span style={{color: '#666', display: 'block', marginBottom: '4px', fontWeight: '500'}}>N° de Ticket</span>
-                  <span>{modalEdicion?.registro?.numeroTicket || 'Sin ticket'}</span>
                 </div>
               </div>
             </div>
