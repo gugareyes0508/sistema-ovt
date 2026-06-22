@@ -1674,7 +1674,8 @@ function App() {
                       const fin = formularioModal.fechaFin;
                       let horas = formularioModal.horas;
                       if (fin && !isNaN(fin.getTime()) && !isNaN(fecha.getTime())) {
-                        horas = parseFloat(Math.max(0, ((fin - fecha) / (1000 * 60 * 60)).toFixed(2)));
+                        const diff = (fin - fecha) / (1000 * 60 * 60);
+                        horas = Math.max(0, Math.round(diff * 20) / 20);
                       }
                       setFormularioModal({...formularioModal, fechaInicio: fecha, horas});
                     }}
