@@ -1126,9 +1126,11 @@ function App() {
                     <th>Especialista</th>
                     <th>Tipo</th>
                     <th>Descripción</th>
-                    <th>Fecha</th>
+                    <th>Inicio (Fecha - Hora)</th>
+                    <th>Fin (Fecha - Hora)</th>
                     <th>Horas</th>
                     <th>Especialidad</th>
+                    <th>Genera OVT</th>
                     <th>Acciones</th>
                   </tr>
                 </thead>
@@ -1139,9 +1141,23 @@ function App() {
                       <td><strong>{r.createdByNombre || r.especialista}</strong></td>
                       <td>{r.tipo}</td>
                       <td style={{maxWidth: '220px', whiteSpace: 'normal', wordBreak: 'break-word'}}>{r.descripcion}</td>
-                      <td>{parseDate(r.fechaInicio)}</td>
+                      <td style={{fontSize: '13px'}}>{parseDate(r.fechaInicio)} <strong>{toTimeString(toDate(r.fechaInicio))}</strong></td>
+                      <td style={{fontSize: '13px'}}>{parseDate(r.fechaFin)} <strong>{toTimeString(toDate(r.fechaFin))}</strong></td>
                       <td className="numero">{r.horas}h</td>
                       <td>{r.especialidad}</td>
+                      <td>
+                        <span style={{
+                          display: 'inline-block',
+                          padding: '4px 12px',
+                          borderRadius: '20px',
+                          fontSize: '12px',
+                          fontWeight: '700',
+                          background: r.genera_ovt === 'si' ? '#d1fae5' : '#fee2e2',
+                          color: r.genera_ovt === 'si' ? '#065f46' : '#991b1b'
+                        }}>
+                          {r.genera_ovt === 'si' ? '✓ SÍ' : '✗ NO'}
+                        </span>
+                      </td>
                       <td className="acciones">
                         <button 
                           className="btn-aprobar"
