@@ -319,7 +319,7 @@ Sé conciso, específico y ORIGINAL.`;
   // Opciones comunes para gráficos
   const chartOptions = {
     responsive: true,
-    maintainAspectRatio: true,
+    maintainAspectRatio: false,
     plugins: {
       legend: {
         display: true,
@@ -413,13 +413,13 @@ Sé conciso, específico y ORIGINAL.`;
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '20px' }}>
           <div style={{ background: 'white', padding: '20px', borderRadius: '8px', border: '1px solid #eee' }}>
             <h3>HHEE por Tipo</h3>
-            <div style={{ position: 'relative', height: '250px' }}>
+            <div style={{ position: 'relative', height: '250px', overflow: 'hidden' }}>
               <Doughnut data={chartPorTipo} options={chartOptions} />
             </div>
           </div>
           <div style={{ background: 'white', padding: '20px', borderRadius: '8px', border: '1px solid #eee' }}>
             <h3>HHEE por Especialidad</h3>
-            <div style={{ position: 'relative', height: '250px' }}>
+            <div style={{ position: 'relative', height: '250px', overflow: 'hidden' }}>
               <Bar data={chartPorEspecialidad} options={chartOptionsSinLeyenda} />
             </div>
           </div>
@@ -431,20 +431,20 @@ Sé conciso, específico y ORIGINAL.`;
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '20px' }}>
           <div style={{ background: 'white', padding: '20px', borderRadius: '8px', border: '1px solid #eee' }}>
             <h3>Evolución Semana a Semana</h3>
-            <div style={{ position: 'relative', height: '300px' }}>
+            <div style={{ position: 'relative', height: '300px', overflow: 'hidden' }}>
               <Line data={chartSemanal} options={chartOptions} />
             </div>
           </div>
           <div style={{ background: 'white', padding: '20px', borderRadius: '8px', border: '1px solid #eee' }}>
             <h3>HHEE por Día de Semana</h3>
-            <div style={{ position: 'relative', height: '300px' }}>
+            <div style={{ position: 'relative', height: '300px', overflow: 'hidden' }}>
               <Bar data={chartPorDia} options={chartOptionsSinLeyenda} />
             </div>
           </div>
           <div style={{ background: 'white', padding: '20px', borderRadius: '8px', border: '1px solid #eee', gridColumn: '1 / -1' }}>
             <h3>Concentración de HHEE por Hora del Día</h3>
             <p style={{ fontSize: '12px', color: '#999', margin: '0 0 12px' }}>Basado en la hora de inicio de cada registro</p>
-            <div style={{ position: 'relative', height: '280px' }}>
+            <div style={{ position: 'relative', height: '280px', overflow: 'hidden' }}>
               <Bar data={chartPorHora} options={chartOptionsSinLeyenda} />
             </div>
           </div>
@@ -455,7 +455,7 @@ Sé conciso, específico y ORIGINAL.`;
       {activeTab === 'persona' && (
         <div style={{ background: 'white', padding: '20px', borderRadius: '8px', border: '1px solid #eee' }}>
           <h3>Top Especialistas - HHEE</h3>
-          <div style={{ position: 'relative', height: '400px' }}>
+          <div style={{ position: 'relative', height: '400px', overflow: 'hidden' }}>
             <Bar data={chartTopEspecialistas} options={{ ...chartOptionsSinLeyenda, indexAxis: 'y' }} />
           </div>
         </div>
