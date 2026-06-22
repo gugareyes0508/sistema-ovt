@@ -944,7 +944,7 @@ function App() {
                         </td>
                         <td>{r.numeroTicket || '—'}</td>
                         <td><strong>{r.tipo}</strong></td>
-                        <td>{r.especialista}</td>
+                        <td>{r.createdByNombre || r.especialista}</td>
                         <td style={{maxWidth: '250px', whiteSpace: 'normal', wordBreak: 'break-word'}}>{r.descripcion}</td>
                         <td className="numero">{r.horas}h</td>
                         <td>
