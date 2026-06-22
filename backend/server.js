@@ -650,7 +650,8 @@ app.post('/api/proyecciones', verificarToken, async (req, res) => {
       genera_ovt,
       especialidad,
       probabilidad,
-      numeroTicket
+      numeroTicket,
+      especialistaAsignado
     } = req.body;
 
     if (!tipo || !descripcion || !cliente || !fechaInicio || !fechaFin || !probabilidad) {
@@ -667,6 +668,7 @@ app.post('/api/proyecciones', verificarToken, async (req, res) => {
       interno_cliente: String(interno_cliente || 'interno'),
       genera_ovt: String(genera_ovt || 'si'),
       especialidad: String(especialidad || 'operaciones'),
+      especialistaAsignado: especialistaAsignado ? String(especialistaAsignado) : 'Sin asignar',
       probabilidad: String(probabilidad), // 'alta' | 'media' | 'baja'
       numeroTicket: numeroTicket ? String(numeroTicket) : '',
       estado: 'proyectado', // 'proyectado' | 'confirmado' | 'descartado'
