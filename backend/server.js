@@ -2,11 +2,66 @@ const express = require('express');
 const cors = require('cors');
 const jwt = require('jsonwebtoken');
 const admin = require('firebase-admin');
+const https = require('https');
 require('dotenv').config();
 
 const app = express();
 const PORT = process.env.PORT || 3001;
 const JWT_SECRET = process.env.JWT_SECRET || 'demo123';
+
+// ============================================
+// TELEGRAM CONFIG
+// ============================================
+
+const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '';
+const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID || '';
+
+function enviarMensajeTelegram(mensaje) {
+  return new Promise((resolve) => {
+    if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_CHAT_ID) {
+      console.warn('⚠️ Telegram no configurado (falta TELEGRAM_BOT_TOKEN o TELEGRAM_CHAT_ID)');
+      return resolve(false);
+    }
+
+    const payload = JSON.stringify({
+      chat_id: TELEGRAM_CHAT_ID,
+      text: mensaje,
+      parse_mode: 'HTML'
+    });
+
+    const options = {
+      hostname: 'api.telegram.org',
+      path: `/bot${TELEGRAM_BOT_TOKEN}/sendMessage`,
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(payload)
+      }
+    };
+
+    const req = https.request(options, (res) => {
+      let data = '';
+      res.on('data', (chunk) => (data += chunk));
+      res.on('end', () => {
+        if (res.statusCode === 200) {
+          console.log('✓ Mensaje enviado a Telegram');
+          resolve(true);
+        } else {
+          console.error('✗ Error enviando a Telegram:', data);
+          resolve(false);
+        }
+      });
+    });
+
+    req.on('error', (err) => {
+      console.error('✗ Error de conexión con Telegram:', err.message);
+      resolve(false);
+    });
+
+    req.write(payload);
+    req.end();
+  });
+}
 
 // ============================================
 // MIDDLEWARES
@@ -24,18 +79,18 @@ app.use(cors({
 
 try {
   let serviceAccount;
-  
+
   if (process.env.FIREBASE_KEY_JSON) {
     serviceAccount = JSON.parse(process.env.FIREBASE_KEY_JSON);
   } else if (require.resolve('./firebase-key.json')) {
     serviceAccount = require('./firebase-key.json');
   }
-  
+
   admin.initializeApp({
     credential: admin.credential.cert(serviceAccount),
     databaseURL: 'https://sistema-ovt-bcochile.firebaseio.com'
   });
-  
+
   console.log('✓ Firebase inicializado');
 } catch (err) {
   console.error('✗ Error inicializando Firebase:', err.message);
@@ -49,21 +104,14 @@ const db = admin.firestore();
 // ============================================
 
 const usuarios = {
-  // ADMINS
   'admin': { nombre: 'Administrador', rol: 'admin', departamento: 'Admin', contrasena: 'demo123' },
   'miguel.padilla': { nombre: 'Miguel Padilla', rol: 'admin', departamento: 'DPE', contrasena: 'demo123' },
   'hugo.araya': { nombre: 'Hugo Araya', rol: 'admin', departamento: 'DPE', contrasena: 'demo123' },
   'gustavo.reyes': { nombre: 'Gustavo Reyes', rol: 'admin', departamento: 'Squad', contrasena: 'demo123' },
   'najeeb.escobar': { nombre: 'Najeeb Escobar', rol: 'admin', departamento: 'TL', contrasena: 'demo123' },
   'john.estrada': { nombre: 'john Estrada', rol: 'admin', departamento: 'TL', contrasena: 'demo123' },
-  
-  // COORDINADOR
   'maria.admin': { nombre: 'Maria Admin', rol: 'coordinador', departamento: 'Coordinación', contrasena: 'demo123' },
-  
-  // ITSM
   'danilo.isla': { nombre: 'Danilo Isla', rol: 'itsm', departamento: 'ITSM', contrasena: 'demo123' },
-  
-  // ESPECIALISTAS
   'jorge.maureira': { nombre: 'Jorge Maureira', rol: 'especialista', departamento: 'Middleware', contrasena: 'demo123' },
   'jhon.estrada': { nombre: 'Jhon Estrada', rol: 'especialista', departamento: 'Operaciones Cloud', contrasena: 'demo123' },
   'luis.vasquez': { nombre: 'Luis Vasquez', rol: 'especialista', departamento: 'Middleware', contrasena: 'demo123' },
@@ -91,11 +139,11 @@ const usuarios = {
 
 const verificarToken = (req, res, next) => {
   const token = req.headers.authorization?.replace('Bearer ', '');
-  
+
   if (!token) {
     return res.status(401).json({ error: 'Token no proporcionado' });
   }
-  
+
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
     req.usuario = decoded;
@@ -112,24 +160,23 @@ const verificarToken = (req, res, next) => {
 app.post('/api/auth/login', async (req, res) => {
   try {
     const { usuario, contrasena } = req.body;
-    
+
     if (!usuario || !contrasena) {
       return res.status(400).json({ error: 'Usuario y contraseña requeridos' });
     }
-    
+
     const user = usuarios[usuario];
-    
+
     if (!user || user.contrasena !== contrasena) {
       return res.status(401).json({ error: 'Credenciales incorrectas' });
     }
-    
+
     const token = jwt.sign(
       { usuario, nombre: user.nombre, rol: user.rol },
       JWT_SECRET,
       { expiresIn: '24h' }
     );
-    
-    // Registrar en auditoría
+
     await db.collection('auditoria').add({
       accion: 'LOGIN',
       usuarioNombre: user.nombre,
@@ -137,7 +184,7 @@ app.post('/api/auth/login', async (req, res) => {
       timestamp: new Date(),
       ip: req.ip
     });
-    
+
     res.json({
       token,
       usuario: { usuario, nombre: user.nombre, rol: user.rol }
@@ -167,18 +214,15 @@ app.get('/api/admin/listar-usuarios', verificarToken, async (req, res) => {
       });
     }
 
-    res.json({ 
-      success: true, 
-      usuarios: usuariosList 
-    });
+    res.json({ success: true, usuarios: usuariosList });
   } catch (err) {
     console.error('Error listando usuarios:', err);
     res.status(500).json({ error: err.message });
   }
 });
+
 app.post('/api/admin/crear-usuario', verificarToken, async (req, res) => {
   try {
-    // Solo el admin original puede crear nuevos usuarios
     if (req.usuario.usuario !== 'admin') {
       return res.status(403).json({ error: 'No tienes permisos para crear usuarios' });
     }
@@ -189,7 +233,6 @@ app.post('/api/admin/crear-usuario', verificarToken, async (req, res) => {
       return res.status(400).json({ error: 'Faltan campos requeridos' });
     }
 
-    // Agregar usuario a la lista en memoria
     usuarios[usuario] = {
       nombre,
       contrasena,
@@ -197,8 +240,8 @@ app.post('/api/admin/crear-usuario', verificarToken, async (req, res) => {
       departamento: departamento || ''
     };
 
-    res.json({ 
-      success: true, 
+    res.json({
+      success: true,
       message: `Usuario ${usuario} creado correctamente`,
       usuario: { usuario, nombre, rol: rol || 'admin' }
     });
@@ -209,7 +252,7 @@ app.post('/api/admin/crear-usuario', verificarToken, async (req, res) => {
 });
 
 // ============================================
-// CAMBIAR CONTRASEÑA (Cualquier usuario autenticado)
+// CAMBIAR CONTRASEÑA
 // ============================================
 app.post('/api/auth/cambiar-contrasena', verificarToken, async (req, res) => {
   try {
@@ -223,16 +266,13 @@ app.post('/api/auth/cambiar-contrasena', verificarToken, async (req, res) => {
       return res.status(400).json({ error: 'La contraseña debe tener al menos 4 caracteres' });
     }
 
-    // Verificar contraseña actual
     const user = usuarios[req.usuario.usuario];
     if (!user || user.contrasena !== contrasenaActual) {
       return res.status(401).json({ error: 'Contraseña actual incorrecta' });
     }
 
-    // Cambiar contraseña
     usuarios[req.usuario.usuario].contrasena = contraseñaNueva;
 
-    // Registrar en auditoría
     await db.collection('auditoria').add({
       accion: 'CAMBIO_CONTRASEÑA',
       usuarioNombre: req.usuario.nombre,
@@ -241,10 +281,7 @@ app.post('/api/auth/cambiar-contrasena', verificarToken, async (req, res) => {
       detalles: 'Cambio de contraseña exitoso'
     });
 
-    res.json({ 
-      success: true, 
-      message: 'Contraseña cambiada correctamente'
-    });
+    res.json({ success: true, message: 'Contraseña cambiada correctamente' });
   } catch (err) {
     console.error('Error cambiando contraseña:', err);
     res.status(500).json({ error: err.message });
@@ -256,7 +293,6 @@ app.post('/api/auth/cambiar-contrasena', verificarToken, async (req, res) => {
 // ============================================
 app.post('/api/admin/resetear-contrasena', verificarToken, async (req, res) => {
   try {
-    // Solo admin puede resetear contraseñas
     if (req.usuario.usuario !== 'admin') {
       return res.status(403).json({ error: 'No tienes permisos para resetear contraseñas' });
     }
@@ -271,10 +307,8 @@ app.post('/api/admin/resetear-contrasena', verificarToken, async (req, res) => {
       return res.status(404).json({ error: 'Usuario no encontrado' });
     }
 
-    // Cambiar contraseña
     usuarios[usuario].contrasena = contraseñaNueva;
 
-    // Registrar en auditoría
     await db.collection('auditoria').add({
       accion: 'RESETEO_CONTRASENA',
       usuarioAdminNombre: req.usuario.nombre,
@@ -283,10 +317,7 @@ app.post('/api/admin/resetear-contrasena', verificarToken, async (req, res) => {
       detalles: `Reseteo de contraseña realizado por admin`
     });
 
-    res.json({ 
-      success: true, 
-      message: `Contraseña de ${usuario} reseteada correctamente`
-    });
+    res.json({ success: true, message: `Contraseña de ${usuario} reseteada correctamente` });
   } catch (err) {
     console.error('Error reseteando contraseña:', err);
     res.status(500).json({ error: err.message });
@@ -298,7 +329,6 @@ app.post('/api/admin/resetear-contrasena', verificarToken, async (req, res) => {
 // ============================================
 app.post('/api/admin/eliminar-usuario', verificarToken, async (req, res) => {
   try {
-    // Solo admin original puede eliminar usuarios
     if (req.usuario.usuario !== 'admin') {
       return res.status(403).json({ error: 'No tienes permisos para eliminar usuarios' });
     }
@@ -309,7 +339,6 @@ app.post('/api/admin/eliminar-usuario', verificarToken, async (req, res) => {
       return res.status(400).json({ error: 'Usuario requerido' });
     }
 
-    // No permitir eliminar al admin original
     if (usuario === 'admin') {
       return res.status(400).json({ error: 'No se puede eliminar al admin original' });
     }
@@ -319,11 +348,8 @@ app.post('/api/admin/eliminar-usuario', verificarToken, async (req, res) => {
     }
 
     const nombreUsuario = usuarios[usuario].nombre;
-
-    // Eliminar usuario
     delete usuarios[usuario];
 
-    // Registrar en auditoría
     await db.collection('auditoria').add({
       accion: 'ELIMINAR_USUARIO',
       usuarioAdminNombre: req.usuario.nombre,
@@ -333,10 +359,7 @@ app.post('/api/admin/eliminar-usuario', verificarToken, async (req, res) => {
       detalles: `Usuario eliminado por admin`
     });
 
-    res.json({ 
-      success: true, 
-      message: `Usuario ${usuario} (${nombreUsuario}) eliminado correctamente`
-    });
+    res.json({ success: true, message: `Usuario ${usuario} (${nombreUsuario}) eliminado correctamente` });
   } catch (err) {
     console.error('Error eliminando usuario:', err);
     res.status(500).json({ error: err.message });
@@ -347,34 +370,27 @@ app.post('/api/admin/eliminar-usuario', verificarToken, async (req, res) => {
 // RUTAS: REGISTROS MEJORADOS
 // ============================================
 
-// GET registros - Especialista ve solo suyos, Coordinador/Admin ven todos
 app.get('/api/registros', verificarToken, async (req, res) => {
   try {
     let query = db.collection('registros');
-    
-    // Si es especialista, solo ve sus registros
+
     if (req.usuario.rol === 'especialista') {
       query = query.where('createdBy', '==', req.usuario.usuario);
     }
-    
-    // Obtener registros sin ordenar primero
+
     const snapshot = await query.get();
     const registros = [];
-    
+
     snapshot.forEach(doc => {
-      registros.push({
-        id: doc.id,
-        ...doc.data()
-      });
+      registros.push({ id: doc.id, ...doc.data() });
     });
-    
-    // Ordenar en memoria por createdAt descendente
+
     registros.sort((a, b) => {
       const fechaA = a.createdAt?.toDate?.() || new Date(a.createdAt) || new Date(0);
       const fechaB = b.createdAt?.toDate?.() || new Date(b.createdAt) || new Date(0);
       return fechaB - fechaA;
     });
-    
+
     res.json(registros);
   } catch (err) {
     console.error('Error en GET /api/registros:', err);
@@ -382,7 +398,7 @@ app.get('/api/registros', verificarToken, async (req, res) => {
   }
 });
 
-// POST crear registro MEJORADO
+// POST crear registro MEJORADO — incluye numeroTicket
 app.post('/api/registros', verificarToken, async (req, res) => {
   try {
     const {
@@ -396,13 +412,14 @@ app.post('/api/registros', verificarToken, async (req, res) => {
       interno_cliente,
       genera_ovt,
       estado,
-      especialidad
+      especialidad,
+      numeroTicket
     } = req.body;
-    
+
     if (!tipo || !descripcion || !cliente || !fechaInicio || !fechaFin) {
       return res.status(400).json({ error: 'Campos requeridos faltando' });
     }
-    
+
     const docRef = await db.collection('registros').add({
       tipo: String(tipo),
       descripcion: String(descripcion),
@@ -415,21 +432,36 @@ app.post('/api/registros', verificarToken, async (req, res) => {
       genera_ovt: String(genera_ovt),
       estado: String(estado),
       especialidad: String(especialidad),
+      numeroTicket: numeroTicket ? String(numeroTicket) : '',
       createdAt: new Date(),
       createdBy: req.usuario.usuario,
       createdByNombre: req.usuario.nombre
     });
-    
-    // Registrar en auditoría
+
     await db.collection('auditoria').add({
       accion: 'CREAR_REGISTRO',
       usuarioNombre: req.usuario.nombre,
       usuarioRol: req.usuario.rol,
       timestamp: new Date(),
-      camposModificados: { tipo, cliente, especialidad }
+      camposModificados: { tipo, cliente, especialidad, numeroTicket }
     });
-    
-    res.json({ 
+
+    if (String(estado) === 'pendiente') {
+      const mensaje =
+        `🔔 <b>Nuevo registro pendiente de aprobación</b>\n\n` +
+        `👤 <b>Especialista:</b> ${req.usuario.nombre}\n` +
+        `📋 <b>Tipo:</b> ${tipo}\n` +
+        `🎫 <b>N° Ticket:</b> ${numeroTicket || 'Sin ticket'}\n` +
+        `🏢 <b>Cliente:</b> ${cliente}\n` +
+        `⏱️ <b>Horas:</b> ${horas}h\n` +
+        `🛠️ <b>Especialidad:</b> ${especialidad}\n` +
+        `📝 <b>Descripción:</b> ${String(descripcion).substring(0, 150)}\n\n` +
+        `✅ Ingresa al sistema para aprobar o rechazar.`;
+
+      enviarMensajeTelegram(mensaje);
+    }
+
+    res.json({
       id: docRef.id,
       mensaje: 'Registro guardado correctamente'
     });
@@ -439,28 +471,29 @@ app.post('/api/registros', verificarToken, async (req, res) => {
   }
 });
 
-// PATCH actualizar registro (Especialista su propio registro)
+// PATCH actualizar registro
 app.patch('/api/registros/:id', verificarToken, async (req, res) => {
   try {
     const registroRef = db.collection('registros').doc(req.params.id);
     const doc = await registroRef.get();
-    
+
     if (!doc.exists) {
       return res.status(404).json({ error: 'Registro no encontrado' });
     }
-    
-    // Solo el especialista propietario o admin puede modificar
+
     if (req.usuario.rol === 'especialista' && doc.data().createdBy !== req.usuario.usuario) {
       return res.status(403).json({ error: 'No tienes permiso para modificar este registro' });
     }
-    
+
+    const estabaPendiente = doc.data().estado === 'pendiente';
+    const quedaPendiente = req.body.estado === 'pendiente';
+
     await registroRef.update({
       ...req.body,
       updatedAt: new Date(),
       updatedBy: req.usuario.usuario
     });
-    
-    // Registrar en auditoría
+
     await db.collection('auditoria').add({
       accion: 'ACTUALIZAR_REGISTRO',
       usuarioNombre: req.usuario.nombre,
@@ -468,7 +501,21 @@ app.patch('/api/registros/:id', verificarToken, async (req, res) => {
       timestamp: new Date(),
       registroId: req.params.id
     });
-    
+
+    if (!estabaPendiente && quedaPendiente) {
+      const data = doc.data();
+      const mensaje =
+        `🔔 <b>Registro corregido - Pendiente de aprobación</b>\n\n` +
+        `👤 <b>Especialista:</b> ${data.createdByNombre || data.especialista}\n` +
+        `📋 <b>Tipo:</b> ${req.body.tipo || data.tipo}\n` +
+        `🎫 <b>N° Ticket:</b> ${req.body.numeroTicket || data.numeroTicket || 'Sin ticket'}\n` +
+        `🏢 <b>Cliente:</b> ${req.body.cliente || data.cliente}\n` +
+        `⏱️ <b>Horas:</b> ${req.body.horas || data.horas}h\n\n` +
+        `✅ Ingresa al sistema para aprobar o rechazar.`;
+
+      enviarMensajeTelegram(mensaje);
+    }
+
     res.json({ message: 'Registro actualizado' });
   } catch (err) {
     console.error('Error en PATCH /api/registros:', err);
@@ -482,10 +529,9 @@ app.delete('/api/registros/:id', verificarToken, async (req, res) => {
     if (req.usuario.rol !== 'admin') {
       return res.status(403).json({ error: 'Solo el admin puede eliminar' });
     }
-    
+
     await db.collection('registros').doc(req.params.id).delete();
-    
-    // Registrar en auditoría
+
     await db.collection('auditoria').add({
       accion: 'ELIMINAR_REGISTRO',
       usuarioNombre: req.usuario.nombre,
@@ -493,7 +539,7 @@ app.delete('/api/registros/:id', verificarToken, async (req, res) => {
       timestamp: new Date(),
       registroId: req.params.id
     });
-    
+
     res.json({ message: 'Registro eliminado' });
   } catch (err) {
     console.error('Error en DELETE /api/registros:', err);
@@ -508,40 +554,38 @@ app.delete('/api/registros/:id', verificarToken, async (req, res) => {
 app.get('/api/dashboard/resumen', verificarToken, async (req, res) => {
   try {
     let query = db.collection('registros');
-    
-    // Si es especialista, solo sus registros
+
     if (req.usuario.rol === 'especialista') {
       query = query.where('createdBy', '==', req.usuario.usuario);
     }
-    
+
     const snapshot = await query.get();
-    
+
     let totalRegistros = 0;
     let totalHoras = 0;
     let horasEsteMes = 0;
     let registrosPendientes = 0;
-    
+
     const ahora = new Date();
     const mesActual = ahora.getMonth();
     const anioActual = ahora.getFullYear();
-    
+
     snapshot.forEach(doc => {
       const data = doc.data();
       totalRegistros++;
       const horas = parseFloat(data.horas || 0);
       totalHoras += horas;
-      
-      // Verificar si es de este mes
+
       const fecha = data.fechaInicio?.toDate?.() || new Date(data.fechaInicio);
       if (fecha.getMonth() === mesActual && fecha.getFullYear() === anioActual) {
         horasEsteMes += horas;
       }
-      
+
       if (data.estado === 'pendiente') {
         registrosPendientes++;
       }
     });
-    
+
     res.json({
       totalRegistros,
       totalHoras: totalHoras.toFixed(1),
@@ -563,21 +607,43 @@ app.get('/api/auditoria', verificarToken, async (req, res) => {
     if (req.usuario.rol !== 'admin') {
       return res.status(403).json({ error: 'No autorizado' });
     }
-    
+
     const snapshot = await db.collection('auditoria').orderBy('timestamp', 'desc').limit(100).get();
     const logs = [];
-    
+
     snapshot.forEach(doc => {
-      logs.push({
-        id: doc.id,
-        ...doc.data()
-      });
+      logs.push({ id: doc.id, ...doc.data() });
     });
-    
+
     res.json(logs);
   } catch (err) {
     console.error('Error en GET /auditoria:', err);
     res.status(500).json({ error: 'Error al obtener auditoría' });
+  }
+});
+
+// ============================================
+// RUTA: TEST TELEGRAM
+// ============================================
+
+app.get('/api/telegram/test', verificarToken, async (req, res) => {
+  try {
+    if (req.usuario.rol !== 'admin') {
+      return res.status(403).json({ error: 'No autorizado' });
+    }
+
+    const enviado = await enviarMensajeTelegram(
+      `✅ <b>Test de conexión</b>\n\nSistema OVT está correctamente conectado a Telegram.`
+    );
+
+    if (enviado) {
+      res.json({ success: true, message: 'Mensaje de prueba enviado correctamente' });
+    } else {
+      res.status(500).json({ success: false, error: 'No se pudo enviar el mensaje. Verifica TELEGRAM_BOT_TOKEN y TELEGRAM_CHAT_ID.' });
+    }
+  } catch (err) {
+    console.error('Error en test de Telegram:', err);
+    res.status(500).json({ error: err.message });
   }
 });
 
@@ -590,9 +656,9 @@ app.get('/health', (req, res) => {
 });
 
 app.get('/', (req, res) => {
-  res.json({ 
+  res.json({
     message: 'Sistema OVT v2 - Backend API',
-    version: '2.0.0',
+    version: '2.1.0',
     endpoints: [
       'POST /api/auth/login',
       'GET /api/registros',
@@ -600,7 +666,8 @@ app.get('/', (req, res) => {
       'PATCH /api/registros/:id',
       'DELETE /api/registros/:id',
       'GET /api/dashboard/resumen',
-      'GET /api/auditoria'
+      'GET /api/auditoria',
+      'GET /api/telegram/test'
     ]
   });
 });
@@ -625,7 +692,8 @@ app.listen(PORT, () => {
   console.log('✓ Puerto:', PORT);
   console.log('✓ Firebase: CONECTADO');
   console.log('✓ Auditoría: ACTIVA');
+  console.log('✓ Telegram:', TELEGRAM_BOT_TOKEN ? 'CONFIGURADO' : 'NO CONFIGURADO');
+  console.log('✓ Campo N° Ticket: HABILITADO');
   console.log('✓ 22 especialistas + coordinador + admin');
-  console.log('✓ Cambios y Alertas con todos los campos');
   console.log('==================================================');
 });
