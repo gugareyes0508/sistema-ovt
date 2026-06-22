@@ -285,7 +285,7 @@ function App() {
         fechaInicio: toDate(registro.fechaInicio),
         fechaFin: toDate(registro.fechaFin),
         horas: Math.max(0, Math.round((registro.horas || 0) * 20) / 20),
-        especialista: registro.especialista || usuario.nombre || "",
+        especialista: registro.especialista || registro.createdByNombre || "Sin especialista",
         especialidad: registro.especialidad || "operaciones",
         interno_cliente: registro.interno_cliente || "interno",
         genera_ovt: registro.genera_ovt || "si"
@@ -1609,7 +1609,16 @@ function App() {
                 return;
               }
               axios.patch(`${API_URL}/api/registros/${modalEdicion.registro.id}`, 
-                {...formularioModal, estado: 'pendiente'},
+                {
+                  tipo: formularioModal.tipo,
+                  descripcion: formularioModal.descripcion,
+                  fechaInicio: formularioModal.fechaInicio,
+                  fechaFin: formularioModal.fechaFin,
+                  horas: formularioModal.horas,
+                  especialidad: formularioModal.especialidad,
+                  genera_ovt: formularioModal.genera_ovt,
+                  estado: 'pendiente'
+                },
                 {headers: {Authorization: `Bearer ${token}`}}
               )
               .then(() => {
