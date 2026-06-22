@@ -352,7 +352,36 @@ Sé conciso, específico y ORIGINAL.`;
     ...chartOptions,
     plugins: {
       ...chartOptions.plugins,
-      legend: { display: false }
+      legend: { display: false },
+      tooltip: {
+        ...chartOptions.plugins.tooltip,
+        callbacks: {
+          label: (context) => `${context.dataset.label || ''}: ${context.parsed.y?.toFixed(1) ?? context.parsed.x?.toFixed(1)}h`
+        }
+      }
+    }
+  };
+
+  // Variante para gráficos circulares (Doughnut/Pie): sin ejes cartesianos,
+  // y tooltip forzado a 1 decimal para que sea consistente con el resto del Resumen
+  const chartOptionsDoughnut = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        display: true,
+        position: 'bottom',
+        labels: { padding: 15, font: { size: 12 } }
+      },
+      tooltip: {
+        backgroundColor: 'rgba(0,0,0,0.7)',
+        padding: 12,
+        titleFont: { size: 13 },
+        bodyFont: { size: 12 },
+        callbacks: {
+          label: (context) => `${context.label}: ${context.parsed.toFixed(1)}h`
+        }
+      }
     }
   };
 
@@ -414,7 +443,7 @@ Sé conciso, específico y ORIGINAL.`;
           <div style={{ background: 'white', padding: '20px', borderRadius: '8px', border: '1px solid #eee' }}>
             <h3>HHEE por Tipo</h3>
             <div style={{ position: 'relative', height: '250px', overflow: 'hidden' }}>
-              <Doughnut data={chartPorTipo} options={chartOptions} />
+              <Doughnut data={chartPorTipo} options={chartOptionsDoughnut} />
             </div>
           </div>
           <div style={{ background: 'white', padding: '20px', borderRadius: '8px', border: '1px solid #eee' }}>
