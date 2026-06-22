@@ -855,7 +855,7 @@ function App() {
                       <tr key={r.id}>
                         <td><strong>{r.tipo}</strong></td>
                         <td>{r.especialista}</td>
-                        <td>{r.descripcion?.substring(0, 30)}</td>
+                        <td style={{maxWidth: '250px', whiteSpace: 'normal', wordBreak: 'break-word'}}>{r.descripcion}</td>
                         <td className="numero">{r.horas}h</td>
                         <td>
                           <span className={`badge badge-${r.estado}`}>
@@ -993,7 +993,7 @@ function App() {
                   {misRegistrosFiltrados.map(r => (
                     <tr key={r.id}>
                       <td><strong>{r.tipo}</strong></td>
-                      <td>{r.descripcion?.substring(0, 25)}</td>
+                      <td style={{maxWidth: '220px', whiteSpace: 'normal', wordBreak: 'break-word'}}>{r.descripcion}</td>
                       <td>{r.cliente}</td>
                       <td style={{fontSize: '13px'}}>{parseDate(r.fechaInicio)} <strong>{toTimeString(toDate(r.fechaInicio))}</strong></td>
                       <td style={{fontSize: '13px'}}>{parseDate(r.fechaFin)} <strong>{toTimeString(toDate(r.fechaFin))}</strong></td>
@@ -1118,7 +1118,7 @@ function App() {
                     <tr key={r.id}>
                       <td><strong>{r.createdByNombre || r.especialista}</strong></td>
                       <td>{r.tipo}</td>
-                      <td>{r.descripcion?.substring(0, 30)}</td>
+                      <td style={{maxWidth: '220px', whiteSpace: 'normal', wordBreak: 'break-word'}}>{r.descripcion}</td>
                       <td>{parseDate(r.fechaInicio)}</td>
                       <td className="numero">{r.horas}h</td>
                       <td>{r.especialidad}</td>
@@ -1203,7 +1203,7 @@ function App() {
                   {registrosFiltrados.filter(r => r.estado !== 'pendiente').map(r => (
                     <tr key={r.id}>
                       <td><strong>{r.tipo}</strong></td>
-                      <td>{r.descripcion?.substring(0, 25)}</td>
+                      <td style={{maxWidth: '220px', whiteSpace: 'normal', wordBreak: 'break-word'}}>{r.descripcion}</td>
                       <td>{r.createdByNombre || r.especialista}</td>
                       <td>{r.cliente}</td>
                       <td style={{fontSize: '13px'}}>{parseDate(r.fechaInicio)} <strong>{toTimeString(toDate(r.fechaInicio))}</strong></td>
