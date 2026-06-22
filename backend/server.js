@@ -599,6 +599,157 @@ app.get('/api/dashboard/resumen', verificarToken, async (req, res) => {
 });
 
 // ============================================
+// RUTAS: PROYECCIONES OVT (ITSM)
+// Colección separada de "registros" — son estimaciones, no horas reales.
+// ============================================
+
+// GET proyecciones - ITSM ve solo las suyas, Admin/Coordinador ven todas (con filtros opcionales)
+app.get('/api/proyecciones', verificarToken, async (req, res) => {
+  try {
+    let query = db.collection('proyecciones_ovt');
+
+    if (req.usuario.rol === 'itsm') {
+      query = query.where('createdBy', '==', req.usuario.usuario);
+    }
+
+    const snapshot = await query.get();
+    const proyecciones = [];
+
+    snapshot.forEach(doc => {
+      proyecciones.push({ id: doc.id, ...doc.data() });
+    });
+
+    proyecciones.sort((a, b) => {
+      const fechaA = a.createdAt?.toDate?.() || new Date(a.createdAt) || new Date(0);
+      const fechaB = b.createdAt?.toDate?.() || new Date(b.createdAt) || new Date(0);
+      return fechaB - fechaA;
+    });
+
+    res.json(proyecciones);
+  } catch (err) {
+    console.error('Error en GET /api/proyecciones:', err);
+    res.status(500).json({ error: 'Error al obtener proyecciones' });
+  }
+});
+
+// POST crear proyección (solo ITSM)
+app.post('/api/proyecciones', verificarToken, async (req, res) => {
+  try {
+    if (req.usuario.rol !== 'itsm') {
+      return res.status(403).json({ error: 'Solo ITSM puede registrar proyecciones' });
+    }
+
+    const {
+      tipo,
+      descripcion,
+      cliente,
+      fechaInicio,
+      fechaFin,
+      horas,
+      interno_cliente,
+      genera_ovt,
+      especialidad,
+      probabilidad,
+      numeroTicket
+    } = req.body;
+
+    if (!tipo || !descripcion || !cliente || !fechaInicio || !fechaFin || !probabilidad) {
+      return res.status(400).json({ error: 'Campos requeridos faltando' });
+    }
+
+    const docRef = await db.collection('proyecciones_ovt').add({
+      tipo: String(tipo),
+      descripcion: String(descripcion),
+      cliente: String(cliente),
+      fechaInicio: new Date(fechaInicio),
+      fechaFin: new Date(fechaFin),
+      horas: parseFloat(horas) || 0,
+      interno_cliente: String(interno_cliente || 'interno'),
+      genera_ovt: String(genera_ovt || 'si'),
+      especialidad: String(especialidad || 'operaciones'),
+      probabilidad: String(probabilidad), // 'alta' | 'media' | 'baja'
+      numeroTicket: numeroTicket ? String(numeroTicket) : '',
+      estado: 'proyectado', // 'proyectado' | 'confirmado' | 'descartado'
+      createdAt: new Date(),
+      createdBy: req.usuario.usuario,
+      createdByNombre: req.usuario.nombre
+    });
+
+    await db.collection('auditoria').add({
+      accion: 'CREAR_PROYECCION_OVT',
+      usuarioNombre: req.usuario.nombre,
+      usuarioRol: req.usuario.rol,
+      timestamp: new Date(),
+      camposModificados: { tipo, cliente, probabilidad }
+    });
+
+    res.json({ id: docRef.id, mensaje: 'Proyección guardada correctamente' });
+  } catch (err) {
+    console.error('Error en POST /api/proyecciones:', err);
+    res.status(500).json({ error: 'Error al crear proyección: ' + err.message });
+  }
+});
+
+// PATCH actualizar proyección (solo el ITSM que la creó, o admin)
+app.patch('/api/proyecciones/:id', verificarToken, async (req, res) => {
+  try {
+    const ref = db.collection('proyecciones_ovt').doc(req.params.id);
+    const doc = await ref.get();
+
+    if (!doc.exists) {
+      return res.status(404).json({ error: 'Proyección no encontrada' });
+    }
+
+    if (req.usuario.rol === 'itsm' && doc.data().createdBy !== req.usuario.usuario) {
+      return res.status(403).json({ error: 'No tienes permiso para modificar esta proyección' });
+    }
+
+    await ref.update({
+      ...req.body,
+      updatedAt: new Date(),
+      updatedBy: req.usuario.usuario
+    });
+
+    await db.collection('auditoria').add({
+      accion: 'ACTUALIZAR_PROYECCION_OVT',
+      usuarioNombre: req.usuario.nombre,
+      usuarioRol: req.usuario.rol,
+      timestamp: new Date(),
+      proyeccionId: req.params.id
+    });
+
+    res.json({ message: 'Proyección actualizada' });
+  } catch (err) {
+    console.error('Error en PATCH /api/proyecciones:', err);
+    res.status(500).json({ error: 'Error al actualizar proyección' });
+  }
+});
+
+// DELETE eliminar proyección (solo admin, eliminación permanente — distinto de "descartar")
+app.delete('/api/proyecciones/:id', verificarToken, async (req, res) => {
+  try {
+    if (req.usuario.rol !== 'admin') {
+      return res.status(403).json({ error: 'Solo el admin puede eliminar permanentemente' });
+    }
+
+    await db.collection('proyecciones_ovt').doc(req.params.id).delete();
+
+    await db.collection('auditoria').add({
+      accion: 'ELIMINAR_PROYECCION_OVT',
+      usuarioNombre: req.usuario.nombre,
+      usuarioRol: req.usuario.rol,
+      timestamp: new Date(),
+      proyeccionId: req.params.id
+    });
+
+    res.json({ message: 'Proyección eliminada' });
+  } catch (err) {
+    console.error('Error en DELETE /api/proyecciones:', err);
+    res.status(500).json({ error: 'Error al eliminar proyección' });
+  }
+});
+
+// ============================================
 // RUTAS: AUDITORÍA
 // ============================================
 
