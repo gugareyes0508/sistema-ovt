@@ -76,6 +76,7 @@ function App() {
   const [editandoId, setEditandoId] = useState(null);
   const [usuarioList, setUsuarioList] = useState([]);
   const [modalEdicion, setModalEdicion] = useState({ abierto: false, registro: null });
+  const [seleccionados, setSeleccionados] = useState([]);
   const [formularioModal, setFormularioModal] = useState({});
   
   // Formulario mejorado
@@ -487,6 +488,44 @@ function App() {
     }
   };
 
+  // Selección múltiple (Mantenedor)
+  const toggleSeleccion = (id) => {
+    setSeleccionados(prev =>
+      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+    );
+  };
+
+  const toggleSeleccionarTodos = (idsVisibles) => {
+    const todosSeleccionados = idsVisibles.every(id => seleccionados.includes(id));
+    if (todosSeleccionados) {
+      setSeleccionados(prev => prev.filter(id => !idsVisibles.includes(id)));
+    } else {
+      setSeleccionados(prev => [...new Set([...prev, ...idsVisibles])]);
+    }
+  };
+
+  const manejarEliminarSeleccionados = async () => {
+    if (seleccionados.length === 0) return;
+    if (!window.confirm(`¿Eliminar ${seleccionados.length} registro(s) seleccionado(s)? Esta acción no se puede deshacer.`)) return;
+
+    try {
+      await Promise.all(
+        seleccionados.map(id =>
+          axios.delete(`${API_URL}/api/registros/${id}`, {
+            headers: { Authorization: `Bearer ${token}` }
+          })
+        )
+      );
+      alert(`✓ ${seleccionados.length} registro(s) eliminado(s)`);
+      setSeleccionados([]);
+      cargarRegistros();
+      cargarDashboard();
+    } catch (err) {
+      alert('Error eliminando registros: ' + (err.response?.data?.error || err.message));
+      cargarRegistros();
+    }
+  };
+
   // Aprobar o Rechazar registro (Admin)
   const manejarAprobacion = async (id, nuevoEstado) => {
     try {
@@ -853,9 +892,37 @@ function App() {
               <p className="sin-datos">No hay registros</p>
             ) : (
               <div className="tabla-responsive">
+                {seleccionados.length > 0 && (
+                  <div style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                    background: '#fff3cd', border: '1px solid #FF9800', borderRadius: '8px',
+                    padding: '12px 16px', marginBottom: '15px'
+                  }}>
+                    <span style={{fontSize: '13px', fontWeight: '600', color: '#92400e'}}>
+                      {seleccionados.length} registro(s) seleccionado(s)
+                    </span>
+                    <button
+                      onClick={manejarEliminarSeleccionados}
+                      style={{
+                        padding: '8px 16px', background: '#f44336', color: 'white',
+                        border: 'none', borderRadius: '6px', cursor: 'pointer',
+                        fontSize: '13px', fontWeight: '600'
+                      }}
+                    >
+                      🗑️ Eliminar seleccionados ({seleccionados.length})
+                    </button>
+                  </div>
+                )}
                 <table className="tabla tabla-acciones">
                   <thead>
                     <tr>
+                      <th>
+                        <input
+                          type="checkbox"
+                          checked={registros.length > 0 && registros.every(r => seleccionados.includes(r.id))}
+                          onChange={() => toggleSeleccionarTodos(registros.map(r => r.id))}
+                        />
+                      </th>
                       <th>N° Ticket</th>
                       <th>Tipo</th>
                       <th>Especialista</th>
@@ -867,7 +934,14 @@ function App() {
                   </thead>
                   <tbody>
                     {registros.map(r => (
-                      <tr key={r.id}>
+                      <tr key={r.id} style={seleccionados.includes(r.id) ? {background: '#fff8e1'} : {}}>
+                        <td>
+                          <input
+                            type="checkbox"
+                            checked={seleccionados.includes(r.id)}
+                            onChange={() => toggleSeleccion(r.id)}
+                          />
+                        </td>
                         <td>{r.numeroTicket || '—'}</td>
                         <td><strong>{r.tipo}</strong></td>
                         <td>{r.especialista}</td>
