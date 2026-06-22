@@ -72,6 +72,8 @@ function App() {
   useEffect(() => {
     if (usuario?.rol === 'admin') {
       setVista('dashboard');
+    } else if (usuario?.rol === 'itsm') {
+      setVista('proyecciones');
     }
   }, [usuario?.rol]);
   const [auditoria, setAuditoria] = useState([]);
@@ -671,7 +673,7 @@ function App() {
       <main className="main">
         
         {/* SECCIÓN: REGISTRAR CAMBIO/ALERTA */}
-        {vista === 'registros' && (
+        {vista === 'registros' && usuario.rol === 'especialista' && (
           <section className="seccion">
             <h2>📋 {editandoId ? '✏️ Editar Cambio/Alerta' : 'Registrar Cambio o Alerta'}</h2>
             
