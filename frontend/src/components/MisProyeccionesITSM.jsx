@@ -226,24 +226,25 @@ const MisProyeccionesITSM = ({ token, apiUrl }) => {
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(380px, 1fr))', gap: '20px', marginTop: '25px' }}>
-        <div style={{ background: '#fff', border: '1px solid #eee', borderRadius: '8px', padding: '20px' }}>
-          <h4 style={{ marginTop: 0 }}>Tendencia por Semana</h4>
-          <div style={{ position: 'relative', height: '260px', overflow: 'hidden' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '20px', marginTop: '25px' }}>
+        <div style={{ background: '#fff', border: '1px solid #eee', borderRadius: '8px', padding: '20px', minWidth: 0 }}>
+          <h4 style={{ marginTop: 0, marginBottom: '16px' }}>Tendencia por Semana</h4>
+          <div style={{ position: 'relative', height: '240px', overflow: 'hidden' }}>
             <Bar data={chartSemanal} options={chartOptions} />
           </div>
         </div>
-        <div style={{ background: '#fff', border: '1px solid #eee', borderRadius: '8px', padding: '20px' }}>
-          <h4 style={{ marginTop: 0 }}>Distribución por Equipo</h4>
-          <div style={{ position: 'relative', height: '260px', overflow: 'hidden' }}>
+        <div style={{ background: '#fff', border: '1px solid #eee', borderRadius: '8px', padding: '20px', minWidth: 0 }}>
+          <h4 style={{ marginTop: 0, marginBottom: '16px' }}>Distribución por Equipo</h4>
+          <div style={{ position: 'relative', height: '240px', overflow: 'hidden' }}>
             <Doughnut data={chartEquipo} options={chartOptionsDoughnut} />
           </div>
         </div>
-        <div style={{ background: '#fff', border: '1px solid #eee', borderRadius: '8px', padding: '20px', gridColumn: '1 / -1' }}>
-          <h4 style={{ marginTop: 0 }}>Distribución por Especialista Asignado</h4>
-          <div style={{ position: 'relative', height: '280px', overflow: 'hidden' }}>
-            <Bar data={chartPorEspecialista} options={{ ...chartOptions, indexAxis: 'y' }} />
-          </div>
+      </div>
+
+      <div style={{ background: '#fff', border: '1px solid #eee', borderRadius: '8px', padding: '20px', marginTop: '20px' }}>
+        <h4 style={{ marginTop: 0, marginBottom: '16px' }}>Distribución por Especialista Asignado</h4>
+        <div style={{ position: 'relative', height: `${Math.max(120, especialistasOrdenados.length * 45)}px`, overflow: 'hidden' }}>
+          <Bar data={chartPorEspecialista} options={{ ...chartOptions, indexAxis: 'y' }} />
         </div>
       </div>
 
