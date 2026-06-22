@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import TestGroq from './TestGroq';
-import ProyeccionesITSM from './components/ProyeccionesITSM';
+import NuevaProyeccionITSM from './components/NuevaProyeccionITSM';
+import MisProyeccionesITSM from './components/MisProyeccionesITSM';
 import OvtProyectado from './components/OvtProyectado';
 import ExcelUpload from './components/ExcelUpload';
 import Analytics from './components/Analytics';
@@ -73,7 +74,7 @@ function App() {
     if (usuario?.rol === 'admin') {
       setVista('dashboard');
     } else if (usuario?.rol === 'itsm') {
-      setVista('proyecciones');
+      setVista('proyeccion-mis');
     }
   }, [usuario?.rol]);
   const [auditoria, setAuditoria] = useState([]);
@@ -613,12 +614,20 @@ function App() {
         )}
 
         {usuario.rol === 'itsm' && (
-          <button 
-            className={vista === 'proyecciones' ? 'nav-btn active' : 'nav-btn'} 
-            onClick={() => setVista('proyecciones')}
-          >
-            📋 Proyecciones OVT
-          </button>
+          <>
+            <button 
+              className={vista === 'proyeccion-nueva' ? 'nav-btn active' : 'nav-btn'} 
+              onClick={() => setVista('proyeccion-nueva')}
+            >
+              📋 Nueva Proyección
+            </button>
+            <button 
+              className={vista === 'proyeccion-mis' ? 'nav-btn active' : 'nav-btn'} 
+              onClick={() => setVista('proyeccion-mis')}
+            >
+              📊 Mis Proyecciones
+            </button>
+          </>
         )}
 
         {usuario.rol === 'admin' && (
@@ -1953,9 +1962,14 @@ function App() {
         {/* Test GROQ */}
         {vista === 'test-groq' && <TestGroq />}
 
-        {/* Proyecciones OVT (ITSM) */}
-        {vista === 'proyecciones' && usuario.rol === 'itsm' && (
-          <ProyeccionesITSM token={token} apiUrl={API_URL} usuario={usuario} />
+        {/* Nueva Proyección OVT (ITSM) */}
+        {vista === 'proyeccion-nueva' && usuario.rol === 'itsm' && (
+          <NuevaProyeccionITSM token={token} apiUrl={API_URL} />
+        )}
+
+        {/* Mis Proyecciones (ITSM) */}
+        {vista === 'proyeccion-mis' && usuario.rol === 'itsm' && (
+          <MisProyeccionesITSM token={token} apiUrl={API_URL} />
         )}
 
         {/* OVT Proyectado (Admin) */}
