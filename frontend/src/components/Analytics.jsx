@@ -356,7 +356,7 @@ Sé conciso, específico y ORIGINAL.`;
       tooltip: {
         ...chartOptions.plugins.tooltip,
         callbacks: {
-          label: (context) => `${context.dataset.label || ''}: ${context.parsed.y?.toFixed(1) ?? context.parsed.x?.toFixed(1)}h`
+          label: (context) => `${context.dataset.label || ''}: ${(context.raw ?? 0).toFixed(1)}h`
         }
       }
     }
