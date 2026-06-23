@@ -103,7 +103,10 @@ const db = admin.firestore();
 // USUARIOS DEMO
 // ============================================
 
-const usuarios = {
+// Esta lista es solo la SEMILLA inicial. La fuente de verdad real es la
+// colección 'usuarios' en Firestore — así los usuarios creados/editados/eliminados
+// desde Gestión de Usuarios persisten entre reinicios del servidor (Railway).
+const SEED_USUARIOS = {
   'admin': { nombre: 'Administrador', rol: 'admin', departamento: 'Admin', contrasena: 'demo123' },
   'miguel.padilla': { nombre: 'Miguel Padilla', rol: 'admin', departamento: 'DPE', contrasena: 'demo123' },
   'hugo.araya': { nombre: 'Hugo Araya', rol: 'admin', departamento: 'DPE', contrasena: 'demo123' },
@@ -132,6 +135,27 @@ const usuarios = {
   'rodrigo.escobedo': { nombre: 'Rodrigo Escobedo', rol: 'especialista', departamento: 'Middleware', contrasena: 'demo123' },
   'alexis.alfonzo': { nombre: 'Alexis José Alfonzo', rol: 'especialista', departamento: 'Operaciones Cloud', contrasena: 'demo123' }
 };
+
+// Carga la semilla a Firestore SOLO si la colección 'usuarios' está vacía
+// (primera vez que corre el sistema con esta versión). Es idempotente:
+// si ya hay usuarios guardados, no hace nada y respeta lo que el admin haya gestionado.
+async function inicializarUsuarios() {
+  try {
+    const snapshot = await db.collection('usuarios').limit(1).get();
+    if (!snapshot.empty) {
+      console.log('✓ Colección "usuarios" ya existe en Firestore, no se siembra de nuevo');
+      return;
+    }
+    const batch = db.batch();
+    for (const [usuario, datos] of Object.entries(SEED_USUARIOS)) {
+      batch.set(db.collection('usuarios').doc(usuario), datos);
+    }
+    await batch.commit();
+    console.log('✓ Usuarios iniciales sembrados en Firestore (' + Object.keys(SEED_USUARIOS).length + ')');
+  } catch (err) {
+    console.error('✗ Error sembrando usuarios en Firestore:', err.message);
+  }
+}
 
 // ============================================
 // MIDDLEWARE: Verificar Token
@@ -165,9 +189,15 @@ app.post('/api/auth/login', async (req, res) => {
       return res.status(400).json({ error: 'Usuario y contraseña requeridos' });
     }
 
-    const user = usuarios[usuario];
+    const userDoc = await db.collection('usuarios').doc(usuario).get();
 
-    if (!user || user.contrasena !== contrasena) {
+    if (!userDoc.exists) {
+      return res.status(401).json({ error: 'Credenciales incorrectas' });
+    }
+
+    const user = userDoc.data();
+
+    if (user.contrasena !== contrasena) {
       return res.status(401).json({ error: 'Credenciales incorrectas' });
     }
 
@@ -204,15 +234,17 @@ app.get('/api/admin/listar-usuarios', verificarToken, async (req, res) => {
       return res.status(403).json({ error: 'No tienes permisos' });
     }
 
+    const snapshot = await db.collection('usuarios').get();
     const usuariosList = [];
-    for (const [usuario, datos] of Object.entries(usuarios)) {
+    snapshot.forEach(doc => {
+      const datos = doc.data();
       usuariosList.push({
-        usuario,
+        usuario: doc.id,
         nombre: datos.nombre,
         rol: datos.rol,
         departamento: datos.departamento || 'N/A'
       });
-    }
+    });
 
     res.json({ success: true, usuarios: usuariosList });
   } catch (err) {
@@ -231,10 +263,13 @@ app.get('/api/especialistas', verificarToken, async (req, res) => {
       return res.status(403).json({ error: 'No autorizado' });
     }
 
-    const especialistas = Object.values(usuarios)
-      .filter(u => u.rol === 'especialista')
-      .map(u => ({ nombre: u.nombre, departamento: u.departamento || '' }))
-      .sort((a, b) => a.nombre.localeCompare(b.nombre));
+    const snapshot = await db.collection('usuarios').where('rol', '==', 'especialista').get();
+    const especialistas = [];
+    snapshot.forEach(doc => {
+      const datos = doc.data();
+      especialistas.push({ nombre: datos.nombre, departamento: datos.departamento || '' });
+    });
+    especialistas.sort((a, b) => a.nombre.localeCompare(b.nombre));
 
     res.json(especialistas);
   } catch (err) {
@@ -255,12 +290,24 @@ app.post('/api/admin/crear-usuario', verificarToken, async (req, res) => {
       return res.status(400).json({ error: 'Faltan campos requeridos' });
     }
 
-    usuarios[usuario] = {
+    const existente = await db.collection('usuarios').doc(usuario).get();
+    if (existente.exists) {
+      return res.status(400).json({ error: 'Ese nombre de usuario ya existe' });
+    }
+
+    await db.collection('usuarios').doc(usuario).set({
       nombre,
       contrasena,
       rol: rol || 'admin',
       departamento: departamento || ''
-    };
+    });
+
+    await db.collection('auditoria').add({
+      accion: 'CREAR_USUARIO',
+      usuarioAdminNombre: req.usuario.nombre,
+      usuarioCreado: usuario,
+      timestamp: new Date()
+    });
 
     res.json({
       success: true,
@@ -288,12 +335,13 @@ app.post('/api/auth/cambiar-contrasena', verificarToken, async (req, res) => {
       return res.status(400).json({ error: 'La contraseña debe tener al menos 4 caracteres' });
     }
 
-    const user = usuarios[req.usuario.usuario];
-    if (!user || user.contrasena !== contrasenaActual) {
+    const userRef = db.collection('usuarios').doc(req.usuario.usuario);
+    const userDoc = await userRef.get();
+    if (!userDoc.exists || userDoc.data().contrasena !== contrasenaActual) {
       return res.status(401).json({ error: 'Contraseña actual incorrecta' });
     }
 
-    usuarios[req.usuario.usuario].contrasena = contraseñaNueva;
+    await userRef.update({ contrasena: contraseñaNueva });
 
     await db.collection('auditoria').add({
       accion: 'CAMBIO_CONTRASEÑA',
@@ -325,11 +373,13 @@ app.post('/api/admin/resetear-contrasena', verificarToken, async (req, res) => {
       return res.status(400).json({ error: 'Faltan campos requeridos' });
     }
 
-    if (!usuarios[usuario]) {
+    const userRef = db.collection('usuarios').doc(usuario);
+    const userDoc = await userRef.get();
+    if (!userDoc.exists) {
       return res.status(404).json({ error: 'Usuario no encontrado' });
     }
 
-    usuarios[usuario].contrasena = contraseñaNueva;
+    await userRef.update({ contrasena: contraseñaNueva });
 
     await db.collection('auditoria').add({
       accion: 'RESETEO_CONTRASENA',
@@ -365,12 +415,14 @@ app.post('/api/admin/eliminar-usuario', verificarToken, async (req, res) => {
       return res.status(400).json({ error: 'No se puede eliminar al admin original' });
     }
 
-    if (!usuarios[usuario]) {
+    const userRef = db.collection('usuarios').doc(usuario);
+    const userDoc = await userRef.get();
+    if (!userDoc.exists) {
       return res.status(404).json({ error: 'Usuario no encontrado' });
     }
 
-    const nombreUsuario = usuarios[usuario].nombre;
-    delete usuarios[usuario];
+    const nombreUsuario = userDoc.data().nombre;
+    await userRef.delete();
 
     await db.collection('auditoria').add({
       accion: 'ELIMINAR_USUARIO',
@@ -870,7 +922,7 @@ app.use((err, req, res, next) => {
 // START SERVER
 // ============================================
 
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
   console.log('==================================================');
   console.log('✓ SERVIDOR OVT V2 INICIADO CORRECTAMENTE');
   console.log('==================================================');
@@ -879,6 +931,7 @@ app.listen(PORT, () => {
   console.log('✓ Auditoría: ACTIVA');
   console.log('✓ Telegram:', TELEGRAM_BOT_TOKEN ? 'CONFIGURADO' : 'NO CONFIGURADO');
   console.log('✓ Campo N° Ticket: HABILITADO');
-  console.log('✓ 22 especialistas + coordinador + admin');
+  console.log('✓ Usuarios: persistidos en Firestore (colección "usuarios")');
   console.log('==================================================');
+  await inicializarUsuarios();
 });
