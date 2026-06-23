@@ -213,6 +213,7 @@ function App() {
 
       localStorage.setItem('token', response.data.token);
       localStorage.setItem('usuario', JSON.stringify(response.data.usuario));
+      localStorage.setItem('lastActivity', Date.now().toString());
       setToken(response.data.token);
       setUsuario(response.data.usuario);
       setVista('registros');
@@ -222,12 +223,56 @@ function App() {
   };
 
   // Logout
-  const manejarLogout = () => {
+  const manejarLogout = useCallback(() => {
     localStorage.removeItem('token');
     localStorage.removeItem('usuario');
+    localStorage.removeItem('lastActivity');
     setToken(null);
     setUsuario({});
-  };
+  }, []);
+
+  // ============================================
+  // CIERRE DE SESIÓN POR INACTIVIDAD (30 minutos)
+  // ============================================
+  useEffect(() => {
+    if (!token) return;
+
+    const LIMITE_INACTIVIDAD = 30 * 60 * 1000; // 30 minutos
+
+    const registrarActividad = () => {
+      localStorage.setItem('lastActivity', Date.now().toString());
+    };
+
+    // Si no hay registro previo (ej: login recién hecho), lo inicializa
+    if (!localStorage.getItem('lastActivity')) {
+      registrarActividad();
+    }
+
+    // Si al cargar la app ya pasaron 30+ min desde la última actividad
+    // (ej: la pestaña estuvo cerrada o inactiva), cierra sesión de inmediato
+    const ultimaActividad = parseInt(localStorage.getItem('lastActivity') || '0', 10);
+    if (Date.now() - ultimaActividad > LIMITE_INACTIVIDAD) {
+      manejarLogout();
+      alert('Tu sesión se cerró por inactividad (30 minutos sin uso).');
+      return;
+    }
+
+    const eventos = ['mousemove', 'keydown', 'click', 'scroll', 'touchstart'];
+    eventos.forEach(ev => window.addEventListener(ev, registrarActividad));
+
+    const intervalo = setInterval(() => {
+      const ultima = parseInt(localStorage.getItem('lastActivity') || '0', 10);
+      if (Date.now() - ultima > LIMITE_INACTIVIDAD) {
+        manejarLogout();
+        alert('Tu sesión se cerró por inactividad (30 minutos sin uso).');
+      }
+    }, 30 * 1000); // revisa cada 30 segundos
+
+    return () => {
+      eventos.forEach(ev => window.removeEventListener(ev, registrarActividad));
+      clearInterval(intervalo);
+    };
+  }, [token, manejarLogout]);
 
   // Registrar o actualizar cambio/alerta
   const manejarRegistro = async (e) => {
