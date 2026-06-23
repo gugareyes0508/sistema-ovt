@@ -56,13 +56,30 @@ const MisProyeccionesITSM = ({ token, apiUrl }) => {
   const [proyecciones, setProyecciones] = useState([]);
   const [editandoId, setEditandoId] = useState(null);
   const [form, setForm] = useState(null);
+  const [especialistas, setEspecialistas] = useState([]);
+
+  // Lunes de la semana en curso (semana ISO: Lun-Dom)
+  const obtenerLunesSemanaActual = () => {
+    const hoy = new Date();
+    const dia = hoy.getDay(); // 0=Dom, 1=Lun, ... 6=Sab
+    const diff = dia === 0 ? -6 : 1 - dia; // si es domingo, retrocede 6 días
+    const lunes = new Date(hoy);
+    lunes.setDate(hoy.getDate() + diff);
+    return lunes;
+  };
 
   const hoy = new Date();
   const [filtros, setFiltros] = useState({
-    desde: new Date(hoy.getFullYear(), hoy.getMonth(), 1).toISOString().slice(0, 10),
+    desde: obtenerLunesSemanaActual().toISOString().slice(0, 10),
     hasta: new Date(hoy.getFullYear(), hoy.getMonth() + 1, 0).toISOString().slice(0, 10),
     probabilidad: 'todas'
   });
+
+  useEffect(() => {
+    axios.get(`${apiUrl}/api/especialistas`, { headers: { Authorization: `Bearer ${token}` } })
+      .then(res => setEspecialistas(res.data || []))
+      .catch(err => console.error('Error cargando especialistas:', err.message));
+  }, [apiUrl, token]);
 
   const cargar = useCallback(async () => {
     try {
@@ -76,6 +93,16 @@ const MisProyeccionesITSM = ({ token, apiUrl }) => {
   }, [apiUrl, token]);
 
   useEffect(() => { cargar(); }, [cargar]);
+
+  const eliminarPermanente = async (id) => {
+    if (!window.confirm('¿Eliminar esta proyección de forma PERMANENTE? Esta acción no se puede deshacer.')) return;
+    try {
+      await axios.delete(`${apiUrl}/api/proyecciones/${id}`, { headers: { Authorization: `Bearer ${token}` } });
+      cargar();
+    } catch (err) {
+      alert('Error: ' + (err.response?.data?.error || err.message));
+    }
+  };
 
   const dentroDeRango = (fecha) => {
     const f = toDate(fecha);
@@ -447,19 +474,9 @@ const MisProyeccionesITSM = ({ token, apiUrl }) => {
                 <select value={form.especialistaAsignado} onChange={(e) => setForm({ ...form, especialistaAsignado: e.target.value })}
                   style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ddd', fontSize: '14px' }}>
                   <option value="">Sin asignar</option>
-                  <option value="Jorge Maureira">Jorge Maureira</option>
-                  <option value="Jhon Estrada">Jhon Estrada</option>
-                  <option value="Luis Vasquez">Luis Vasquez</option>
-                  <option value="Moises Junco">Moises Junco</option>
-                  <option value="Benjamín Fierro">Benjamín Fierro</option>
-                  <option value="Ariel Garate">Ariel Garate</option>
-                  <option value="Cristian Madariaga">Cristian Madariaga</option>
-                  <option value="Miguel Martinez">Miguel Martinez</option>
-                  <option value="Fabian Tobar">Fabian Tobar</option>
-                  <option value="Gustavo Perolo">Gustavo Perolo</option>
-                  <option value="Leonardo Silva">Leonardo Silva</option>
-                  <option value="Cristian Lecaros">Cristian Lecaros</option>
-                  <option value="Rodrigo Escobedo">Rodrigo Escobedo</option>
+                  {especialistas.map(e => (
+                    <option key={e.nombre} value={e.nombre}>{e.nombre}</option>
+                  ))}
                 </select>
               </div>
             </div>
@@ -543,6 +560,7 @@ const MisProyeccionesITSM = ({ token, apiUrl }) => {
                   ) : (
                     <button className="btn-rechazar" onClick={() => cambiarEstado(p.id, 'descartado')}>✗ Descartar</button>
                   )}
+                  <button className="btn-eliminar" onClick={() => eliminarPermanente(p.id)}>🗑️ Eliminar</button>
                 </td>
               </tr>
             ))}

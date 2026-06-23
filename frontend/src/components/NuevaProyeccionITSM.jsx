@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 
 const toDate = (fecha) => {
@@ -39,7 +39,7 @@ const vacio = {
   fechaInicio: new Date(),
   fechaFin: new Date(),
   horas: 0,
-  interno_cliente: 'interno',
+  interno_cliente: 'cliente',
   genera_ovt: 'si',
   especialidad: 'operaciones',
   especialistaAsignado: '',
@@ -49,6 +49,13 @@ const vacio = {
 
 const NuevaProyeccionITSM = ({ token, apiUrl, onGuardado }) => {
   const [form, setForm] = useState(vacio);
+  const [especialistas, setEspecialistas] = useState([]);
+
+  useEffect(() => {
+    axios.get(`${apiUrl}/api/especialistas`, { headers: { Authorization: `Bearer ${token}` } })
+      .then(res => setEspecialistas(res.data || []))
+      .catch(err => console.error('Error cargando especialistas:', err.message));
+  }, [apiUrl, token]);
 
   const handleFecha = (campo, valor) => {
     setForm(prev => {
@@ -120,25 +127,9 @@ const NuevaProyeccionITSM = ({ token, apiUrl, onGuardado }) => {
           <label>Especialista Asignado</label>
           <select value={form.especialistaAsignado} onChange={(e) => setForm({ ...form, especialistaAsignado: e.target.value })}>
             <option value="">Sin asignar</option>
-            <option value="Jorge Maureira">Jorge Maureira</option>
-            <option value="Jhon Estrada">Jhon Estrada</option>
-            <option value="Luis Vasquez">Luis Vasquez</option>
-            <option value="Moises Junco">Moises Junco</option>
-            <option value="Manuel Urbina Hernández">Manuel Urbina Hernández</option>
-            <option value="Benjamín Fierro">Benjamín Fierro</option>
-            <option value="Mauricio Antonio Serrano Gonzalez">Mauricio Serrano</option>
-            <option value="Ricardo Andrés Rojas Ramos">Ricardo Rojas</option>
-            <option value="Ariel Garate">Ariel Garate</option>
-            <option value="Rodrigo Alejandro Sanhueza">Rodrigo Sanhueza</option>
-            <option value="Sebastian Arroyo Vigouroux">Sebastian Arroyo</option>
-            <option value="Cristian Madariaga">Cristian Madariaga</option>
-            <option value="Miguel Martinez">Miguel Martinez</option>
-            <option value="Fabian Tobar">Fabian Tobar</option>
-            <option value="Gustavo Perolo">Gustavo Perolo</option>
-            <option value="Leonardo Silva">Leonardo Silva</option>
-            <option value="Cristian Lecaros">Cristian Lecaros</option>
-            <option value="Rodrigo Escobedo">Rodrigo Escobedo</option>
-            <option value="Alexis José Alfonzo">Alexis Alfonzo</option>
+            {especialistas.map(e => (
+              <option key={e.nombre} value={e.nombre}>{e.nombre}{e.departamento ? ` (${e.departamento})` : ''}</option>
+            ))}
           </select>
         </div>
 
