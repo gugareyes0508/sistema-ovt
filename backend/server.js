@@ -107,33 +107,33 @@ const db = admin.firestore();
 // colección 'usuarios' en Firestore — así los usuarios creados/editados/eliminados
 // desde Gestión de Usuarios persisten entre reinicios del servidor (Railway).
 const SEED_USUARIOS = {
-  'admin': { nombre: 'Administrador', rol: 'admin', departamento: 'Admin', contrasena: 'demo123' },
-  'miguel.padilla': { nombre: 'Miguel Padilla', rol: 'admin', departamento: 'DPE', contrasena: 'demo123' },
-  'hugo.araya': { nombre: 'Hugo Araya', rol: 'admin', departamento: 'DPE', contrasena: 'demo123' },
-  'gustavo.reyes': { nombre: 'Gustavo Reyes', rol: 'admin', departamento: 'Squad', contrasena: 'demo123' },
-  'najeeb.escobar': { nombre: 'Najeeb Escobar', rol: 'admin', departamento: 'TL', contrasena: 'demo123' },
-  'john.estrada': { nombre: 'john Estrada', rol: 'admin', departamento: 'TL', contrasena: 'demo123' },
-  'maria.admin': { nombre: 'Maria Admin', rol: 'coordinador', departamento: 'Coordinación', contrasena: 'demo123' },
-  'danilo.isla': { nombre: 'Danilo Isla', rol: 'itsm', departamento: 'ITSM', contrasena: 'demo123' },
-  'jorge.maureira': { nombre: 'Jorge Maureira', rol: 'especialista', departamento: 'Middleware', contrasena: 'demo123' },
-  'jhon.estrada': { nombre: 'Jhon Estrada', rol: 'especialista', departamento: 'Operaciones Cloud', contrasena: 'demo123' },
-  'luis.vasquez': { nombre: 'Luis Vasquez', rol: 'especialista', departamento: 'Middleware', contrasena: 'demo123' },
-  'moises.junco': { nombre: 'Moises Junco', rol: 'especialista', departamento: 'Operaciones Cloud', contrasena: 'demo123' },
-  'manuel.urbina': { nombre: 'Manuel Urbina Hernández', rol: 'especialista', departamento: 'Middleware', contrasena: 'demo123' },
-  'benjamin.fierro': { nombre: 'Benjamín Fierro', rol: 'especialista', departamento: 'Operaciones Cloud', contrasena: 'demo123' },
-  'mauricio.serrano': { nombre: 'Mauricio Antonio Serrano Gonzalez', rol: 'especialista', departamento: 'Middleware', contrasena: 'demo123' },
-  'ricardo.rojas': { nombre: 'Ricardo Andrés Rojas Ramos', rol: 'especialista', departamento: 'Operaciones Cloud', contrasena: 'demo123' },
-  'ariel.garate': { nombre: 'Ariel Garate', rol: 'especialista', departamento: 'Middleware', contrasena: 'demo123' },
-  'rodrigo.sanhueza': { nombre: 'Rodrigo Alejandro Sanhueza', rol: 'especialista', departamento: 'Middleware', contrasena: 'demo123' },
-  'sebastian.arroyo': { nombre: 'Sebastian Arroyo Vigouroux', rol: 'especialista', departamento: 'Operaciones Cloud', contrasena: 'demo123' },
-  'cristian.madariaga': { nombre: 'Cristian Madariaga', rol: 'especialista', departamento: 'Middleware', contrasena: 'demo123' },
-  'miguel.martinez': { nombre: 'Miguel Martinez', rol: 'especialista', departamento: 'Operaciones Cloud', contrasena: 'demo123' },
-  'fabian.tobar': { nombre: 'Fabian Tobar', rol: 'especialista', departamento: 'Middleware', contrasena: 'demo123' },
-  'gustavo.perolo': { nombre: 'Gustavo Perolo', rol: 'especialista', departamento: 'Operaciones Cloud', contrasena: 'demo123' },
-  'leonardo.silva': { nombre: 'Leonardo Silva', rol: 'especialista', departamento: 'Middleware', contrasena: 'demo123' },
-  'cristian.lecaros': { nombre: 'Cristian Lecaros', rol: 'especialista', departamento: 'Operaciones Cloud', contrasena: 'demo123' },
-  'rodrigo.escobedo': { nombre: 'Rodrigo Escobedo', rol: 'especialista', departamento: 'Middleware', contrasena: 'demo123' },
-  'alexis.alfonzo': { nombre: 'Alexis José Alfonzo', rol: 'especialista', departamento: 'Operaciones Cloud', contrasena: 'demo123' }
+  'admin': { nombre: 'Administrador', rol: 'admin', departamento: 'Admin', contrasena: 'demo123', empresa: 'Kyndryl' },
+  'miguel.padilla': { nombre: 'Miguel Padilla', rol: 'admin', departamento: 'DPE', contrasena: 'demo123', empresa: 'Kyndryl' },
+  'hugo.araya': { nombre: 'Hugo Araya', rol: 'admin', departamento: 'DPE', contrasena: 'demo123', empresa: 'Kyndryl' },
+  'gustavo.reyes': { nombre: 'Gustavo Reyes', rol: 'admin', departamento: 'Squad', contrasena: 'demo123', empresa: 'Kyndryl' },
+  'najeeb.escobar': { nombre: 'Najeeb Escobar', rol: 'admin', departamento: 'TL', contrasena: 'demo123', empresa: 'Kyndryl' },
+  'john.estrada': { nombre: 'john Estrada', rol: 'admin', departamento: 'TL', contrasena: 'demo123', empresa: 'Kyndryl' },
+  'maria.admin': { nombre: 'Maria Admin', rol: 'coordinador', departamento: 'Coordinación', contrasena: 'demo123', empresa: 'Kyndryl' },
+  'danilo.isla': { nombre: 'Danilo Isla', rol: 'itsm', departamento: 'ITSM', contrasena: 'demo123', empresa: 'Kyndryl' },
+  'jorge.maureira': { nombre: 'Jorge Maureira', rol: 'especialista', departamento: 'Middleware', contrasena: 'demo123', empresa: 'Kyndryl' },
+  'jhon.estrada': { nombre: 'Jhon Estrada', rol: 'especialista', departamento: 'Operaciones Cloud', contrasena: 'demo123', empresa: 'Kyndryl' },
+  'luis.vasquez': { nombre: 'Luis Vasquez', rol: 'especialista', departamento: 'Middleware', contrasena: 'demo123', empresa: 'Kyndryl' },
+  'moises.junco': { nombre: 'Moises Junco', rol: 'especialista', departamento: 'Operaciones Cloud', contrasena: 'demo123', empresa: 'Kyndryl' },
+  'manuel.urbina': { nombre: 'Manuel Urbina Hernández', rol: 'especialista', departamento: 'Middleware', contrasena: 'demo123', empresa: 'Kyndryl' },
+  'benjamin.fierro': { nombre: 'Benjamín Fierro', rol: 'especialista', departamento: 'Operaciones Cloud', contrasena: 'demo123', empresa: 'Kyndryl' },
+  'mauricio.serrano': { nombre: 'Mauricio Antonio Serrano Gonzalez', rol: 'especialista', departamento: 'Middleware', contrasena: 'demo123', empresa: 'Kyndryl' },
+  'ricardo.rojas': { nombre: 'Ricardo Andrés Rojas Ramos', rol: 'especialista', departamento: 'Operaciones Cloud', contrasena: 'demo123', empresa: 'Kyndryl' },
+  'ariel.garate': { nombre: 'Ariel Garate', rol: 'especialista', departamento: 'Middleware', contrasena: 'demo123', empresa: 'Kyndryl' },
+  'rodrigo.sanhueza': { nombre: 'Rodrigo Alejandro Sanhueza', rol: 'especialista', departamento: 'Middleware', contrasena: 'demo123', empresa: 'Kyndryl' },
+  'sebastian.arroyo': { nombre: 'Sebastian Arroyo Vigouroux', rol: 'especialista', departamento: 'Operaciones Cloud', contrasena: 'demo123', empresa: 'Kyndryl' },
+  'cristian.madariaga': { nombre: 'Cristian Madariaga', rol: 'especialista', departamento: 'Middleware', contrasena: 'demo123', empresa: 'Kyndryl' },
+  'miguel.martinez': { nombre: 'Miguel Martinez', rol: 'especialista', departamento: 'Operaciones Cloud', contrasena: 'demo123', empresa: 'Kyndryl' },
+  'fabian.tobar': { nombre: 'Fabian Tobar', rol: 'especialista', departamento: 'Middleware', contrasena: 'demo123', empresa: 'Kyndryl' },
+  'gustavo.perolo': { nombre: 'Gustavo Perolo', rol: 'especialista', departamento: 'Operaciones Cloud', contrasena: 'demo123', empresa: 'Kyndryl' },
+  'leonardo.silva': { nombre: 'Leonardo Silva', rol: 'especialista', departamento: 'Middleware', contrasena: 'demo123', empresa: 'Kyndryl' },
+  'cristian.lecaros': { nombre: 'Cristian Lecaros', rol: 'especialista', departamento: 'Operaciones Cloud', contrasena: 'demo123', empresa: 'Kyndryl' },
+  'rodrigo.escobedo': { nombre: 'Rodrigo Escobedo', rol: 'especialista', departamento: 'Middleware', contrasena: 'demo123', empresa: 'Kyndryl' },
+  'alexis.alfonzo': { nombre: 'Alexis José Alfonzo', rol: 'especialista', departamento: 'Operaciones Cloud', contrasena: 'demo123', empresa: 'Kyndryl' }
 };
 
 // Carga la semilla a Firestore SOLO si la colección 'usuarios' está vacía
@@ -242,7 +242,8 @@ app.get('/api/admin/listar-usuarios', verificarToken, async (req, res) => {
         usuario: doc.id,
         nombre: datos.nombre,
         rol: datos.rol,
-        departamento: datos.departamento || 'N/A'
+        departamento: datos.departamento || 'N/A',
+        empresa: datos.empresa || 'Sin asignar'
       });
     });
 
@@ -284,7 +285,7 @@ app.post('/api/admin/crear-usuario', verificarToken, async (req, res) => {
       return res.status(403).json({ error: 'No tienes permisos para crear usuarios' });
     }
 
-    const { usuario, nombre, rol, departamento, contrasena } = req.body;
+    const { usuario, nombre, rol, departamento, contrasena, empresa } = req.body;
 
     if (!usuario || !nombre || !contrasena) {
       return res.status(400).json({ error: 'Faltan campos requeridos' });
@@ -299,7 +300,8 @@ app.post('/api/admin/crear-usuario', verificarToken, async (req, res) => {
       nombre,
       contrasena,
       rol: rol || 'admin',
-      departamento: departamento || ''
+      departamento: departamento || '',
+      empresa: empresa || 'Kyndryl'
     });
 
     await db.collection('auditoria').add({
@@ -392,6 +394,53 @@ app.post('/api/admin/resetear-contrasena', verificarToken, async (req, res) => {
     res.json({ success: true, message: `Contraseña de ${usuario} reseteada correctamente` });
   } catch (err) {
     console.error('Error reseteando contraseña:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ============================================
+// ADMIN: Editar parámetros de un usuario (ej: empresa, departamento, nombre)
+// ============================================
+app.post('/api/admin/editar-usuario', verificarToken, async (req, res) => {
+  try {
+    if (req.usuario.usuario !== 'admin') {
+      return res.status(403).json({ error: 'No tienes permisos para editar usuarios' });
+    }
+
+    const { usuario, empresa, nombre, departamento } = req.body;
+
+    if (!usuario) {
+      return res.status(400).json({ error: 'Usuario requerido' });
+    }
+
+    const userRef = db.collection('usuarios').doc(usuario);
+    const userDoc = await userRef.get();
+    if (!userDoc.exists) {
+      return res.status(404).json({ error: 'Usuario no encontrado' });
+    }
+
+    const cambios = {};
+    if (empresa !== undefined) cambios.empresa = empresa;
+    if (nombre !== undefined && nombre !== '') cambios.nombre = nombre;
+    if (departamento !== undefined && departamento !== '') cambios.departamento = departamento;
+
+    if (Object.keys(cambios).length === 0) {
+      return res.status(400).json({ error: 'No se enviaron campos para actualizar' });
+    }
+
+    await userRef.update(cambios);
+
+    await db.collection('auditoria').add({
+      accion: 'EDITAR_USUARIO',
+      usuarioAdminNombre: req.usuario.nombre,
+      usuarioEditado: usuario,
+      camposModificados: cambios,
+      timestamp: new Date()
+    });
+
+    res.json({ success: true, message: `Usuario ${usuario} actualizado correctamente` });
+  } catch (err) {
+    console.error('Error editando usuario:', err);
     res.status(500).json({ error: err.message });
   }
 });
