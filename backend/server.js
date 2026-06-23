@@ -221,6 +221,28 @@ app.get('/api/admin/listar-usuarios', verificarToken, async (req, res) => {
   }
 });
 
+// ============================================
+// LISTAR ESPECIALISTAS ACTIVOS (para selects de ITSM/Admin)
+// Endpoint liviano, sin datos sensibles, accesible a itsm y admin
+// ============================================
+app.get('/api/especialistas', verificarToken, async (req, res) => {
+  try {
+    if (req.usuario.rol !== 'admin' && req.usuario.rol !== 'itsm') {
+      return res.status(403).json({ error: 'No autorizado' });
+    }
+
+    const especialistas = Object.values(usuarios)
+      .filter(u => u.rol === 'especialista')
+      .map(u => ({ nombre: u.nombre, departamento: u.departamento || '' }))
+      .sort((a, b) => a.nombre.localeCompare(b.nombre));
+
+    res.json(especialistas);
+  } catch (err) {
+    console.error('Error listando especialistas:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.post('/api/admin/crear-usuario', verificarToken, async (req, res) => {
   try {
     if (req.usuario.usuario !== 'admin') {
@@ -727,14 +749,24 @@ app.patch('/api/proyecciones/:id', verificarToken, async (req, res) => {
   }
 });
 
-// DELETE eliminar proyección (solo admin, eliminación permanente — distinto de "descartar")
+// DELETE eliminar proyección (admin: cualquiera | ITSM: solo las propias) — eliminación permanente, distinto de "descartar"
 app.delete('/api/proyecciones/:id', verificarToken, async (req, res) => {
   try {
-    if (req.usuario.rol !== 'admin') {
-      return res.status(403).json({ error: 'Solo el admin puede eliminar permanentemente' });
+    const ref = db.collection('proyecciones_ovt').doc(req.params.id);
+    const doc = await ref.get();
+
+    if (!doc.exists) {
+      return res.status(404).json({ error: 'Proyección no encontrada' });
     }
 
-    await db.collection('proyecciones_ovt').doc(req.params.id).delete();
+    const esAdmin = req.usuario.rol === 'admin';
+    const esDuena = req.usuario.rol === 'itsm' && doc.data().createdBy === req.usuario.usuario;
+
+    if (!esAdmin && !esDuena) {
+      return res.status(403).json({ error: 'No tienes permiso para eliminar esta proyección' });
+    }
+
+    await ref.delete();
 
     await db.collection('auditoria').add({
       accion: 'ELIMINAR_PROYECCION_OVT',
