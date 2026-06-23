@@ -29,9 +29,18 @@ const OvtProyectado = ({ token, apiUrl }) => {
   const [insights, setInsights] = useState(null);
   const [loadingIA, setLoadingIA] = useState(false);
 
+  const obtenerLunesSemanaActual = () => {
+    const hoy = new Date();
+    const dia = hoy.getDay(); // 0=Dom, 1=Lun, ... 6=Sab
+    const diff = dia === 0 ? -6 : 1 - dia;
+    const lunes = new Date(hoy);
+    lunes.setDate(hoy.getDate() + diff);
+    return lunes;
+  };
+
   const hoy = new Date();
   const [filtros, setFiltros] = useState({
-    desde: new Date(hoy.getFullYear(), hoy.getMonth(), 1).toISOString().slice(0, 10),
+    desde: obtenerLunesSemanaActual().toISOString().slice(0, 10),
     hasta: new Date(hoy.getFullYear(), hoy.getMonth() + 1, 0).toISOString().slice(0, 10),
     cliente: 'todos',
     probabilidad: 'todas'
