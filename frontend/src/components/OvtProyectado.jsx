@@ -60,6 +60,16 @@ const OvtProyectado = ({ token, apiUrl }) => {
 
   const proyeccionesFiltradas = proyecciones.filter(p => {
     if (p.estado === 'descartado') return false;
+    if (p.genera_ovt === 'no') return false; // no se considera para sumas/gráficos
+    if (!dentroDeRango(p.fechaInicio)) return false;
+    if (filtros.cliente !== 'todos' && p.cliente !== filtros.cliente) return false;
+    if (filtros.probabilidad !== 'todas' && p.probabilidad !== filtros.probabilidad) return false;
+    return true;
+  });
+
+  // Para la tabla de detalle SÍ se muestran todas (incluidas las que no generan OVT), marcadas
+  const proyeccionesParaTabla = proyecciones.filter(p => {
+    if (p.estado === 'descartado') return false;
     if (!dentroDeRango(p.fechaInicio)) return false;
     if (filtros.cliente !== 'todos' && p.cliente !== filtros.cliente) return false;
     if (filtros.probabilidad !== 'todas' && p.probabilidad !== filtros.probabilidad) return false;
@@ -340,24 +350,36 @@ Sé conciso, máximo 80 caracteres por línea.`;
       </div>
 
       <h3 style={{ marginTop: '30px' }}>Detalle de Proyecciones</h3>
-      {proyeccionesFiltradas.length === 0 ? (
+      {proyeccionesParaTabla.length === 0 ? (
         <p className="sin-datos">No hay proyecciones para este filtro</p>
       ) : (
         <table className="tabla">
           <thead>
             <tr>
-              <th>N° Ticket</th><th>Cliente</th><th>Descripción</th><th>Especialidad</th>
-              <th>Horas</th><th>Probabilidad</th><th>Estado</th><th>Ingresado por</th>
+              <th>N° Ticket</th><th>Cliente</th><th>Descripción</th><th>Especialidad</th><th>Especialista Asignado</th>
+              <th>Inicio</th><th>Fin</th><th>Horas</th><th>Genera OVT</th><th>Probabilidad</th><th>Estado</th><th>Ingresado por</th>
             </tr>
           </thead>
           <tbody>
-            {proyeccionesFiltradas.map(p => (
-              <tr key={p.id}>
+            {proyeccionesParaTabla.map(p => (
+              <tr key={p.id} style={p.genera_ovt === 'no' ? { opacity: 0.65 } : {}}>
                 <td>{p.numeroTicket || '—'}</td>
                 <td>{p.cliente}</td>
-                <td style={{ maxWidth: '220px', whiteSpace: 'normal', wordBreak: 'break-word' }}>{p.descripcion}</td>
+                <td style={{ maxWidth: '200px', whiteSpace: 'normal', wordBreak: 'break-word' }}>{p.descripcion}</td>
                 <td>{p.especialidad}</td>
+                <td>{p.especialistaAsignado || 'Sin asignar'}</td>
+                <td style={{ fontSize: '12px' }}>{toDate(p.fechaInicio).toLocaleDateString('es-CL')} {String(toDate(p.fechaInicio).getHours()).padStart(2,'0')}:{String(toDate(p.fechaInicio).getMinutes()).padStart(2,'0')}</td>
+                <td style={{ fontSize: '12px' }}>{toDate(p.fechaFin).toLocaleDateString('es-CL')} {String(toDate(p.fechaFin).getHours()).padStart(2,'0')}:{String(toDate(p.fechaFin).getMinutes()).padStart(2,'0')}</td>
                 <td className="numero">{p.horas}h</td>
+                <td>
+                  <span style={{
+                    display: 'inline-block', padding: '3px 10px', borderRadius: '14px', fontSize: '11px', fontWeight: '700',
+                    background: p.genera_ovt === 'no' ? '#fee2e2' : '#d1fae5',
+                    color: p.genera_ovt === 'no' ? '#991b1b' : '#065f46'
+                  }}>
+                    {p.genera_ovt === 'no' ? '✗ No' : '✓ Sí'}
+                  </span>
+                </td>
                 <td>
                   <span className={`badge badge-${p.probabilidad === 'alta' ? 'fallido' : p.probabilidad === 'media' ? 'pendiente' : 'exitoso'}`}>
                     {p.probabilidad}
