@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
-import { Bar, Doughnut } from 'react-chartjs-2';
+import { Bar, Doughnut, Line } from 'react-chartjs-2';
 import {
-  Chart as ChartJS, CategoryScale, LinearScale, BarElement, ArcElement, Tooltip, Legend
+  Chart as ChartJS, CategoryScale, LinearScale, BarElement, ArcElement, LineElement, PointElement, Tooltip, Legend
 } from 'chart.js';
 
-ChartJS.register(CategoryScale, LinearScale, BarElement, ArcElement, Tooltip, Legend);
+ChartJS.register(CategoryScale, LinearScale, BarElement, ArcElement, LineElement, PointElement, Tooltip, Legend);
 
 const toDate = (fecha) => {
   if (fecha instanceof Date) return fecha;
@@ -127,6 +127,59 @@ const MisProyeccionesITSM = ({ token, apiUrl }) => {
     datasets: [{ label: 'Horas', data: especialistasOrdenados.map(([, h]) => h), backgroundColor: '#1d9e75' }]
   };
 
+  // Distribución por Probabilidad
+  const porProbabilidad = { alta: 0, media: 0, baja: 0 };
+  filtradas.forEach(p => { porProbabilidad[p.probabilidad] = (porProbabilidad[p.probabilidad] || 0) + (p.horas || 0); });
+  const chartProbabilidad = {
+    labels: ['Alta', 'Media', 'Baja'],
+    datasets: [{ data: [porProbabilidad.alta, porProbabilidad.media, porProbabilidad.baja], backgroundColor: ['#ef4444', '#f59e0b', '#10b981'] }]
+  };
+
+  // OVT Proyectada por Día de Semana
+  const diasOrden = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sab', 'Dom'];
+  const diasNombres = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sab'];
+  const porDiaSemana = { Lun: 0, Mar: 0, Mié: 0, Jue: 0, Vie: 0, Sab: 0, Dom: 0 };
+  filtradas.forEach(p => {
+    const dia = diasNombres[toDate(p.fechaInicio).getDay()];
+    porDiaSemana[dia] += p.horas || 0;
+  });
+  const chartPorDiaSemana = {
+    labels: diasOrden,
+    datasets: [{ label: 'Horas', data: diasOrden.map(d => porDiaSemana[d]), backgroundColor: '#ba7517' }]
+  };
+
+  // Distribución de Horario (Madrugada/Mañana/Tarde/Noche)
+  const porHorario = { 'Madrugada (00-06h)': 0, 'Mañana (06-12h)': 0, 'Tarde (12-18h)': 0, 'Noche (18-24h)': 0 };
+  filtradas.forEach(p => {
+    const h = toDate(p.fechaInicio).getHours();
+    if (h < 6) porHorario['Madrugada (00-06h)'] += p.horas || 0;
+    else if (h < 12) porHorario['Mañana (06-12h)'] += p.horas || 0;
+    else if (h < 18) porHorario['Tarde (12-18h)'] += p.horas || 0;
+    else porHorario['Noche (18-24h)'] += p.horas || 0;
+  });
+  const chartHorario = {
+    labels: Object.keys(porHorario),
+    datasets: [{ data: Object.values(porHorario), backgroundColor: ['#1e3a8a', '#3266ad', '#f59e0b', '#7c3aed'] }]
+  };
+
+  // Evolución Semana a Semana (línea)
+  const chartEvolucion = {
+    labels: semanasOrdenadas,
+    datasets: [{
+      label: 'Horas Proyectadas', data: semanasOrdenadas.map(s => porSemana[s]),
+      borderColor: '#2563eb', backgroundColor: 'rgba(37,99,235,0.1)', borderWidth: 2,
+      fill: true, tension: 0.4, pointBackgroundColor: '#2563eb', pointRadius: 5
+    }]
+  };
+
+  // Concentración por Hora del Día
+  const porHora = Array.from({ length: 24 }, () => 0);
+  filtradas.forEach(p => { porHora[toDate(p.fechaInicio).getHours()] += p.horas || 0; });
+  const chartPorHora = {
+    labels: Array.from({ length: 24 }, (_, i) => `${String(i).padStart(2, '0')}:00`),
+    datasets: [{ label: 'Horas', data: porHora, backgroundColor: '#73726c' }]
+  };
+
   const chartOptions = {
     responsive: true, maintainAspectRatio: false,
     plugins: {
@@ -234,10 +287,41 @@ const MisProyeccionesITSM = ({ token, apiUrl }) => {
           </div>
         </div>
         <div style={{ background: '#fff', border: '1px solid #eee', borderRadius: '8px', padding: '20px', minWidth: 0 }}>
+          <h4 style={{ marginTop: 0, marginBottom: '16px' }}>Distribución por Probabilidad</h4>
+          <div style={{ position: 'relative', height: '240px', overflow: 'hidden' }}>
+            <Doughnut data={chartProbabilidad} options={chartOptionsDoughnut} />
+          </div>
+        </div>
+        <div style={{ background: '#fff', border: '1px solid #eee', borderRadius: '8px', padding: '20px', minWidth: 0 }}>
           <h4 style={{ marginTop: 0, marginBottom: '16px' }}>Distribución por Equipo</h4>
           <div style={{ position: 'relative', height: '240px', overflow: 'hidden' }}>
             <Doughnut data={chartEquipo} options={chartOptionsDoughnut} />
           </div>
+        </div>
+        <div style={{ background: '#fff', border: '1px solid #eee', borderRadius: '8px', padding: '20px', minWidth: 0 }}>
+          <h4 style={{ marginTop: 0, marginBottom: '16px' }}>Distribución de Horario</h4>
+          <div style={{ position: 'relative', height: '240px', overflow: 'hidden' }}>
+            <Doughnut data={chartHorario} options={chartOptionsDoughnut} />
+          </div>
+        </div>
+        <div style={{ background: '#fff', border: '1px solid #eee', borderRadius: '8px', padding: '20px', minWidth: 0 }}>
+          <h4 style={{ marginTop: 0, marginBottom: '16px' }}>OVT Proyectada por Día de Semana</h4>
+          <div style={{ position: 'relative', height: '240px', overflow: 'hidden' }}>
+            <Bar data={chartPorDiaSemana} options={chartOptions} />
+          </div>
+        </div>
+        <div style={{ background: '#fff', border: '1px solid #eee', borderRadius: '8px', padding: '20px', minWidth: 0 }}>
+          <h4 style={{ marginTop: 0, marginBottom: '16px' }}>Evolución Semana a Semana</h4>
+          <div style={{ position: 'relative', height: '240px', overflow: 'hidden' }}>
+            <Line data={chartEvolucion} options={chartOptions} />
+          </div>
+        </div>
+      </div>
+
+      <div style={{ background: '#fff', border: '1px solid #eee', borderRadius: '8px', padding: '20px', marginTop: '20px' }}>
+        <h4 style={{ marginTop: 0, marginBottom: '16px' }}>Concentración de OVT Proyectada por Hora del Día</h4>
+        <div style={{ position: 'relative', height: '260px', overflow: 'hidden' }}>
+          <Bar data={chartPorHora} options={chartOptions} />
         </div>
       </div>
 
