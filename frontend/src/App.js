@@ -1425,6 +1425,7 @@ function App() {
                   nombre: e.target.nombre.value,
                   rol: e.target.rol.value,
                   departamento: e.target.departamento.value,
+                  empresa: e.target.empresa.value,
                   contrasena: e.target.contrasena.value
                 };
 
@@ -1503,6 +1504,17 @@ function App() {
                       <option value="ITSM">ITSM</option>
                     </optgroup>
                   </select>
+                </div>
+
+                <div className="form-group">
+                  <label>Empresa (contratista) *</label>
+                  <select name="empresa" defaultValue="Kyndryl" required>
+                    <option value="Kyndryl">Kyndryl</option>
+                    <option value="Incosec">Incosec</option>
+                    <option value="Biznet">Biznet</option>
+                    <option value="Otro">Otro</option>
+                  </select>
+                  <small>Empresa a la que pertenece esta persona (usado para desglosar OVT y OVT Proyectado por empresa).</small>
                 </div>
 
                 <div className="form-group">
@@ -1628,9 +1640,51 @@ function App() {
                   >
                     <div>
                       <strong>{u.nombre}</strong><br/>
-                      <small style={{color: '#666'}}>@{u.usuario} • {u.rol} • {u.departamento}</small>
+                      <small style={{color: '#666'}}>@{u.usuario} • {u.rol} • {u.departamento}</small><br/>
+                      <small style={{color: '#2563eb', fontWeight: '600'}}>🏢 {u.empresa || 'Sin asignar'}</small>
                     </div>
                     <div style={{display: 'flex', gap: '8px'}}>
+                      <button
+                        onClick={() => {
+                          const opciones = ['Kyndryl', 'Incosec', 'Biznet', 'Otro'];
+                          const listaTexto = opciones.map((o, i) => `${i + 1}. ${o}`).join('\n');
+                          const seleccion = prompt(
+                            `Empresa/Cliente actual de ${u.nombre}: ${u.empresa || 'Sin asignar'}\n\nElige el número de la nueva empresa:\n${listaTexto}`,
+                            '1'
+                          );
+                          if (!seleccion) return;
+                          const indice = parseInt(seleccion, 10) - 1;
+                          if (isNaN(indice) || indice < 0 || indice >= opciones.length) {
+                            alert('❌ Opción inválida');
+                            return;
+                          }
+                          const nuevaEmpresa = opciones[indice];
+
+                          axios.post(`${API_URL}/api/admin/editar-usuario`,
+                            { usuario: u.usuario, empresa: nuevaEmpresa },
+                            { headers: { Authorization: `Bearer ${token}` } }
+                          )
+                          .then(() => {
+                            alert(`✅ Empresa de ${u.nombre} actualizada a: ${nuevaEmpresa}`);
+                            cargarUsuarios();
+                          })
+                          .catch(err => {
+                            alert('❌ Error: ' + (err.response?.data?.error || err.message));
+                          });
+                        }}
+                        style={{
+                          padding: '8px 16px',
+                          background: '#2563eb',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '6px',
+                          cursor: 'pointer',
+                          fontSize: '12px',
+                          fontWeight: '600'
+                        }}
+                      >
+                        🏢 Empresa
+                      </button>
                       <button
                         onClick={() => {
                           const nuevaContraseña = prompt(`Ingresa nueva contraseña para ${u.nombre}:\n(mínimo 4 caracteres)`, 'demo123');
