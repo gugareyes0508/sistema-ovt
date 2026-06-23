@@ -39,6 +39,11 @@ const Analytics = ({ registros = [], usuarios = [], token }) => {
   const [insightId, setInsightId] = useState(null);
   const [generationCount, setGenerationCount] = useState(0);
 
+  const ahoraInicial = new Date();
+  const [filtroMes, setFiltroMes] = useState(ahoraInicial.getMonth() + 1);
+  const [filtroAnio, setFiltroAnio] = useState(ahoraInicial.getFullYear());
+  const [filtroEmpresa, setFiltroEmpresa] = useState('todas');
+
   // Convertir fecha a Date
   const toDate = (fecha) => {
     if (fecha instanceof Date) return fecha;
@@ -55,6 +60,10 @@ const Analytics = ({ registros = [], usuarios = [], token }) => {
     return new Date();
   };
 
+  // Mapeo nombre -> empresa contratista (para el filtro y el gráfico)
+  const mapaEmpresaPorNombre = {};
+  (usuarios || []).forEach(u => { mapaEmpresaPorNombre[u.nombre] = u.empresa || 'Sin asignar'; });
+
   // Procesar datos
   const procesarDatos = () => {
     if (!registros || registros.length === 0) {
@@ -64,16 +73,22 @@ const Analytics = ({ registros = [], usuarios = [], token }) => {
         porEspecialidad: {},
         porPersona: {},
         porSemana: {},
-        porDia: {}
+        porDia: {},
+        porHora: Array.from({ length: 24 }, () => 0),
+        registrosFiltrados: []
       };
     }
 
-    const hoy = new Date();
-    const hace4Semanas = new Date(hoy.getTime() - 28 * 24 * 60 * 60 * 1000);
-
     let registrosFiltrados = registros.filter(r => {
+      if (r.estado !== 'exitoso') return false;
       const fecha = toDate(r.fechaInicio);
-      return fecha >= hace4Semanas && fecha <= hoy && r.estado === 'exitoso';
+      if (fecha.getMonth() + 1 !== filtroMes || fecha.getFullYear() !== filtroAnio) return false;
+      if (filtroEmpresa !== 'todas') {
+        const nombre = r.createdByNombre || r.especialista || '';
+        const empresa = mapaEmpresaPorNombre[nombre] || 'Sin asignar';
+        if (empresa !== filtroEmpresa) return false;
+      }
+      return true;
     });
 
     const datos = {
@@ -226,6 +241,23 @@ Sé conciso, específico y ORIGINAL.`;
   }, [activeTab]);
 
   const datos = procesarDatos();
+
+  // Distribución por Empresa Contratista (cruza registros con la empresa de cada especialista)
+  const porEmpresa = {};
+  (datos.registrosFiltrados || []).forEach(r => {
+    const nombre = r.createdByNombre || r.especialista || '';
+    const empresa = mapaEmpresaPorNombre[nombre] || 'Sin asignar';
+    porEmpresa[empresa] = (porEmpresa[empresa] || 0) + (r.horas || 0);
+  });
+  const empresasOrdenadas = Object.entries(porEmpresa).sort((a, b) => b[1] - a[1]);
+  const coloresEmpresa = { Kyndryl: '#FF462D', Incosec: '#3266ad', Biznet: '#1d9e75', 'Sin asignar': '#9aa0ad', Otro: '#ba7517' };
+  const chartPorEmpresa = {
+    labels: empresasOrdenadas.map(([nombre]) => nombre),
+    datasets: [{
+      data: empresasOrdenadas.map(([, h]) => h),
+      backgroundColor: empresasOrdenadas.map(([nombre]) => coloresEmpresa[nombre] || '#73726c')
+    }]
+  };
 
   // Colores para gráficos
   const colores = ['#3266ad', '#e24b4a', '#73726c', '#ba7517', '#1d9e75'];
@@ -389,6 +421,38 @@ Sé conciso, específico y ORIGINAL.`;
     <div style={{ padding: '20px', fontFamily: 'Arial, sans-serif' }}>
       <h2>📊 Analytics - Análisis de HHEE</h2>
 
+      {/* Filtros */}
+      <div style={{ display: 'flex', gap: '14px', flexWrap: 'wrap', alignItems: 'flex-end', marginBottom: '20px', background: '#f5f5f5', padding: '14px 16px', borderRadius: '8px' }}>
+        <div className="form-group" style={{ minWidth: '140px' }}>
+          <label style={{ fontSize: '12px', fontWeight: '600', color: '#555', display: 'block', marginBottom: '5px' }}>Mes</label>
+          <select value={filtroMes} onChange={(e) => setFiltroMes(parseInt(e.target.value))}>
+            {[...Array(12)].map((_, i) => (
+              <option key={i + 1} value={i + 1}>{new Date(2024, i).toLocaleString('es-CL', { month: 'long' })}</option>
+            ))}
+          </select>
+        </div>
+        <div className="form-group" style={{ minWidth: '110px' }}>
+          <label style={{ fontSize: '12px', fontWeight: '600', color: '#555', display: 'block', marginBottom: '5px' }}>Año</label>
+          <select value={filtroAnio} onChange={(e) => setFiltroAnio(parseInt(e.target.value))}>
+            <option value="2023">2023</option>
+            <option value="2024">2024</option>
+            <option value="2025">2025</option>
+            <option value="2026">2026</option>
+            <option value="2027">2027</option>
+          </select>
+        </div>
+        <div className="form-group" style={{ minWidth: '180px' }}>
+          <label style={{ fontSize: '12px', fontWeight: '600', color: '#555', display: 'block', marginBottom: '5px' }}>Empresa Contratista</label>
+          <select value={filtroEmpresa} onChange={(e) => setFiltroEmpresa(e.target.value)}>
+            <option value="todas">Todas</option>
+            <option value="Kyndryl">Kyndryl</option>
+            <option value="Incosec">Incosec</option>
+            <option value="Biznet">Biznet</option>
+            <option value="Otro">Otro</option>
+          </select>
+        </div>
+      </div>
+
       {/* Métricas Principales */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '12px', marginBottom: '30px' }}>
         <div style={{ background: '#f5f5f5', padding: '15px', borderRadius: '8px', textAlign: 'center' }}>
@@ -450,6 +514,12 @@ Sé conciso, específico y ORIGINAL.`;
             <h3>HHEE por Especialidad</h3>
             <div style={{ position: 'relative', height: '250px', overflow: 'hidden' }}>
               <Bar data={chartPorEspecialidad} options={chartOptionsSinLeyenda} />
+            </div>
+          </div>
+          <div style={{ background: 'white', padding: '20px', borderRadius: '8px', border: '1px solid #eee' }}>
+            <h3>Distribución por Empresa Contratista</h3>
+            <div style={{ position: 'relative', height: '250px', overflow: 'hidden' }}>
+              <Doughnut data={chartPorEmpresa} options={chartOptionsDoughnut} />
             </div>
           </div>
         </div>
@@ -632,7 +702,7 @@ Sé conciso, específico y ORIGINAL.`;
 
       {/* Footer */}
       <div style={{ marginTop: '30px', padding: '15px', background: '#f9f9f9', borderRadius: '8px', textAlign: 'center', fontSize: '12px', color: '#999' }}>
-        📊 Datos actualizados al momento • Último período: últimas 4 semanas
+        📊 Datos actualizados al momento • Período: {new Date(2024, filtroMes - 1).toLocaleString('es-CL', { month: 'long' })} {filtroAnio}{filtroEmpresa !== 'todas' ? ` • Empresa: ${filtroEmpresa}` : ''}
       </div>
     </div>
   );
