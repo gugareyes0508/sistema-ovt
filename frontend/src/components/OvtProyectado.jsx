@@ -42,7 +42,6 @@ const OvtProyectado = ({ token, apiUrl }) => {
   const [filtros, setFiltros] = useState({
     desde: obtenerLunesSemanaActual().toISOString().slice(0, 10),
     hasta: new Date(hoy.getFullYear(), hoy.getMonth() + 1, 0).toISOString().slice(0, 10),
-    cliente: 'todos',
     probabilidad: 'todas'
   });
 
@@ -71,7 +70,6 @@ const OvtProyectado = ({ token, apiUrl }) => {
     if (p.estado === 'descartado') return false;
     if (p.genera_ovt === 'no') return false; // no se considera para sumas/gráficos
     if (!dentroDeRango(p.fechaInicio)) return false;
-    if (filtros.cliente !== 'todos' && p.cliente !== filtros.cliente) return false;
     if (filtros.probabilidad !== 'todas' && p.probabilidad !== filtros.probabilidad) return false;
     return true;
   });
@@ -80,7 +78,6 @@ const OvtProyectado = ({ token, apiUrl }) => {
   const proyeccionesParaTabla = proyecciones.filter(p => {
     if (p.estado === 'descartado') return false;
     if (!dentroDeRango(p.fechaInicio)) return false;
-    if (filtros.cliente !== 'todos' && p.cliente !== filtros.cliente) return false;
     if (filtros.probabilidad !== 'todas' && p.probabilidad !== filtros.probabilidad) return false;
     return true;
   });
@@ -262,16 +259,6 @@ Sé conciso, máximo 80 caracteres por línea.`;
         <div className="form-group">
           <label>Hasta</label>
           <input type="date" value={filtros.hasta} onChange={(e) => setFiltros({ ...filtros, hasta: e.target.value })} />
-        </div>
-        <div className="form-group">
-          <label>Cliente</label>
-          <select value={filtros.cliente} onChange={(e) => setFiltros({ ...filtros, cliente: e.target.value })}>
-            <option value="todos">Todos</option>
-            <option value="Banco de Chile">Banco de Chile</option>
-            <option value="Banco Santander">Banco Santander</option>
-            <option value="Banco BCI">Banco BCI</option>
-            <option value="Banco Estado">Banco Estado</option>
-          </select>
         </div>
         <div className="form-group">
           <label>Probabilidad</label>
