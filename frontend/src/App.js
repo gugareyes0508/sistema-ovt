@@ -3,6 +3,7 @@ import axios from 'axios';
 import TestGroq from './TestGroq';
 import NuevaProyeccionITSM from './components/NuevaProyeccionITSM';
 import MisProyeccionesITSM from './components/MisProyeccionesITSM';
+import ExcelUploadITSM from './components/ExcelUploadITSM';
 import OvtProyectado from './components/OvtProyectado';
 import ExcelUpload from './components/ExcelUpload';
 import Analytics from './components/Analytics';
@@ -671,6 +672,12 @@ function App() {
               onClick={() => setVista('proyeccion-mis')}
             >
               📊 Mis Proyecciones
+            </button>
+            <button 
+              className={vista === 'proyeccion-excel' ? 'nav-btn active' : 'nav-btn'} 
+              onClick={() => setVista('proyeccion-excel')}
+            >
+              📥 Cargar Excel
             </button>
           </>
         )}
@@ -2069,6 +2076,11 @@ function App() {
         {/* Mis Proyecciones (ITSM) */}
         {vista === 'proyeccion-mis' && usuario.rol === 'itsm' && (
           <MisProyeccionesITSM token={token} apiUrl={API_URL} />
+        )}
+
+        {/* Carga Excel de Proyecciones (ITSM) */}
+        {vista === 'proyeccion-excel' && usuario.rol === 'itsm' && (
+          <ExcelUploadITSM token={token} apiUrl={API_URL} />
         )}
 
         {/* OVT Proyectado (Admin) */}
