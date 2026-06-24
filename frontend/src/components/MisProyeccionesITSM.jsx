@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
+import ExcelJS from 'exceljs';
 import { Bar, Doughnut, Line } from 'react-chartjs-2';
 import {
   Chart as ChartJS, CategoryScale, LinearScale, BarElement, ArcElement, LineElement, PointElement, Tooltip, Legend
@@ -102,6 +103,81 @@ const MisProyeccionesITSM = ({ token, apiUrl }) => {
     } catch (err) {
       alert('Error: ' + (err.response?.data?.error || err.message));
     }
+  };
+
+  // Exportar el detalle a Excel — mismas columnas que el template de entrada,
+  // con los mismos colores que se ven en pantalla (Probabilidad / Genera OVT / Estado)
+  const descargarDetalleExcel = async (filas) => {
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet('Detalle Proyecciones');
+
+    const headers = [
+      'N° Ticket', 'Tipo', 'Cliente', 'Especialidad', 'Especialista Asignado', 'Descripción',
+      'Fecha Inicio', 'Hora Inicio', 'Fecha Fin', 'Hora Fin', 'Interno/Cliente',
+      'Genera OVT', 'Probabilidad', 'Horas', 'Estado', 'Ingresado por'
+    ];
+    ws.addRow(headers);
+    ws.getRow(1).font = { bold: true };
+    ws.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFDCE6F7' } };
+    ws.columns = headers.map(() => ({ width: 22 }));
+
+    filas.forEach(p => {
+      const fInicio = toDate(p.fechaInicio);
+      const fFin = toDate(p.fechaFin);
+      const row = ws.addRow([
+        p.numeroTicket || '',
+        p.tipo,
+        p.cliente,
+        p.especialidad,
+        p.especialistaAsignado || '',
+        p.descripcion,
+        parseDateDisplay(p.fechaInicio),
+        toTimeString(fInicio),
+        parseDateDisplay(p.fechaFin),
+        toTimeString(fFin),
+        p.interno_cliente,
+        p.genera_ovt === 'no' ? 'no' : 'si',
+        p.probabilidad,
+        p.horas,
+        p.estado,
+        p.createdByNombre || ''
+      ]);
+
+      // Mismos colores que los badges de "Probabilidad" en pantalla
+      const colorProb = p.probabilidad === 'alta' ? 'FFFEE2E2' : p.probabilidad === 'media' ? 'FFFEF3C7' : 'FFD1FAE5';
+      const fontProb = p.probabilidad === 'alta' ? 'FF991B1B' : p.probabilidad === 'media' ? 'FF92400E' : 'FF065F46';
+      row.getCell(13).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: colorProb } };
+      row.getCell(13).font = { color: { argb: fontProb }, bold: true };
+
+      // Mismos colores que el badge "Genera OVT" (verde/rojo)
+      const colorGenera = p.genera_ovt === 'no' ? 'FFFEE2E2' : 'FFD1FAE5';
+      const fontGenera = p.genera_ovt === 'no' ? 'FF991B1B' : 'FF065F46';
+      row.getCell(12).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: colorGenera } };
+      row.getCell(12).font = { color: { argb: fontGenera }, bold: true };
+
+      // Mismos colores que el badge "Estado"
+      const colorEstado = p.estado === 'descartado' ? 'FFF3F4F6' : p.estado === 'confirmado' ? 'FFD1FAE5' : 'FFFEF3C7';
+      const fontEstado = p.estado === 'descartado' ? 'FF6B7280' : p.estado === 'confirmado' ? 'FF065F46' : 'FF92400E';
+      row.getCell(15).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: colorEstado } };
+      row.getCell(15).font = { color: { argb: fontEstado }, bold: true };
+
+      if (p.genera_ovt === 'no' || p.estado === 'descartado') {
+        for (let c = 1; c <= headers.length; c++) {
+          if (c !== 12 && c !== 13 && c !== 15) row.getCell(c).font = { color: { argb: 'FF9AA0AD' } };
+        }
+      }
+    });
+
+    const buffer = await wb.xlsx.writeBuffer();
+    const blob = new Blob([buffer], { type: 'application/octet-stream' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'detalle_proyecciones_ovt.xlsx';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
   };
 
   const dentroDeRango = (fecha) => {
@@ -512,7 +588,16 @@ const MisProyeccionesITSM = ({ token, apiUrl }) => {
         </div>
       )}
 
-      <h3 style={{ marginTop: '30px' }}>Detalle</h3>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '30px' }}>
+        <h3 style={{ margin: 0 }}>Detalle</h3>
+        <button
+          onClick={() => descargarDetalleExcel(todasParaTabla)}
+          className="btn-primary"
+          style={{ background: '#1d9e75', margin: 0 }}
+        >
+          ⬇️ Descargar Detalle (Excel)
+        </button>
+      </div>
       {todasParaTabla.length === 0 ? (
         <p className="sin-datos">No hay proyecciones para este período</p>
       ) : (

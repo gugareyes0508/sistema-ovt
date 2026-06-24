@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
+import ExcelJS from 'exceljs';
 import { Bar, Doughnut, Line } from 'react-chartjs-2';
 import {
   Chart as ChartJS, CategoryScale, LinearScale, BarElement, ArcElement, LineElement, PointElement, Tooltip, Legend
@@ -208,6 +209,79 @@ const OvtProyectado = ({ token, apiUrl }) => {
     }
   };
 
+  // Exportar el detalle a Excel — mismas columnas que el template de entrada,
+  // con los mismos colores que se ven en pantalla (Probabilidad / Genera OVT / Estado)
+  const descargarDetalleExcel = async (filas) => {
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet('Detalle Proyecciones');
+
+    const headers = [
+      'N° Ticket', 'Tipo', 'Cliente', 'Especialidad', 'Especialista Asignado', 'Descripción',
+      'Fecha Inicio', 'Hora Inicio', 'Fecha Fin', 'Hora Fin', 'Interno/Cliente',
+      'Genera OVT', 'Probabilidad', 'Horas', 'Estado', 'Ingresado por'
+    ];
+    ws.addRow(headers);
+    ws.getRow(1).font = { bold: true };
+    ws.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFDCE6F7' } };
+    ws.columns = headers.map(() => ({ width: 22 }));
+
+    const fmtFecha = (f) => toDate(f).toLocaleDateString('es-CL');
+    const fmtHora = (f) => `${String(toDate(f).getHours()).padStart(2, '0')}:${String(toDate(f).getMinutes()).padStart(2, '0')}`;
+
+    filas.forEach(p => {
+      const row = ws.addRow([
+        p.numeroTicket || '',
+        p.tipo,
+        p.cliente,
+        p.especialidad,
+        p.especialistaAsignado || '',
+        p.descripcion,
+        fmtFecha(p.fechaInicio),
+        fmtHora(p.fechaInicio),
+        fmtFecha(p.fechaFin),
+        fmtHora(p.fechaFin),
+        p.interno_cliente,
+        p.genera_ovt === 'no' ? 'no' : 'si',
+        p.probabilidad,
+        p.horas,
+        p.estado,
+        p.createdByNombre || ''
+      ]);
+
+      const colorProb = p.probabilidad === 'alta' ? 'FFFEE2E2' : p.probabilidad === 'media' ? 'FFFEF3C7' : 'FFD1FAE5';
+      const fontProb = p.probabilidad === 'alta' ? 'FF991B1B' : p.probabilidad === 'media' ? 'FF92400E' : 'FF065F46';
+      row.getCell(13).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: colorProb } };
+      row.getCell(13).font = { color: { argb: fontProb }, bold: true };
+
+      const colorGenera = p.genera_ovt === 'no' ? 'FFFEE2E2' : 'FFD1FAE5';
+      const fontGenera = p.genera_ovt === 'no' ? 'FF991B1B' : 'FF065F46';
+      row.getCell(12).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: colorGenera } };
+      row.getCell(12).font = { color: { argb: fontGenera }, bold: true };
+
+      const colorEstado = p.estado === 'descartado' ? 'FFF3F4F6' : p.estado === 'confirmado' ? 'FFD1FAE5' : 'FFFEF3C7';
+      const fontEstado = p.estado === 'descartado' ? 'FF6B7280' : p.estado === 'confirmado' ? 'FF065F46' : 'FF92400E';
+      row.getCell(15).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: colorEstado } };
+      row.getCell(15).font = { color: { argb: fontEstado }, bold: true };
+
+      if (p.genera_ovt === 'no' || p.estado === 'descartado') {
+        for (let c = 1; c <= headers.length; c++) {
+          if (c !== 12 && c !== 13 && c !== 15) row.getCell(c).font = { color: { argb: 'FF9AA0AD' } };
+        }
+      }
+    });
+
+    const buffer = await wb.xlsx.writeBuffer();
+    const blob = new Blob([buffer], { type: 'application/octet-stream' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'detalle_proyecciones_ovt.xlsx';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
+  };
+
   const generarInsights = async () => {
     setLoadingIA(true);
     try {
@@ -345,7 +419,16 @@ Sé conciso, máximo 80 caracteres por línea.`;
         </div>
       </div>
 
-      <h3 style={{ marginTop: '30px' }}>Detalle de Proyecciones</h3>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '30px' }}>
+        <h3 style={{ margin: 0 }}>Detalle de Proyecciones</h3>
+        <button
+          onClick={() => descargarDetalleExcel(proyeccionesParaTabla)}
+          className="btn-primary"
+          style={{ background: '#1d9e75', margin: 0 }}
+        >
+          ⬇️ Descargar Detalle (Excel)
+        </button>
+      </div>
       {proyeccionesParaTabla.length === 0 ? (
         <p className="sin-datos">No hay proyecciones para este filtro</p>
       ) : (

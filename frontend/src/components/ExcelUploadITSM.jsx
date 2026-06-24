@@ -105,7 +105,7 @@ const ExcelUploadITSM = ({ token, apiUrl }) => {
 
     // Hoja de Listas (oculta) — fuente de los combobox
     const listas = wb.addWorksheet('Listas');
-    listas.state = 'hidden';
+    listas.state = 'veryHidden'; // oculta incluso desde el menú "Mostrar hoja" de Excel
 
     const TIPO_OPCIONES = ['cambio', 'alerta'];
     const CLIENTE_OPCIONES = ['Banco de Chile', 'Banco Santander', 'Banco BCI', 'Banco Estado', 'Otro'];
