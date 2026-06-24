@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
 
 // ============================================
 // Helpers de fecha/hora
@@ -91,13 +92,81 @@ const ExcelUploadITSM = ({ token, apiUrl }) => {
   const [archivo, setArchivo] = useState(null);
   const [cargando, setCargando] = useState(false);
   const [resultados, setResultados] = useState(null);
+  const [especialistas, setEspecialistas] = useState([]);
 
-  const descargarTemplate = () => {
-    const ws = XLSX.utils.aoa_to_sheet([ENCABEZADOS, FILA_EJEMPLO]);
-    ws['!cols'] = ENCABEZADOS.map(() => ({ wch: 26 }));
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Proyecciones OVT');
-    XLSX.writeFile(wb, 'template_proyecciones_ovt.xlsx');
+  useEffect(() => {
+    axios.get(`${apiUrl}/api/especialistas`, { headers: { Authorization: `Bearer ${token}` } })
+      .then(res => setEspecialistas(res.data || []))
+      .catch(err => console.error('Error cargando especialistas:', err.message));
+  }, [apiUrl, token]);
+
+  const descargarTemplate = async () => {
+    const wb = new ExcelJS.Workbook();
+
+    // Hoja de Listas (oculta) — fuente de los combobox
+    const listas = wb.addWorksheet('Listas');
+    listas.state = 'hidden';
+
+    const TIPO_OPCIONES = ['cambio', 'alerta'];
+    const CLIENTE_OPCIONES = ['Banco de Chile', 'Banco Santander', 'Banco BCI', 'Banco Estado', 'Otro'];
+    const ESPECIALIDAD_OPCIONES = ['middleware', 'operaciones', 'ambas'];
+    const INTERNO_CLIENTE_OPCIONES = ['interno', 'cliente'];
+    const GENERA_OVT_OPCIONES = ['si', 'no'];
+    const PROBABILIDAD_OPCIONES = ['alta', 'media', 'baja'];
+    const ESPECIALISTA_OPCIONES = especialistas.length > 0
+      ? especialistas.map(e => e.nombre)
+      : ['Sin asignar'];
+
+    TIPO_OPCIONES.forEach((v, i) => { listas.getCell(`A${i + 1}`).value = v; });
+    CLIENTE_OPCIONES.forEach((v, i) => { listas.getCell(`B${i + 1}`).value = v; });
+    ESPECIALIDAD_OPCIONES.forEach((v, i) => { listas.getCell(`C${i + 1}`).value = v; });
+    INTERNO_CLIENTE_OPCIONES.forEach((v, i) => { listas.getCell(`D${i + 1}`).value = v; });
+    GENERA_OVT_OPCIONES.forEach((v, i) => { listas.getCell(`E${i + 1}`).value = v; });
+    PROBABILIDAD_OPCIONES.forEach((v, i) => { listas.getCell(`F${i + 1}`).value = v; });
+    ESPECIALISTA_OPCIONES.forEach((v, i) => { listas.getCell(`G${i + 1}`).value = v; });
+
+    // Hoja principal
+    const ws = wb.addWorksheet('Proyecciones OVT');
+    ws.addRow(ENCABEZADOS);
+    ws.getRow(1).font = { bold: true };
+    ws.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFDCE6F7' } };
+    ws.columns = ENCABEZADOS.map(() => ({ width: 28 }));
+    ws.addRow(FILA_EJEMPLO);
+
+    // Rango de filas con combobox (desde fila 2 hasta 200, suficiente para varias semanas)
+    const ULTIMA_FILA = 200;
+
+    const aplicarLista = (columna, rangoListas) => {
+      for (let fila = 2; fila <= ULTIMA_FILA; fila++) {
+        ws.getCell(`${columna}${fila}`).dataValidation = {
+          type: 'list',
+          allowBlank: true,
+          formulae: [`Listas!${rangoListas}`],
+          showErrorMessage: true,
+          errorTitle: 'Valor inválido',
+          error: 'Selecciona una opción de la lista desplegable.'
+        };
+      }
+    };
+
+    aplicarLista('B', `$A$1:$A$${TIPO_OPCIONES.length}`);                      // Tipo
+    aplicarLista('C', `$B$1:$B$${CLIENTE_OPCIONES.length}`);                   // Cliente
+    aplicarLista('D', `$C$1:$C$${ESPECIALIDAD_OPCIONES.length}`);              // Especialidad
+    aplicarLista('E', `$G$1:$G$${ESPECIALISTA_OPCIONES.length}`);              // Especialista Asignado
+    aplicarLista('K', `$D$1:$D$${INTERNO_CLIENTE_OPCIONES.length}`);           // Interno/Cliente
+    aplicarLista('L', `$E$1:$E$${GENERA_OVT_OPCIONES.length}`);                // Genera OVT
+    aplicarLista('M', `$F$1:$F$${PROBABILIDAD_OPCIONES.length}`);              // Probabilidad
+
+    const buffer = await wb.xlsx.writeBuffer();
+    const blob = new Blob([buffer], { type: 'application/octet-stream' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'template_proyecciones_ovt.xlsx';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
   };
 
   const procesarArchivo = async () => {
@@ -192,6 +261,8 @@ const ExcelUploadITSM = ({ token, apiUrl }) => {
         <h3 style={{ marginTop: 0, fontSize: '15px', color: '#1e40af' }}>1️⃣ Descarga el template</h3>
         <p style={{ fontSize: '12.5px', color: '#1e40af', marginBottom: '14px' }}>
           Archivo Excel (.xlsx) con los mismos campos del formulario "Nueva Proyección", más una fila de ejemplo que puedes borrar.
+          <br />
+          <strong>Las columnas Tipo, Cliente, Especialidad, Especialista Asignado, Interno/Cliente, Genera OVT y Probabilidad tienen un combobox (lista desplegable)</strong> — solo haz click en la celda y elige una opción, hasta la fila 200.
         </p>
         <button onClick={descargarTemplate} className="btn-primary" style={{ background: '#1e40af' }}>
           ⬇️ Descargar template_proyecciones_ovt.xlsx
