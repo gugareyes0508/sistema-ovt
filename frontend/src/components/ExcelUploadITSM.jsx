@@ -177,7 +177,10 @@ const ExcelUploadITSM = ({ token, apiUrl }) => {
     try {
       const data = await archivo.arrayBuffer();
       const wb = XLSX.read(data, { type: 'array', cellDates: true });
-      const sheet = wb.Sheets[wb.SheetNames[0]];
+      // Importante: el libro tiene 2 hojas (la oculta "Listas" + la de datos).
+      // Buscamos explícitamente la hoja de datos por nombre, no por índice 0.
+      const nombreHoja = wb.SheetNames.includes('Proyecciones OVT') ? 'Proyecciones OVT' : wb.SheetNames[0];
+      const sheet = wb.Sheets[nombreHoja];
       const filas = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
 
       // Quita la fila de encabezado (y la de ejemplo si el usuario la dejó)
