@@ -1104,7 +1104,7 @@ function App() {
                 <h3>⏳ Registros Pendientes de aprobación</h3>
                 <p className="numero">{misRegistrosFiltrados.filter(r => r.estado === 'pendiente').length}</p>
               </div>
-              <div className="card" style={{ background: 'linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)' }}>
+              <div className="card" style={{ background: 'linear-gradient(135deg, #fcd34d 0%, #fbbf24 100%)' }}>
                 <h3>⏱️ Horas Pendientes de aprobación</h3>
                 <p className="numero">{misRegistrosFiltrados.filter(r => r.estado === 'pendiente').reduce((sum, r) => sum + (r.horas || 0), 0).toFixed(2)}h</p>
               </div>
@@ -1272,7 +1272,7 @@ function App() {
                 <h3>✅ Registros Aprobados</h3>
                 <p className="numero">{aprobados}</p>
               </div>
-              <div className="card card-yellow">
+              <div className="card" style={{ background: 'linear-gradient(135deg, #6ee7b7 0%, #34d399 100%)' }}>
                 <h3>📈 Total Horas Aprobadas en el mes</h3>
                 <p className="numero">{totalHorasAprobadas.toFixed(2)}h</p>
               </div>
