@@ -759,6 +759,8 @@ function App() {
                   >
                     <option value="cambio">Cambio</option>
                     <option value="alerta">Alerta</option>
+                    <option value="incidente">Incidente</option>
+                    <option value="requerimiento">Requerimiento</option>
                   </select>
                 </div>
 
@@ -1888,6 +1890,8 @@ function App() {
                 >
                   <option value="cambio">Cambio</option>
                   <option value="alerta">Alerta</option>
+                  <option value="incidente">Incidente</option>
+                  <option value="requerimiento">Requerimiento</option>
                 </select>
               </div>
 

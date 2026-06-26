@@ -52,13 +52,23 @@ const normalizar = (valor, opcionesValidas, porDefecto) => {
   return opcionesValidas.includes(texto) ? texto : porDefecto;
 };
 
+// Si la columna "Tipo" viene vacía o con un valor no reconocido, se infiere por el prefijo del N° de Ticket
+const inferirTipoPorTicket = (ticket, porDefecto) => {
+  const t = String(ticket || '').trim().toUpperCase();
+  if (t.startsWith('ALERT')) return 'alerta';
+  if (t.startsWith('CHG')) return 'cambio';
+  if (t.startsWith('INC')) return 'incidente';
+  if (t.startsWith('RITM')) return 'requerimiento';
+  return porDefecto;
+};
+
 // ============================================
 // Columnas del template (mismos campos del formulario)
 // ============================================
 
 const ENCABEZADOS = [
   'N° Ticket',
-  'Tipo (cambio/alerta)',
+  'Tipo (cambio/alerta/incidente/requerimiento)',
   'Cliente',
   'Especialidad (middleware/operaciones/ambas)',
   'Especialista Asignado',
@@ -107,7 +117,7 @@ const ExcelUploadITSM = ({ token, apiUrl }) => {
     const listas = wb.addWorksheet('Listas');
     listas.state = 'veryHidden'; // oculta incluso desde el menú "Mostrar hoja" de Excel
 
-    const TIPO_OPCIONES = ['cambio', 'alerta'];
+    const TIPO_OPCIONES = ['cambio', 'alerta', 'incidente', 'requerimiento'];
     const CLIENTE_OPCIONES = ['Banco de Chile', 'Banco Santander', 'Banco BCI', 'Banco Estado', 'Otro'];
     const ESPECIALIDAD_OPCIONES = ['middleware', 'operaciones', 'ambas'];
     const INTERNO_CLIENTE_OPCIONES = ['interno', 'cliente'];
@@ -213,7 +223,7 @@ const ExcelUploadITSM = ({ token, apiUrl }) => {
 
           const payload = {
             numeroTicket: String(numeroTicket || ''),
-            tipo: normalizar(tipoRaw, ['cambio', 'alerta'], 'cambio'),
+            tipo: normalizar(tipoRaw, ['cambio', 'alerta', 'incidente', 'requerimiento'], inferirTipoPorTicket(numeroTicket, 'cambio')),
             cliente: String(cliente),
             especialidad: normalizar(especialidadRaw, ['middleware', 'operaciones', 'ambas'], 'operaciones'),
             especialistaAsignado: String(especialistaAsignado || ''),

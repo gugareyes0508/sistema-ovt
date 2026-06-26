@@ -454,6 +454,8 @@ const MisProyeccionesITSM = ({ token, apiUrl }) => {
                   style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ddd', fontSize: '14px' }}>
                   <option value="cambio">Cambio</option>
                   <option value="alerta">Alerta</option>
+                  <option value="incidente">Incidente</option>
+                  <option value="requerimiento">Requerimiento</option>
                 </select>
               </div>
               <div>

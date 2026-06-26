@@ -69,7 +69,7 @@ const Analytics = ({ registros = [], usuarios = [], token }) => {
     if (!registros || registros.length === 0) {
       return {
         total: 0,
-        porTipo: { cambios: 0, alertas: 0 },
+        porTipo: { cambios: 0, alertas: 0, incidentes: 0, requerimientos: 0 },
         porEspecialidad: {},
         porPersona: {},
         porSemana: {},
@@ -93,7 +93,7 @@ const Analytics = ({ registros = [], usuarios = [], token }) => {
 
     const datos = {
       total: registrosFiltrados.reduce((sum, r) => sum + (r.horas || 0), 0),
-      porTipo: { cambios: 0, alertas: 0 },
+      porTipo: { cambios: 0, alertas: 0, incidentes: 0, requerimientos: 0 },
       porEspecialidad: {},
       porPersona: {},
       porSemana: {},
@@ -109,6 +109,8 @@ const Analytics = ({ registros = [], usuarios = [], token }) => {
       // Por Tipo
       if (r.tipo === 'cambio') datos.porTipo.cambios += horas;
       else if (r.tipo === 'alerta') datos.porTipo.alertas += horas;
+      else if (r.tipo === 'incidente') datos.porTipo.incidentes += horas;
+      else if (r.tipo === 'requerimiento') datos.porTipo.requerimientos += horas;
 
       // Por Especialidad
       const especialidad = r.especialidad || 'Sin especialidad';
@@ -157,6 +159,8 @@ const Analytics = ({ registros = [], usuarios = [], token }) => {
 Total HHEE: ${datos.total.toFixed(2)}h
 Cambios: ${datos.porTipo.cambios.toFixed(2)}h (${((datos.porTipo.cambios / datos.total) * 100).toFixed(1)}%)
 Alertas: ${datos.porTipo.alertas.toFixed(2)}h (${((datos.porTipo.alertas / datos.total) * 100).toFixed(1)}%)
+Incidentes: ${datos.porTipo.incidentes.toFixed(2)}h (${((datos.porTipo.incidentes / datos.total) * 100).toFixed(1)}%)
+Requerimientos: ${datos.porTipo.requerimientos.toFixed(2)}h (${((datos.porTipo.requerimientos / datos.total) * 100).toFixed(1)}%)
 
 Por Especialidad: ${JSON.stringify(datos.porEspecialidad)}
 Top Especialistas: ${JSON.stringify(Object.entries(datos.porPersona).sort((a, b) => b[1] - a[1]).slice(0, 5))}
@@ -295,11 +299,11 @@ Sé conciso, específico y ORIGINAL.`;
 
   // Gráfico Por Tipo
   const chartPorTipo = {
-    labels: ['Cambios', 'Alertas'],
+    labels: ['Cambios', 'Alertas', 'Incidentes', 'Requerimientos'],
     datasets: [{
-      data: [datos.porTipo.cambios, datos.porTipo.alertas],
-      backgroundColor: ['#3266ad', '#e24b4a'],
-      borderColor: ['#3266ad', '#e24b4a'],
+      data: [datos.porTipo.cambios, datos.porTipo.alertas, datos.porTipo.incidentes, datos.porTipo.requerimientos],
+      backgroundColor: ['#3266ad', '#e24b4a', '#ba7517', '#1d9e75'],
+      borderColor: ['#3266ad', '#e24b4a', '#ba7517', '#1d9e75'],
       borderWidth: 2
     }]
   };
@@ -497,6 +501,14 @@ Sé conciso, específico y ORIGINAL.`;
         <div style={{ background: '#f5f5f5', padding: '15px', borderRadius: '8px', textAlign: 'center' }}>
           <p style={{ margin: 0, fontSize: '12px', color: '#666', fontWeight: 'bold' }}>Alertas</p>
           <p style={{ margin: '8px 0 0', fontSize: '24px', fontWeight: 'bold', color: '#e24b4a' }}>{datos.porTipo.alertas.toFixed(0)}h</p>
+        </div>
+        <div style={{ background: '#f5f5f5', padding: '15px', borderRadius: '8px', textAlign: 'center' }}>
+          <p style={{ margin: 0, fontSize: '12px', color: '#666', fontWeight: 'bold' }}>Incidentes</p>
+          <p style={{ margin: '8px 0 0', fontSize: '24px', fontWeight: 'bold', color: '#ba7517' }}>{datos.porTipo.incidentes.toFixed(0)}h</p>
+        </div>
+        <div style={{ background: '#f5f5f5', padding: '15px', borderRadius: '8px', textAlign: 'center' }}>
+          <p style={{ margin: 0, fontSize: '12px', color: '#666', fontWeight: 'bold' }}>Requerimientos</p>
+          <p style={{ margin: '8px 0 0', fontSize: '24px', fontWeight: 'bold', color: '#1d9e75' }}>{datos.porTipo.requerimientos.toFixed(0)}h</p>
         </div>
         <div style={{ background: '#f5f5f5', padding: '15px', borderRadius: '8px', textAlign: 'center' }}>
           <p style={{ margin: 0, fontSize: '12px', color: '#666', fontWeight: 'bold' }}>Registros</p>

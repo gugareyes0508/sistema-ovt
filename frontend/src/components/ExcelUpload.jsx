@@ -49,9 +49,19 @@ const combinarFechaHora = (fechaBase, hora) => {
   return f;
 };
 
-const inferirTipo = (descripcion) => {
+// Categoriza según el prefijo del N° de Ticket (ALERT/CHG/INC/RITM).
+// Si el ticket no trae un prefijo reconocible (ej: "XXXXX"), usa palabras clave de la descripción como respaldo.
+const inferirTipo = (ticket, descripcion) => {
+  const t = String(ticket || '').trim().toUpperCase();
+  if (t.startsWith('ALERT')) return 'alerta';
+  if (t.startsWith('CHG')) return 'cambio';
+  if (t.startsWith('INC')) return 'incidente';
+  if (t.startsWith('RITM')) return 'requerimiento';
+
   const txt = normalizarTexto(descripcion);
-  if (txt.includes('incidente') || txt.includes('alerta') || txt.includes('falla')) return 'alerta';
+  if (txt.includes('incidente')) return 'incidente';
+  if (txt.includes('alerta') || txt.includes('falla')) return 'alerta';
+  if (txt.includes('requerimiento')) return 'requerimiento';
   return 'cambio';
 };
 
@@ -145,7 +155,7 @@ const ExcelUpload = ({ token, apiUrl, usuario, onUploadComplete }) => {
 
           const payload = {
             numeroTicket: ticketRaw ? String(ticketRaw).trim() : '',
-            tipo: inferirTipo(descripcion),
+            tipo: inferirTipo(ticketRaw, descripcion),
             descripcion,
             cliente: opciones.cliente,
             fechaInicio,
@@ -231,7 +241,7 @@ const ExcelUpload = ({ token, apiUrl, usuario, onUploadComplete }) => {
           </div>
         </div>
         <small style={{ color: '#999' }}>
-          El "Tipo" (Cambio/Alerta) se infiere automáticamente según palabras clave en la descripción (ej: "incidente" → Alerta).
+          El "Tipo" se detecta automáticamente según el prefijo de tu N° de Ticket: <strong>ALERT</strong> → Alerta, <strong>CHG</strong> → Cambio, <strong>INC</strong> → Incidente, <strong>RITM</strong> → Requerimiento. Si el ticket no calza con ninguno (ej: "XXXXX"), se usa la descripción como respaldo.
         </small>
       </div>
 
