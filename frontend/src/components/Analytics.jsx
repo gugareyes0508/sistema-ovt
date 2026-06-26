@@ -532,6 +532,7 @@ Sé conciso, específico y ORIGINAL.`;
 
       {/* Tab: Resumen */}
       {activeTab === 'resumen' && (
+        <>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '20px' }}>
           <div style={{ background: 'white', padding: '20px', borderRadius: '8px', border: '1px solid #eee' }}>
             <h3>HHEE por Tipo</h3>
@@ -565,6 +566,7 @@ Sé conciso, específico y ORIGINAL.`;
             }} />
           </div>
         </div>
+        </>
       )}
 
       {/* Tab: Tendencias */}
