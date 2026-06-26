@@ -278,13 +278,15 @@ Sé conciso, específico y ORIGINAL.`;
     datasets: [{
       label: `HHEE ${filtroAnio}`,
       data: porMesAnio,
-      showLine: false, // solo puntos, sin línea conectora
-      pointRadius: 7,
-      pointHoverRadius: 9,
+      borderColor: '#3266ad',
+      backgroundColor: 'rgba(50, 102, 173, 0.1)',
+      borderWidth: 2,
+      fill: true,
+      tension: 0.4,
       pointBackgroundColor: '#3266ad',
       pointBorderColor: '#fff',
       pointBorderWidth: 2,
-      backgroundColor: '#3266ad'
+      pointRadius: 5
     }]
   };
 
@@ -560,10 +562,7 @@ Sé conciso, específico y ORIGINAL.`;
             Horas extra acumuladas por mes durante todo el año (no se ve afectado por el filtro de Mes)
           </p>
           <div style={{ position: 'relative', height: '280px', overflow: 'hidden' }}>
-            <Line data={chartTendenciaAnual} options={{
-              ...chartOptions,
-              plugins: { ...chartOptions.plugins, legend: { display: false } }
-            }} />
+            <Line data={chartTendenciaAnual} options={chartOptions} />
           </div>
         </div>
         </>
