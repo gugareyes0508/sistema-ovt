@@ -83,6 +83,7 @@ function App() {
   const [usuarioList, setUsuarioList] = useState([]);
   const [modalEdicion, setModalEdicion] = useState({ abierto: false, registro: null });
   const [seleccionados, setSeleccionados] = useState([]);
+  const [seleccionadosPendientes, setSeleccionadosPendientes] = useState([]);
   const [formularioModal, setFormularioModal] = useState({});
   
   // Formulario mejorado
@@ -596,6 +597,45 @@ function App() {
       cargarDashboard();
     } catch (err) {
       alert('Error: ' + (err.response?.data?.error || err.message));
+    }
+  };
+
+  // Selección múltiple para la tabla de Pendientes (Dashboard admin)
+  const toggleSeleccionPendiente = (id) => {
+    setSeleccionadosPendientes(prev =>
+      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+    );
+  };
+
+  const toggleSeleccionarTodosPendientes = (idsVisibles) => {
+    const todosSeleccionados = idsVisibles.every(id => seleccionadosPendientes.includes(id));
+    if (todosSeleccionados) {
+      setSeleccionadosPendientes(prev => prev.filter(id => !idsVisibles.includes(id)));
+    } else {
+      setSeleccionadosPendientes(prev => [...new Set([...prev, ...idsVisibles])]);
+    }
+  };
+
+  const manejarAprobacionMasiva = async (nuevoEstado) => {
+    if (seleccionadosPendientes.length === 0) return;
+    const accionTexto = nuevoEstado === 'exitoso' ? 'aprobar' : 'rechazar';
+    if (!window.confirm(`¿${accionTexto.charAt(0).toUpperCase() + accionTexto.slice(1)} ${seleccionadosPendientes.length} registro(s) seleccionado(s)?`)) return;
+
+    try {
+      await Promise.all(
+        seleccionadosPendientes.map(id =>
+          axios.patch(`${API_URL}/api/registros/${id}`, { estado: nuevoEstado }, {
+            headers: { Authorization: `Bearer ${token}` }
+          })
+        )
+      );
+      alert(`✓ ${seleccionadosPendientes.length} registro(s) ${nuevoEstado === 'exitoso' ? 'aprobado(s)' : 'rechazado(s)'}`);
+      setSeleccionadosPendientes([]);
+      cargarRegistros();
+      cargarDashboard();
+    } catch (err) {
+      alert('Error procesando registros: ' + (err.response?.data?.error || err.message));
+      cargarRegistros();
     }
   };
 
@@ -1287,65 +1327,117 @@ function App() {
             {registrosFiltrados.filter(r => r.estado === 'pendiente').length === 0 ? (
               <p className="sin-datos">No hay registros pendientes</p>
             ) : (
-              <table className="tabla">
-                <thead>
-                  <tr>
-                    <th>N° Ticket</th>
-                    <th>Especialista</th>
-                    <th>Tipo</th>
-                    <th>Descripción</th>
-                    <th>Inicio (Fecha - Hora)</th>
-                    <th>Fin (Fecha - Hora)</th>
-                    <th>Horas</th>
-                    <th>Especialidad</th>
-                    <th>Genera OVT</th>
-                    <th>Acciones</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {registrosFiltrados.filter(r => r.estado === 'pendiente').map(r => (
-                    <tr key={r.id}>
-                      <td>{r.numeroTicket || '—'}</td>
-                      <td><strong>{r.createdByNombre || r.especialista}</strong></td>
-                      <td>{r.tipo}</td>
-                      <td style={{maxWidth: '220px', whiteSpace: 'normal', wordBreak: 'break-word'}}>{r.descripcion}</td>
-                      <td style={{fontSize: '13px'}}>{parseDate(r.fechaInicio)} <strong>{toTimeString(toDate(r.fechaInicio))}</strong></td>
-                      <td style={{fontSize: '13px'}}>{parseDate(r.fechaFin)} <strong>{toTimeString(toDate(r.fechaFin))}</strong></td>
-                      <td className="numero">{r.horas}h</td>
-                      <td>{r.especialidad}</td>
-                      <td>
-                        <span style={{
-                          display: 'inline-block',
-                          padding: '4px 12px',
-                          borderRadius: '20px',
-                          fontSize: '12px',
-                          fontWeight: '700',
-                          background: r.genera_ovt === 'si' ? '#d1fae5' : '#fee2e2',
-                          color: r.genera_ovt === 'si' ? '#065f46' : '#991b1b'
-                        }}>
-                          {r.genera_ovt === 'si' ? '✓ SÍ' : '✗ NO'}
-                        </span>
-                      </td>
-                      <td className="acciones">
-                        <button 
-                          className="btn-aprobar"
-                          onClick={() => manejarAprobacion(r.id, 'exitoso')}
-                          title="Aprobar registro"
-                        >
-                          ✅ Aprobar
-                        </button>
-                        <button 
-                          className="btn-rechazar"
-                          onClick={() => manejarAprobacion(r.id, 'fallido')}
-                          title="Rechazar registro"
-                        >
-                          ❌ Rechazar
-                        </button>
-                      </td>
+              <>
+                {seleccionadosPendientes.length > 0 && (
+                  <div style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                    background: '#fff3cd', border: '1px solid #FF9800', borderRadius: '8px',
+                    padding: '12px 16px', marginBottom: '15px'
+                  }}>
+                    <span style={{fontSize: '13px', fontWeight: '600', color: '#92400e'}}>
+                      {seleccionadosPendientes.length} registro(s) seleccionado(s)
+                    </span>
+                    <div style={{display: 'flex', gap: '8px'}}>
+                      <button
+                        onClick={() => manejarAprobacionMasiva('exitoso')}
+                        style={{
+                          padding: '8px 16px', background: '#4CAF50', color: 'white',
+                          border: 'none', borderRadius: '6px', cursor: 'pointer',
+                          fontSize: '13px', fontWeight: '600'
+                        }}
+                      >
+                        ✅ Aprobar seleccionados ({seleccionadosPendientes.length})
+                      </button>
+                      <button
+                        onClick={() => manejarAprobacionMasiva('fallido')}
+                        style={{
+                          padding: '8px 16px', background: '#f44336', color: 'white',
+                          border: 'none', borderRadius: '6px', cursor: 'pointer',
+                          fontSize: '13px', fontWeight: '600'
+                        }}
+                      >
+                        ❌ Rechazar seleccionados ({seleccionadosPendientes.length})
+                      </button>
+                    </div>
+                  </div>
+                )}
+                <table className="tabla">
+                  <thead>
+                    <tr>
+                      <th>
+                        <input
+                          type="checkbox"
+                          checked={
+                            registrosFiltrados.filter(r => r.estado === 'pendiente').length > 0 &&
+                            registrosFiltrados.filter(r => r.estado === 'pendiente').every(r => seleccionadosPendientes.includes(r.id))
+                          }
+                          onChange={() => toggleSeleccionarTodosPendientes(registrosFiltrados.filter(r => r.estado === 'pendiente').map(r => r.id))}
+                        />
+                      </th>
+                      <th>N° Ticket</th>
+                      <th>Especialista</th>
+                      <th>Tipo</th>
+                      <th>Descripción</th>
+                      <th>Inicio (Fecha - Hora)</th>
+                      <th>Fin (Fecha - Hora)</th>
+                      <th>Horas</th>
+                      <th>Especialidad</th>
+                      <th>Genera OVT</th>
+                      <th>Acciones</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {registrosFiltrados.filter(r => r.estado === 'pendiente').map(r => (
+                      <tr key={r.id} style={seleccionadosPendientes.includes(r.id) ? {background: '#fff8e1'} : {}}>
+                        <td>
+                          <input
+                            type="checkbox"
+                            checked={seleccionadosPendientes.includes(r.id)}
+                            onChange={() => toggleSeleccionPendiente(r.id)}
+                          />
+                        </td>
+                        <td>{r.numeroTicket || '—'}</td>
+                        <td><strong>{r.createdByNombre || r.especialista}</strong></td>
+                        <td>{r.tipo}</td>
+                        <td style={{maxWidth: '220px', whiteSpace: 'normal', wordBreak: 'break-word'}}>{r.descripcion}</td>
+                        <td style={{fontSize: '13px'}}>{parseDate(r.fechaInicio)} <strong>{toTimeString(toDate(r.fechaInicio))}</strong></td>
+                        <td style={{fontSize: '13px'}}>{parseDate(r.fechaFin)} <strong>{toTimeString(toDate(r.fechaFin))}</strong></td>
+                        <td className="numero">{r.horas}h</td>
+                        <td>{r.especialidad}</td>
+                        <td>
+                          <span style={{
+                            display: 'inline-block',
+                            padding: '4px 12px',
+                            borderRadius: '20px',
+                            fontSize: '12px',
+                            fontWeight: '700',
+                            background: r.genera_ovt === 'si' ? '#d1fae5' : '#fee2e2',
+                            color: r.genera_ovt === 'si' ? '#065f46' : '#991b1b'
+                          }}>
+                            {r.genera_ovt === 'si' ? '✓ SÍ' : '✗ NO'}
+                          </span>
+                        </td>
+                        <td className="acciones">
+                          <button 
+                            className="btn-aprobar"
+                            onClick={() => manejarAprobacion(r.id, 'exitoso')}
+                            title="Aprobar registro"
+                          >
+                            ✅ Aprobar
+                          </button>
+                          <button 
+                            className="btn-rechazar"
+                            onClick={() => manejarAprobacion(r.id, 'fallido')}
+                            title="Rechazar registro"
+                          >
+                            ❌ Rechazar
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </>
             )}
 
             {/* Gráficos */}
