@@ -737,6 +737,26 @@ function App() {
         {vista === 'registros' && usuario.rol === 'especialista' && (
           <section className="seccion">
             <h2>📋 {editandoId ? '✏️ Editar Cambio/Alerta' : 'Registrar Cambio o Alerta'}</h2>
+
+            {(() => {
+              const misPendientes = registros.filter(r => r.createdBy === usuario.usuario && r.estado === 'pendiente');
+              const horasPendientes = misPendientes.reduce((sum, r) => sum + (r.horas || 0), 0);
+              return (
+                <div style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                  color: 'white', borderRadius: '12px', padding: '18px 24px', marginBottom: '25px'
+                }}>
+                  <div>
+                    <div style={{ fontSize: '13px', opacity: 0.9, marginBottom: '4px' }}>⏳ Horas Pendientes de Aprobación</div>
+                    <div style={{ fontSize: '28px', fontWeight: '700' }}>{horasPendientes.toFixed(2)}h</div>
+                  </div>
+                  <div style={{ fontSize: '13px', opacity: 0.9, textAlign: 'right' }}>
+                    {misPendientes.length} registro(s) esperando aprobación
+                  </div>
+                </div>
+              );
+            })()}
             
             <form onSubmit={manejarRegistro} className="formulario-mejorado">
               <div className="form-group">
