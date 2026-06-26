@@ -259,6 +259,35 @@ Sé conciso, específico y ORIGINAL.`;
     }]
   };
 
+  // Tendencia Anual de HHEE (Ene-Dic del año seleccionado, independiente del filtro de mes)
+  const porMesAnio = Array.from({ length: 12 }, () => 0);
+  (registros || []).forEach(r => {
+    if (r.estado !== 'exitoso') return;
+    const fecha = toDate(r.fechaInicio);
+    if (fecha.getFullYear() !== filtroAnio) return;
+    if (filtroEmpresa !== 'todas') {
+      const nombre = r.createdByNombre || r.especialista || '';
+      const empresa = mapaEmpresaPorNombre[nombre] || 'Sin asignar';
+      if (empresa !== filtroEmpresa) return;
+    }
+    porMesAnio[fecha.getMonth()] += (r.horas || 0);
+  });
+  const nombresMeses = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+  const chartTendenciaAnual = {
+    labels: nombresMeses,
+    datasets: [{
+      label: `HHEE ${filtroAnio}`,
+      data: porMesAnio,
+      showLine: false, // solo puntos, sin línea conectora
+      pointRadius: 7,
+      pointHoverRadius: 9,
+      pointBackgroundColor: '#3266ad',
+      pointBorderColor: '#fff',
+      pointBorderWidth: 2,
+      backgroundColor: '#3266ad'
+    }]
+  };
+
   // Colores para gráficos
   const colores = ['#3266ad', '#e24b4a', '#73726c', '#ba7517', '#1d9e75'];
 
@@ -521,6 +550,19 @@ Sé conciso, específico y ORIGINAL.`;
             <div style={{ position: 'relative', height: '250px', overflow: 'hidden' }}>
               <Doughnut data={chartPorEmpresa} options={chartOptionsDoughnut} />
             </div>
+          </div>
+        </div>
+
+        <div style={{ background: 'white', padding: '20px', borderRadius: '8px', border: '1px solid #eee', marginTop: '20px' }}>
+          <h3>Tendencia Anual de HHEE — {filtroAnio}</h3>
+          <p style={{ fontSize: '12px', color: '#999', margin: '0 0 12px' }}>
+            Horas extra acumuladas por mes durante todo el año (no se ve afectado por el filtro de Mes)
+          </p>
+          <div style={{ position: 'relative', height: '280px', overflow: 'hidden' }}>
+            <Line data={chartTendenciaAnual} options={{
+              ...chartOptions,
+              plugins: { ...chartOptions.plugins, legend: { display: false } }
+            }} />
           </div>
         </div>
       )}
