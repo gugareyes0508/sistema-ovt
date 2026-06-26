@@ -324,12 +324,18 @@ function App() {
   // Cargar registro para editar
   const cargarParaEditar = (registro) => {
     try {
-      if (registro.estado !== "fallido") {
+      const esAdmin = usuario.rol === 'admin';
+
+      if (!esAdmin && registro.estado !== "fallido") {
         alert("❌ Solo puedes editar registros rechazados");
         return;
       }
-      
-      alert("ℹ️ Editando registro rechazado.\n\nPuedes corregir y volver a enviarlo para aprobación.");
+
+      if (registro.estado === "fallido") {
+        alert("ℹ️ Editando registro rechazado.\n\nPuedes corregir y volver a enviarlo para aprobación.");
+      } else if (esAdmin) {
+        alert("ℹ️ Editando registro como administrador.\n\nEl estado actual (" + registro.estado + ") se mantendrá; no se reenviará a aprobación.");
+      }
       
       setModalEdicion({ abierto: true, registro });
       setFormularioModal({
@@ -343,7 +349,8 @@ function App() {
         especialidad: registro.especialidad || "operaciones",
         interno_cliente: registro.interno_cliente || "interno",
         genera_ovt: registro.genera_ovt || "si",
-        numeroTicket: registro.numeroTicket || ""
+        numeroTicket: registro.numeroTicket || "",
+        estadoOriginal: registro.estado || "pendiente"
       });
     } catch (err) {
       console.error("Error en cargarParaEditar:", err);
@@ -1830,7 +1837,9 @@ function App() {
         {/* MODAL MEJORADO - EDICIÓN COMPLETA */}
         {modalEdicion && modalEdicion.abierto && (
           <div style={{position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', background: 'white', padding: '30px', borderRadius: '12px', zIndex: 9999, width: '95%', maxWidth: '600px', boxShadow: '0 10px 40px rgba(0,0,0,0.3)', maxHeight: '90vh', overflowY: 'auto'}}>
-            <h2 style={{marginTop: 0, marginBottom: '20px'}}>✏️ Editar Registro Rechazado</h2>
+            <h2 style={{marginTop: 0, marginBottom: '20px'}}>
+              ✏️ Editar Registro {modalEdicion?.registro?.estado === 'fallido' ? 'Rechazado' : ''}
+            </h2>
             
             {/* INFO NO EDITABLE */}
             <div style={{background: '#f5f5f5', padding: '12px', borderRadius: '8px', marginBottom: '20px', fontSize: '13px'}}>
@@ -1845,7 +1854,20 @@ function App() {
                 </div>
                 <div>
                   <span style={{color: '#666', display: 'block', marginBottom: '4px', fontWeight: '500'}}>Estado Actual</span>
-                  <span style={{background: '#FFE0B2', color: '#E65100', padding: '2px 8px', borderRadius: '4px', fontSize: '12px', fontWeight: '500', display: 'inline-block'}}>Rechazado</span>
+                  {(() => {
+                    const e = modalEdicion?.registro?.estado;
+                    const estilo = e === 'fallido'
+                      ? { background: '#FFE0B2', color: '#E65100' }
+                      : e === 'exitoso'
+                        ? { background: '#d1fae5', color: '#065f46' }
+                        : { background: '#fef3c7', color: '#92400e' };
+                    const texto = e === 'fallido' ? 'Rechazado' : e === 'exitoso' ? 'Aprobado' : 'Pendiente';
+                    return (
+                      <span style={{ ...estilo, padding: '2px 8px', borderRadius: '4px', fontSize: '12px', fontWeight: '500', display: 'inline-block' }}>
+                        {texto}
+                      </span>
+                    );
+                  })()}
                 </div>
                 <div>
                   <span style={{color: '#666', display: 'block', marginBottom: '4px', fontWeight: '500'}}>Cliente</span>
@@ -1869,12 +1891,16 @@ function App() {
                   horas: formularioModal.horas,
                   especialidad: formularioModal.especialidad,
                   genera_ovt: formularioModal.genera_ovt,
-                  estado: 'pendiente'
+                  estado: formularioModal.estadoOriginal === 'fallido' ? 'pendiente' : formularioModal.estadoOriginal
                 },
                 {headers: {Authorization: `Bearer ${token}`}}
               )
               .then(() => {
-                alert('✅ Registro guardado y enviado a aprobación');
+                if (formularioModal.estadoOriginal === 'fallido') {
+                  alert('✅ Registro guardado y enviado a aprobación');
+                } else {
+                  alert('✅ Registro actualizado correctamente');
+                }
                 setModalEdicion({abierto: false, registro: null});
                 cargarRegistros();
               })
@@ -2056,7 +2082,7 @@ function App() {
                   type="submit" 
                   style={{flex: 1, padding: '12px', background: '#2196F3', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '600', fontSize: '14px'}}
                 >
-                  ✅ Guardar y Enviar a Aprobación
+                  {formularioModal.estadoOriginal === 'fallido' ? '✅ Guardar y Enviar a Aprobación' : '✅ Guardar Cambios'}
                 </button>
                 <button 
                   type="button" 
@@ -2068,7 +2094,9 @@ function App() {
               </div>
 
               <div style={{fontSize: '12px', color: '#666', textAlign: 'center', marginTop: '12px'}}>
-                El registro quedará como "Pendiente de Aprobación"
+                {formularioModal.estadoOriginal === 'fallido'
+                  ? 'El registro quedará como "Pendiente de Aprobación"'
+                  : `El estado se mantendrá como "${formularioModal.estadoOriginal === 'exitoso' ? 'Aprobado' : formularioModal.estadoOriginal === 'pendiente' ? 'Pendiente' : formularioModal.estadoOriginal}"`}
               </div>
             </form>
           </div>
