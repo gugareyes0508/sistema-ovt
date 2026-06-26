@@ -1264,20 +1264,20 @@ function App() {
             {/* Tarjetas resumen */}
             <div className="dashboard-grid">
               <div className="card card-blue">
-                <h3>⏳ Pendientes</h3>
+                <h3>⏳ Pendientes de Aprobación</h3>
                 <p className="numero">{pendientes}</p>
                 <p style={{fontSize: '11px', color: '#fff', marginTop: '5px'}}>de {registrosFiltrados.length} registros</p>
               </div>
               <div className="card card-green">
-                <h3>✅ Aprobados</h3>
+                <h3>✅ Registros Aprobados</h3>
                 <p className="numero">{aprobados}</p>
               </div>
               <div className="card card-red">
-                <h3>❌ Rechazados</h3>
+                <h3>❌ Registros Rechazados</h3>
                 <p className="numero">{rechazados}</p>
               </div>
               <div className="card card-yellow">
-                <h3>📈 Total Horas Aprobadas</h3>
+                <h3>📈 Total Horas Aprobadas en el mes</h3>
                 <p className="numero">{totalHorasAprobadas.toFixed(2)}h</p>
               </div>
             </div>
