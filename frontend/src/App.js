@@ -945,6 +945,7 @@ function App() {
             <h2>📥 Cargar Registros desde Excel</h2>
             <ExcelUpload 
               token={token} 
+              apiUrl={API_URL}
               usuario={usuario} 
               onUploadComplete={() => {
                 setTimeout(() => {

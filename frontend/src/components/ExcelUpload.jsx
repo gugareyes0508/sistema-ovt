@@ -1,331 +1,308 @@
 import React, { useState } from 'react';
 import axios from 'axios';
+import * as XLSX from 'xlsx';
 
-// Este archivo va en: frontend/src/components/ExcelUpload.jsx
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
+const normalizarTexto = (txt) =>
+  String(txt || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim();
 
-const ExcelUpload = ({ token, usuario, onUploadComplete }) => {
+const calcularHoras = (inicio, fin) => {
+  if (!inicio || !fin || isNaN(inicio.getTime()) || isNaN(fin.getTime())) return 0;
+  const diff = (fin - inicio) / (1000 * 60 * 60);
+  return Math.max(0, Math.round(diff * 20) / 20);
+};
+
+const parseFechaCelda = (valor) => {
+  if (!valor) return null;
+  if (valor instanceof Date && !isNaN(valor.getTime())) return valor;
+  const texto = String(valor).trim();
+  const match = texto.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})$/);
+  if (match) {
+    const [, d, m, y] = match;
+    return new Date(parseInt(y), parseInt(m) - 1, parseInt(d));
+  }
+  const intento = new Date(texto);
+  return isNaN(intento.getTime()) ? null : intento;
+};
+
+const parseHoraCelda = (valor) => {
+  if (valor === undefined || valor === null || valor === '' || valor === '-') return null;
+  if (valor instanceof Date && !isNaN(valor.getTime())) {
+    return { h: valor.getHours(), m: valor.getMinutes() };
+  }
+  if (typeof valor === 'number') {
+    const totalMin = Math.round(valor * 24 * 60);
+    return { h: Math.floor(totalMin / 60) % 24, m: totalMin % 60 };
+  }
+  const texto = String(valor).trim();
+  const match = texto.match(/^(\d{1,2}):(\d{2})/);
+  if (match) return { h: parseInt(match[1]), m: parseInt(match[2]) };
+  return null;
+};
+
+const combinarFechaHora = (fechaBase, hora) => {
+  const f = new Date(fechaBase);
+  f.setHours(hora.h, hora.m, 0, 0);
+  return f;
+};
+
+const inferirTipo = (descripcion) => {
+  const txt = normalizarTexto(descripcion);
+  if (txt.includes('incidente') || txt.includes('alerta') || txt.includes('falla')) return 'alerta';
+  return 'cambio';
+};
+
+const encontrarColumna = (headers, posibles) => {
+  const normalizados = headers.map(normalizarTexto);
+  for (const candidato of posibles) {
+    const idx = normalizados.findIndex(h => h.includes(candidato));
+    if (idx !== -1) return idx;
+  }
+  return -1;
+};
+
+const ExcelUpload = ({ token, apiUrl, usuario, onUploadComplete }) => {
+  const [archivo, setArchivo] = useState(null);
   const [cargando, setCargando] = useState(false);
-  const [resultado, setResultado] = useState(null);
-  const [error, setError] = useState(null);
+  const [resultados, setResultados] = useState(null);
 
-  // Descargar template Excel
-  const descargarTemplate = () => {
-    const datos = [
-      ['tipo', 'descripcion', 'cliente', 'fechaInicio', 'horaInicio', 'fechaFin', 'horaFin', 'especialidad', 'interno_cliente', 'genera_ovt'],
-      ['cambio', 'Descripción del cambio...', 'Banco de Chile', '2026-06-17', '15:00', '2026-06-18', '15:00', 'operaciones', 'interno', 'si'],
-      ['alerta', 'Descripción de la alerta...', 'Banco Santander', '2026-06-17', '09:00', '2026-06-17', '17:00', 'middleware', 'cliente', 'no'],
-    ];
+  const [opciones, setOpciones] = useState({
+    cliente: 'Banco de Chile',
+    especialidad: 'operaciones',
+    interno_cliente: 'cliente',
+    genera_ovt: 'si'
+  });
 
-    const csv = datos.map(fila => 
-      fila.map(celda => `"${celda}"`).join(',')
-    ).join('\n');
-
-    const elemento = document.createElement('a');
-    elemento.setAttribute('href', 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv));
-    elemento.setAttribute('download', 'template_registros.csv');
-    elemento.style.display = 'none';
-    document.body.appendChild(elemento);
-    elemento.click();
-    document.body.removeChild(elemento);
-  };
-
-  // Procesar archivo Excel
-  const procesarArchivo = async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-
-    setError(null);
-    setResultado(null);
+  const procesarArchivo = async () => {
+    if (!archivo) return;
     setCargando(true);
+    setResultados(null);
 
     try {
-      // Leer archivo
-      const reader = new FileReader();
-      reader.onload = async (event) => {
+      const data = await archivo.arrayBuffer();
+      const wb = XLSX.read(data, { type: 'array', cellDates: true });
+      const nombreHoja = wb.SheetNames[0];
+      const sheet = wb.Sheets[nombreHoja];
+      const filas = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+
+      if (filas.length < 2) {
+        throw new Error('El archivo no tiene filas de datos');
+      }
+
+      const headers = filas[0];
+      const idxFecha = encontrarColumna(headers, ['fecha']);
+      const idxTicket = encontrarColumna(headers, ['chg', 'ritm', 'ticket', 'n ticket', 'n° ticket']);
+      const idxDescripcion = encontrarColumna(headers, ['detalle', 'descripcion']);
+      const idxHoraInicio = encontrarColumna(headers, ['hora de inicio', 'hora inicio', 'inicio']);
+      const idxHoraFin = encontrarColumna(headers, ['hora de termino', 'hora de término', 'hora termino', 'hora fin', 'termino', 'término']);
+
+      if (idxFecha === -1 || idxDescripcion === -1 || idxHoraInicio === -1 || idxHoraFin === -1) {
+        throw new Error(
+          'No se encontraron las columnas esperadas (Fecha, Detalle de actividad, Hora de Inicio, Hora de Termino). ' +
+          'Revisa que tu planilla tenga esos encabezados en la primera fila.'
+        );
+      }
+
+      const filasDatos = filas.slice(1);
+      const resultadosFilas = [];
+
+      for (let i = 0; i < filasDatos.length; i++) {
+        const fila = filasDatos[i];
+        const numFilaExcel = i + 2;
+
+        const fechaRaw = fila[idxFecha];
+        const ticketRaw = idxTicket !== -1 ? fila[idxTicket] : '';
+        const descripcionRaw = fila[idxDescripcion];
+        const horaInicioRaw = fila[idxHoraInicio];
+        const horaFinRaw = fila[idxHoraFin];
+
+        const sinActividad =
+          !descripcionRaw || String(descripcionRaw).trim() === '' ||
+          horaInicioRaw === '-' || horaFinRaw === '-' ||
+          parseHoraCelda(horaInicioRaw) === null || parseHoraCelda(horaFinRaw) === null;
+
+        if (sinActividad) continue;
+
         try {
-          const contenido = event.target.result;
-          const lineas = contenido.split('\n').filter(l => l.trim());
-          
-          if (lineas.length < 2) {
-            setError('El archivo está vacío o no tiene encabezados');
-            setCargando(false);
-            return;
+          const fechaBase = parseFechaCelda(fechaRaw);
+          if (!fechaBase) throw new Error('Fecha inválida');
+
+          const horaInicio = parseHoraCelda(horaInicioRaw);
+          const horaFin = parseHoraCelda(horaFinRaw);
+
+          const fechaInicio = combinarFechaHora(fechaBase, horaInicio);
+          let fechaFin = combinarFechaHora(fechaBase, horaFin);
+
+          if (fechaFin <= fechaInicio) {
+            fechaFin = new Date(fechaFin.getTime() + 24 * 60 * 60 * 1000);
           }
 
-          // Parse de encabezados
-          const encabezados = lineas[0]
-            .split(',')
-            .map(h => h.replace(/"/g, '').trim().toLowerCase());
+          const horas = calcularHoras(fechaInicio, fechaFin);
+          const descripcion = String(descripcionRaw).trim();
 
-          // Mapear índices
-          const indices = {
-            tipo: encabezados.indexOf('tipo'),
-            descripcion: encabezados.indexOf('descripcion'),
-            cliente: encabezados.indexOf('cliente'),
-            fechaInicio: encabezados.indexOf('fechainicio'),
-            horaInicio: encabezados.indexOf('horainicio'),
-            fechaFin: encabezados.indexOf('fechafin'),
-            horaFin: encabezados.indexOf('horafin'),
-            especialidad: encabezados.indexOf('especialidad'),
-            interno_cliente: encabezados.indexOf('interno_cliente'),
-            genera_ovt: encabezados.indexOf('genera_ovt'),
+          const payload = {
+            numeroTicket: ticketRaw ? String(ticketRaw).trim() : '',
+            tipo: inferirTipo(descripcion),
+            descripcion,
+            cliente: opciones.cliente,
+            fechaInicio,
+            fechaFin,
+            horas,
+            especialista: usuario.nombre || '',
+            interno_cliente: opciones.interno_cliente,
+            genera_ovt: opciones.genera_ovt,
+            estado: 'pendiente',
+            especialidad: opciones.especialidad
           };
 
-          // Validar que tenga columnas requeridas
-          if (indices.tipo === -1 || indices.descripcion === -1 || indices.cliente === -1) {
-            setError('Faltan columnas requeridas: tipo, descripcion, cliente');
-            setCargando(false);
-            return;
-          }
-
-          // Parse de registros
-          const registros = [];
-          const errores = [];
-
-          for (let i = 1; i < lineas.length; i++) {
-            try {
-              const partes = lineas[i].split(',').map(p => p.replace(/"/g, '').trim());
-              
-              if (!partes[indices.tipo]) continue; // Saltar vacías
-
-              const fechaInicio = new Date(`${partes[indices.fechaInicio]}T${partes[indices.horaInicio]}`);
-              const fechaFin = new Date(`${partes[indices.fechaFin]}T${partes[indices.horaFin]}`);
-
-              const horas = (fechaFin - fechaInicio) / (1000 * 60 * 60);
-
-              registros.push({
-                tipo: partes[indices.tipo].toLowerCase(),
-                descripcion: partes[indices.descripcion],
-                cliente: partes[indices.cliente],
-                fechaInicio,
-                fechaFin,
-                horas: Math.max(0, Math.round(horas * 20) / 20),
-                especialista: usuario.nombre,
-                especialidad: partes[indices.especialidad] || 'operaciones',
-                interno_cliente: partes[indices.interno_cliente] || 'interno',
-                genera_ovt: partes[indices.genera_ovt] || 'si',
-                estado: 'pendiente'
-              });
-            } catch (err) {
-              errores.push(`Fila ${i + 1}: ${err.message}`);
-            }
-          }
-
-          if (registros.length === 0) {
-            setError('No se pudieron procesar registros válidos del archivo');
-            setCargando(false);
-            return;
-          }
-
-          // Subir registros
-          let exitosos = 0;
-          let fallidos = 0;
-          const erroresUpload = [];
-
-          for (const reg of registros) {
-            try {
-              await axios.post(`${API_URL}/api/registros`, reg, {
-                headers: { Authorization: `Bearer ${token}` }
-              });
-              exitosos++;
-            } catch (err) {
-              fallidos++;
-              erroresUpload.push(`${reg.descripcion}: ${err.response?.data?.error || err.message}`);
-            }
-          }
-
-          setResultado({
-            exitosos,
-            fallidos,
-            total: registros.length,
-            errores: erroresUpload.slice(0, 5) // Mostrar primeros 5 errores
+          await axios.post(`${apiUrl}/api/registros`, payload, {
+            headers: { Authorization: `Bearer ${token}` }
           });
 
-          // Callback
-          if (onUploadComplete) {
-            onUploadComplete(exitosos);
-          }
-
-          setCargando(false);
+          resultadosFilas.push({ fila: numFilaExcel, exito: true, ticket: payload.numeroTicket || '—', descripcion, horas });
         } catch (err) {
-          setError('Error procesando archivo: ' + err.message);
-          setCargando(false);
+          resultadosFilas.push({
+            fila: numFilaExcel,
+            exito: false,
+            ticket: ticketRaw || '—',
+            descripcion: descripcionRaw || '(sin descripción)',
+            error: err.response?.data?.error || err.message
+          });
         }
-      };
+      }
 
-      reader.readAsText(file);
+      setResultados(resultadosFilas);
+      if (onUploadComplete) onUploadComplete();
     } catch (err) {
-      setError('Error: ' + err.message);
+      alert('Error leyendo el archivo Excel: ' + err.message);
+    } finally {
       setCargando(false);
     }
   };
 
-  return (
-    <div style={{ padding: '20px', fontFamily: 'Arial, sans-serif' }}>
-      <h3>📥 Cargar Registros desde Excel/CSV</h3>
+  const exitosos = resultados ? resultados.filter(r => r.exito).length : 0;
+  const fallidos = resultados ? resultados.filter(r => !r.exito).length : 0;
 
-      {/* Instrucciones */}
-      <div style={{ background: '#e3f2fd', padding: '15px', borderRadius: '8px', marginBottom: '20px', fontSize: '13px', color: '#1565c0' }}>
-        <p style={{ margin: '0 0 10px 0', fontWeight: 'bold' }}>Pasos:</p>
-        <ol style={{ margin: 0, paddingLeft: '20px' }}>
-          <li>Descarga el template Excel haciendo clic en el botón abajo</li>
-          <li>Completa tus registros (cambios/alertas)</li>
-          <li>Sube el archivo aquí</li>
-          <li>Se validarán y crearán automáticamente</li>
-        </ol>
+  return (
+    <div>
+      <p style={{ color: '#666', fontSize: '13px', marginBottom: '20px' }}>
+        Sube directamente tu planilla de seguimiento actual (la misma que ya usas, con columnas
+        <strong> Fecha, CHG/RITM/Otro, Detalle de actividad, Hora de Inicio, Hora de Termino</strong>).
+        No necesitas cambiar tu formato — el sistema detecta esas columnas automáticamente y omite las filas sin horario (con "-").
+      </p>
+
+      <div style={{ background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '10px', padding: '20px', marginBottom: '20px' }}>
+        <h3 style={{ marginTop: 0, fontSize: '15px' }}>Datos que tu planilla no incluye (se aplican a todas las filas)</h3>
+        <div className="form-row">
+          <div className="form-group">
+            <label>Cliente</label>
+            <select value={opciones.cliente} onChange={(e) => setOpciones({ ...opciones, cliente: e.target.value })}>
+              <option value="Banco de Chile">Banco de Chile</option>
+              <option value="Banco Santander">Banco Santander</option>
+              <option value="Banco BCI">Banco BCI</option>
+              <option value="Banco Estado">Banco Estado</option>
+              <option value="Otro">Otro</option>
+            </select>
+          </div>
+          <div className="form-group">
+            <label>Especialidad</label>
+            <select value={opciones.especialidad} onChange={(e) => setOpciones({ ...opciones, especialidad: e.target.value })}>
+              <option value="operaciones">Operaciones Cloud</option>
+              <option value="middleware">Middleware</option>
+              <option value="ambas">Ambas</option>
+            </select>
+          </div>
+          <div className="form-group">
+            <label>Interno/Cliente</label>
+            <select value={opciones.interno_cliente} onChange={(e) => setOpciones({ ...opciones, interno_cliente: e.target.value })}>
+              <option value="cliente">Cliente</option>
+              <option value="interno">Interno</option>
+            </select>
+          </div>
+          <div className="form-group">
+            <label>¿Genera OVT?</label>
+            <select value={opciones.genera_ovt} onChange={(e) => setOpciones({ ...opciones, genera_ovt: e.target.value })}>
+              <option value="si">Sí</option>
+              <option value="no">No</option>
+            </select>
+          </div>
+        </div>
+        <small style={{ color: '#999' }}>
+          El "Tipo" (Cambio/Alerta) se infiere automáticamente según palabras clave en la descripción (ej: "incidente" → Alerta).
+        </small>
       </div>
 
-      {/* Botón descargar template */}
-      <div style={{ marginBottom: '20px' }}>
+      <div style={{ background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '10px', padding: '20px', marginBottom: '20px' }}>
+        <h3 style={{ marginTop: 0, fontSize: '15px' }}>Sube tu planilla (.xlsx)</h3>
+        <input
+          type="file"
+          accept=".xlsx,.xls"
+          onChange={(e) => setArchivo(e.target.files[0])}
+          style={{ marginBottom: '14px', display: 'block' }}
+        />
         <button
-          onClick={descargarTemplate}
-          style={{
-            padding: '10px 20px',
-            background: '#4CAF50',
-            color: 'white',
-            border: 'none',
-            borderRadius: '6px',
-            cursor: 'pointer',
-            fontWeight: 'bold',
-            fontSize: '14px',
-            marginRight: '10px'
-          }}
+          onClick={procesarArchivo}
+          disabled={!archivo || cargando}
+          className="btn-primary"
+          style={{ opacity: !archivo || cargando ? 0.5 : 1, cursor: !archivo || cargando ? 'not-allowed' : 'pointer' }}
         >
-          📄 Descargar Template
+          {cargando ? '⏳ Procesando...' : '🚀 Cargar Registros'}
         </button>
       </div>
 
-      {/* Input archivo */}
-      <div style={{ marginBottom: '20px' }}>
-        <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '8px', fontSize: '14px' }}>
-          Selecciona archivo CSV o Excel:
-        </label>
-        <input
-          type="file"
-          accept=".csv,.xlsx,.xls"
-          onChange={procesarArchivo}
-          disabled={cargando}
-          style={{
-            padding: '8px',
-            border: '1px solid #ddd',
-            borderRadius: '6px',
-            cursor: cargando ? 'not-allowed' : 'pointer',
-            opacity: cargando ? 0.6 : 1
-          }}
-        />
-        <p style={{ fontSize: '12px', color: '#666', margin: '8px 0 0 0' }}>
-          Soportados: CSV, XLSX, XLS
-        </p>
-      </div>
-
-      {/* Cargando */}
-      {cargando && (
-        <div style={{ padding: '15px', background: '#fff3cd', borderRadius: '6px', color: '#856404', marginBottom: '20px' }}>
-          ⏳ Procesando archivo... Por favor espera
-        </div>
-      )}
-
-      {/* Error */}
-      {error && (
-        <div style={{ padding: '15px', background: '#ffebee', borderRadius: '6px', color: '#c62828', marginBottom: '20px', borderLeft: '4px solid #f44336' }}>
-          <p style={{ margin: '0 0 8px 0', fontWeight: 'bold' }}>❌ Error:</p>
-          <p style={{ margin: 0, fontSize: '13px' }}>{error}</p>
-        </div>
-      )}
-
-      {/* Resultado */}
-      {resultado && (
-        <div style={{ padding: '15px', background: '#e8f5e9', borderRadius: '6px', color: '#2e7d32', borderLeft: '4px solid #4CAF50' }}>
-          <p style={{ margin: '0 0 10px 0', fontWeight: 'bold', fontSize: '14px' }}>✅ Carga completada:</p>
-          <div style={{ fontSize: '13px' }}>
-            <p style={{ margin: '5px 0' }}>
-              <strong style={{ color: '#2e7d32' }}>✓ Exitosos:</strong> {resultado.exitosos}/{resultado.total}
-            </p>
-            {resultado.fallidos > 0 && (
-              <p style={{ margin: '5px 0', color: '#d32f2f' }}>
-                <strong>✗ Fallidos:</strong> {resultado.fallidos}
-              </p>
-            )}
+      {resultados && (
+        <div>
+          <div className="dashboard-grid" style={{ marginBottom: '20px' }}>
+            <div className="card card-blue">
+              <h3>📋 Filas Procesadas</h3>
+              <p className="numero">{resultados.length}</p>
+            </div>
+            <div className="card card-green">
+              <h3>✅ Exitosas</h3>
+              <p className="numero">{exitosos}</p>
+            </div>
+            <div className="card card-red">
+              <h3>❌ Fallidas</h3>
+              <p className="numero">{fallidos}</p>
+            </div>
           </div>
 
-          {resultado.errores.length > 0 && (
-            <div style={{ marginTop: '10px', fontSize: '12px', color: '#666', maxHeight: '150px', overflowY: 'auto' }}>
-              <p style={{ margin: '0 0 5px 0', fontWeight: 'bold' }}>Primeros errores:</p>
-              {resultado.errores.map((err, idx) => (
-                <p key={idx} style={{ margin: '3px 0', color: '#d32f2f' }}>• {err}</p>
+          <h3>Detalle por fila</h3>
+          <table className="tabla">
+            <thead>
+              <tr>
+                <th>Fila Excel</th>
+                <th>Ticket</th>
+                <th>Descripción</th>
+                <th>Horas</th>
+                <th>Resultado</th>
+              </tr>
+            </thead>
+            <tbody>
+              {resultados.map((r) => (
+                <tr key={r.fila}>
+                  <td>{r.fila}</td>
+                  <td>{r.ticket}</td>
+                  <td style={{ maxWidth: '300px', whiteSpace: 'normal', wordBreak: 'break-word' }}>
+                    {String(r.descripcion).substring(0, 70)}
+                  </td>
+                  <td>{r.horas ?? '—'}</td>
+                  <td>
+                    {r.exito ? (
+                      <span className="badge badge-exitoso">✅ Cargada (pendiente de aprobación)</span>
+                    ) : (
+                      <span className="badge badge-fallido" title={r.error}>❌ {r.error}</span>
+                    )}
+                  </td>
+                </tr>
               ))}
-            </div>
-          )}
+            </tbody>
+          </table>
         </div>
       )}
-
-      {/* Info formato */}
-      <div style={{ marginTop: '20px', padding: '15px', background: '#f5f5f5', borderRadius: '6px', fontSize: '12px', color: '#666' }}>
-        <p style={{ margin: '0 0 8px 0', fontWeight: 'bold' }}>📋 Columnas requeridas:</p>
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
-          <thead>
-            <tr style={{ borderBottom: '1px solid #ddd' }}>
-              <th style={{ textAlign: 'left', padding: '6px', fontWeight: 'bold' }}>Columna</th>
-              <th style={{ textAlign: 'left', padding: '6px', fontWeight: 'bold' }}>Formato</th>
-              <th style={{ textAlign: 'left', padding: '6px', fontWeight: 'bold' }}>Ejemplo</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr style={{ borderBottom: '1px solid #eee' }}>
-              <td style={{ padding: '6px' }}><strong>tipo</strong> *</td>
-              <td style={{ padding: '6px' }}>cambio | alerta</td>
-              <td style={{ padding: '6px' }}>cambio</td>
-            </tr>
-            <tr style={{ borderBottom: '1px solid #eee' }}>
-              <td style={{ padding: '6px' }}><strong>descripcion</strong> *</td>
-              <td style={{ padding: '6px' }}>texto</td>
-              <td style={{ padding: '6px' }}>Cambio en sistema X</td>
-            </tr>
-            <tr style={{ borderBottom: '1px solid #eee' }}>
-              <td style={{ padding: '6px' }}><strong>cliente</strong> *</td>
-              <td style={{ padding: '6px' }}>Banco de Chile, Santander, etc</td>
-              <td style={{ padding: '6px' }}>Banco de Chile</td>
-            </tr>
-            <tr style={{ borderBottom: '1px solid #eee' }}>
-              <td style={{ padding: '6px' }}><strong>fechaInicio</strong> *</td>
-              <td style={{ padding: '6px' }}>YYYY-MM-DD</td>
-              <td style={{ padding: '6px' }}>2026-06-17</td>
-            </tr>
-            <tr style={{ borderBottom: '1px solid #eee' }}>
-              <td style={{ padding: '6px' }}><strong>horaInicio</strong> *</td>
-              <td style={{ padding: '6px' }}>HH:MM</td>
-              <td style={{ padding: '6px' }}>15:00</td>
-            </tr>
-            <tr style={{ borderBottom: '1px solid #eee' }}>
-              <td style={{ padding: '6px' }}><strong>fechaFin</strong> *</td>
-              <td style={{ padding: '6px' }}>YYYY-MM-DD</td>
-              <td style={{ padding: '6px' }}>2026-06-18</td>
-            </tr>
-            <tr style={{ borderBottom: '1px solid #eee' }}>
-              <td style={{ padding: '6px' }}><strong>horaFin</strong> *</td>
-              <td style={{ padding: '6px' }}>HH:MM</td>
-              <td style={{ padding: '6px' }}>15:00</td>
-            </tr>
-            <tr style={{ borderBottom: '1px solid #eee' }}>
-              <td style={{ padding: '6px' }}>especialidad</td>
-              <td style={{ padding: '6px' }}>operaciones | middleware</td>
-              <td style={{ padding: '6px' }}>operaciones</td>
-            </tr>
-            <tr style={{ borderBottom: '1px solid #eee' }}>
-              <td style={{ padding: '6px' }}>interno_cliente</td>
-              <td style={{ padding: '6px' }}>interno | cliente</td>
-              <td style={{ padding: '6px' }}>interno</td>
-            </tr>
-            <tr>
-              <td style={{ padding: '6px' }}>genera_ovt</td>
-              <td style={{ padding: '6px' }}>si | no</td>
-              <td style={{ padding: '6px' }}>si</td>
-            </tr>
-          </tbody>
-        </table>
-        <p style={{ margin: '8px 0 0 0', color: '#999' }}>* = Requerido</p>
-      </div>
     </div>
   );
 };
