@@ -1,42 +1,29 @@
 /* ============================================
-   KYNDRYL OVT SYSTEM — Design System
-   Paleta: Negro/Carbón + Naranja #FF462D
+   KYNDRYL OVT — Opción C: Header naranja
    ============================================ */
 
 :root {
-  /* Marca Kyndryl */
-  --kyn-orange:       #FF462D;
-  --kyn-orange-dark:  #D93A24;
-  --kyn-orange-dim:   #FF462D18;
-
-  /* Escala de grises corporativa */
-  --kyn-ink:          #11131A;
-  --kyn-panel:        #1d212c;
-  --kyn-panel-2:      #262b38;
-  --kyn-line:         #313744;
-
-  /* Superficie (fondo app) */
-  --bg:               #F3F4F6;
-  --surface:          #FFFFFF;
-  --surface-2:        #F9FAFB;
-
-  /* Texto */
-  --text-primary:     #111827;
-  --text-secondary:   #4B5563;
-  --text-muted:       #9CA3AF;
-
-  /* Semánticos */
-  --good:             #059669;
-  --good-light:       #D1FAE5;
-  --warn:             #D97706;
-  --warn-light:       #FEF3C7;
-  --bad:              #DC2626;
-  --bad-light:        #FEE2E2;
-
-  --radius:           8px;
-  --radius-lg:        12px;
-  --shadow:           0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.06);
-  --shadow-lg:        0 10px 25px rgba(0,0,0,0.10);
+  --kyn-orange:      #FF462D;
+  --kyn-orange-dark: #D93A24;
+  --kyn-orange-dim:  #FF462D18;
+  --kyn-ink:         #11131A;
+  --bg:              #F3F4F6;
+  --surface:         #FFFFFF;
+  --surface-2:       #F9FAFB;
+  --text-primary:    #111827;
+  --text-secondary:  #4B5563;
+  --text-muted:      #9CA3AF;
+  --good:            #059669;
+  --good-light:      #D1FAE5;
+  --warn:            #D97706;
+  --warn-light:      #FEF3C7;
+  --bad:             #DC2626;
+  --bad-light:       #FEE2E2;
+  --border:          #E5E7EB;
+  --radius:          8px;
+  --radius-lg:       12px;
+  --shadow:          0 1px 3px rgba(0,0,0,0.08);
+  --shadow-lg:       0 10px 25px rgba(0,0,0,0.10);
 }
 
 *, *::before, *::after { box-sizing: border-box; }
@@ -65,8 +52,8 @@ body {
 }
 
 .login-box {
-  background: var(--kyn-panel);
-  border: 1px solid var(--kyn-line);
+  background: #171a23;
+  border: 1px solid #262b38;
   padding: 48px 44px;
   border-radius: 16px;
   box-shadow: 0 30px 60px rgba(0,0,0,.4);
@@ -82,7 +69,7 @@ body {
 }
 
 .login-box h1 {
-  font-size: 28px;
+  font-size: 26px;
   color: var(--kyn-orange);
   margin-bottom: 6px;
   font-weight: 800;
@@ -90,33 +77,31 @@ body {
 }
 
 .login-box h2 {
-  font-size: 13px;
-  color: #9aa0ad;
+  font-size: 11px;
+  color: #5e6573;
   margin-bottom: 32px;
   font-weight: 400;
   text-transform: uppercase;
-  letter-spacing: 1.4px;
+  letter-spacing: 1.5px;
 }
 
 .login-box form {
   display: flex;
   flex-direction: column;
-  gap: 14px;
-  margin-bottom: 28px;
+  gap: 13px;
+  margin-bottom: 24px;
 }
 
 .login-box input {
   padding: 13px 15px;
-  border: 1px solid var(--kyn-line);
+  border: 1px solid #313744;
   border-radius: var(--radius);
   font-size: 14px;
-  background: var(--kyn-panel-2);
+  background: #1d212c;
   color: #edeef2;
   transition: border-color .2s, box-shadow .2s;
 }
-
 .login-box input::placeholder { color: #5e6573; }
-
 .login-box input:focus {
   outline: none;
   border-color: var(--kyn-orange);
@@ -135,13 +120,9 @@ body {
   transition: background .2s, transform .15s;
   margin-top: 4px;
 }
+.login-box button:hover { background: var(--kyn-orange-dark); transform: translateY(-1px); }
 
-.login-box button:hover {
-  background: var(--kyn-orange-dark);
-  transform: translateY(-1px);
-}
-
-.login-footer { text-align: center; margin-top: 28px; padding-top: 20px; border-top: 1px solid var(--kyn-line); }
+.login-footer { text-align: center; margin-top: 24px; padding-top: 18px; border-top: 1px solid #262b38; }
 .login-footer p { font-size: 12px; color: #5e6573; margin: 4px 0; }
 .login-footer .version { font-size: 10px; font-family: monospace; }
 
@@ -149,14 +130,14 @@ body {
    APP SHELL
    ============================================ */
 
-.app { display: flex; flex-direction: column; min-height: 100vh; background: var(--bg); width: 100%; overflow-x: hidden; }
+.app { display: flex; flex-direction: column; min-height: 100vh; background: var(--bg); overflow-x: hidden; }
 
 /* ============================================
-   HEADER / TOPBAR
+   HEADER — naranja Kyndryl
    ============================================ */
 
 .header {
-  background: var(--kyn-ink);
+  background: var(--kyn-orange);
   padding: 16px 28px;
   display: flex;
   justify-content: space-between;
@@ -166,20 +147,21 @@ body {
   position: sticky;
   top: 0;
   z-index: 100;
-  box-shadow: 0 2px 8px rgba(0,0,0,.3);
+  box-shadow: 0 2px 8px rgba(255,70,45,.35);
 }
 
 .header-left h1 {
   font-size: 18px;
   color: #fff;
   margin: 0;
-  font-weight: 700;
+  font-weight: 800;
+  letter-spacing: -0.3px;
   display: flex;
   align-items: center;
   gap: 10px;
 }
 
-/* Cuadrado naranja de marca */
+/* Cuadrado semitransparente como ícono de marca */
 .header-left h1::before {
   content: 'K';
   display: inline-flex;
@@ -187,7 +169,7 @@ body {
   justify-content: center;
   width: 28px;
   height: 28px;
-  background: var(--kyn-orange);
+  background: rgba(0,0,0,0.20);
   color: #fff;
   border-radius: 6px;
   font-size: 14px;
@@ -197,41 +179,42 @@ body {
 
 .header-right { display: flex; align-items: center; gap: 14px; }
 
-.user-badge { text-align: right; font-size: 13px; color: #edeef2; font-weight: 500; }
-.user-badge small { display: block; font-size: 11px; color: #9aa0ad; }
+.user-badge { text-align: right; font-size: 13px; color: rgba(255,255,255,.95); font-weight: 600; }
+.user-badge small { display: block; font-size: 11px; color: rgba(255,255,255,.7); }
 
 .btn-logout {
-  padding: 8px 16px;
-  background: var(--bad);
-  color: white;
-  border: none;
+  padding: 7px 16px;
+  background: rgba(0,0,0,.22);
+  color: #fff;
+  border: 1.5px solid rgba(255,255,255,.35);
   border-radius: var(--radius);
   cursor: pointer;
-  font-weight: 600;
+  font-weight: 700;
   font-size: 13px;
   transition: background .2s;
   white-space: nowrap;
 }
-.btn-logout:hover { background: #b91c1c; }
+.btn-logout:hover { background: rgba(0,0,0,.38); }
 
 /* ============================================
-   NAVEGACIÓN
+   NAVEGACIÓN — blanca con acento naranja
    ============================================ */
 
 .nav {
   background: var(--surface);
-  border-bottom: 1px solid var(--kyn-line);
+  border-bottom: 1px solid var(--border);
   padding: 0 28px;
   display: flex;
   gap: 2px;
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
+  box-shadow: 0 1px 3px rgba(0,0,0,.06);
 }
 .nav::-webkit-scrollbar { display: none; }
 
 .nav-btn {
-  padding: 15px 18px;
+  padding: 14px 18px;
   background: none;
   border: none;
   border-bottom: 3px solid transparent;
@@ -239,20 +222,12 @@ body {
   font-weight: 600;
   font-size: 13px;
   cursor: pointer;
-  transition: color .2s, border-color .2s, background .2s;
+  transition: color .18s, border-color .18s, background .18s;
   white-space: nowrap;
   flex-shrink: 0;
 }
-
-.nav-btn:hover {
-  color: var(--kyn-orange);
-  background: var(--kyn-orange-dim);
-}
-
-.nav-btn.active {
-  color: var(--kyn-orange);
-  border-bottom-color: var(--kyn-orange);
-}
+.nav-btn:hover { color: var(--kyn-orange); background: var(--kyn-orange-dim); }
+.nav-btn.active { color: var(--kyn-orange); border-bottom-color: var(--kyn-orange); }
 
 /* ============================================
    MAIN
@@ -276,27 +251,26 @@ body {
   padding: 36px;
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow);
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--border);
   width: 100%;
   box-sizing: border-box;
   animation: fadeIn 0.3s ease-out;
 }
-
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
 .seccion h2 {
-  font-size: 22px;
-  margin-bottom: 28px;
+  font-size: 21px;
+  margin-bottom: 26px;
   color: var(--text-primary);
-  border-bottom: 2px solid var(--kyn-orange);
-  padding-bottom: 14px;
+  border-bottom: 3px solid var(--kyn-orange);
+  padding-bottom: 13px;
   font-weight: 700;
 }
 
 .seccion h3 {
   font-size: 16px;
-  margin-top: 36px;
-  margin-bottom: 18px;
+  margin-top: 34px;
+  margin-bottom: 16px;
   color: var(--text-primary);
   font-weight: 700;
 }
@@ -307,10 +281,10 @@ body {
 
 .formulario-mejorado {
   background: var(--surface-2);
-  padding: 28px;
+  padding: 26px;
   border-radius: var(--radius-lg);
-  border: 1px solid #e5e7eb;
-  margin-bottom: 36px;
+  border: 1px solid var(--border);
+  margin-bottom: 34px;
   display: flex;
   flex-direction: column;
   gap: 20px;
@@ -339,7 +313,7 @@ body {
 .form-group select,
 .form-group textarea {
   padding: 11px 13px;
-  border: 1px solid #d1d5db;
+  border: 1px solid #D1D5DB;
   border-radius: var(--radius);
   font-size: 14px;
   transition: border-color .2s, box-shadow .2s;
@@ -349,7 +323,6 @@ body {
   box-sizing: border-box;
   color: var(--text-primary);
 }
-
 .form-group input:focus,
 .form-group select:focus,
 .form-group textarea:focus {
@@ -357,14 +330,8 @@ body {
   border-color: var(--kyn-orange);
   box-shadow: 0 0 0 3px var(--kyn-orange-dim);
 }
-
 .form-group textarea { resize: vertical; min-height: 80px; }
-
-.input-disabled {
-  background: var(--surface-2);
-  cursor: not-allowed;
-  color: var(--text-muted);
-}
+.input-disabled { background: var(--surface-2); cursor: not-allowed; color: var(--text-muted); }
 
 /* ============================================
    BOTONES
@@ -388,7 +355,7 @@ body {
 
 .btn-cancelar {
   padding: 11px 22px;
-  background: #6b7280;
+  background: #6B7280;
   color: white;
   border: none;
   border-radius: var(--radius);
@@ -399,7 +366,7 @@ body {
   min-width: 150px;
   transition: background .2s;
 }
-.btn-cancelar:hover { background: #4b5563; }
+.btn-cancelar:hover { background: #4B5563; }
 
 .btn-editar {
   padding: 6px 12px;
@@ -444,7 +411,7 @@ body {
   white-space: nowrap;
   transition: background .2s;
 }
-.btn-rechazar:hover { background: #b91c1c; }
+.btn-rechazar:hover { background: #B91C1C; }
 
 .btn-eliminar {
   padding: 6px 12px;
@@ -458,7 +425,7 @@ body {
   white-space: nowrap;
   transition: background .2s;
 }
-.btn-eliminar:hover { background: var(--kyn-ink); }
+.btn-eliminar:hover { background: #1F2937; }
 
 .btn-guardar {
   padding: 11px 22px;
@@ -472,6 +439,8 @@ body {
   transition: background .2s;
 }
 .btn-guardar:hover { background: var(--kyn-orange-dark); }
+
+.card-red { background: linear-gradient(135deg, var(--bad), #991b1b); color: white; }
 
 /* ============================================
    TARJETAS KPI
@@ -494,23 +463,21 @@ body {
 .card:hover { transform: translateY(-3px); box-shadow: 0 20px 40px rgba(0,0,0,.12); }
 
 .card h3 {
-  font-size: 12px;
-  margin-bottom: 14px;
+  font-size: 11px;
+  margin-bottom: 12px;
   margin-top: 0;
   opacity: .88;
   color: inherit;
   text-transform: uppercase;
-  letter-spacing: .5px;
+  letter-spacing: .6px;
   font-weight: 700;
 }
-
 .card .numero { font-size: 32px; font-weight: 800; color: inherit; }
 
-/* Colores de las tarjetas — naranja Kyndryl para Pendientes */
+/* KPI Pendientes = naranja (color de marca, llama atención donde se necesita) */
 .card-blue   { background: linear-gradient(135deg, var(--kyn-orange) 0%, var(--kyn-orange-dark) 100%); }
 .card-green  { background: linear-gradient(135deg, #059669 0%, #047857 100%); }
 .card-yellow { background: linear-gradient(135deg, var(--warn) 0%, #b45309 100%); }
-.card-red    { background: linear-gradient(135deg, var(--bad) 0%, #991b1b 100%); }
 .card-success{ background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%); }
 .card-danger { background: linear-gradient(135deg, var(--bad) 0%, #991b1b 100%); }
 
@@ -525,32 +492,39 @@ body {
   min-width: 600px;
 }
 
-.tabla thead { background: var(--surface-2); border-bottom: 2px solid #e5e7eb; }
+.tabla thead { background: var(--surface-2); border-bottom: 2px solid var(--border); }
 
 .tabla th {
   padding: 12px 14px;
   text-align: left;
   font-weight: 700;
-  color: var(--text-secondary);
-  font-size: 12px;
+  color: var(--kyn-orange);
+  font-size: 11.5px;
   text-transform: uppercase;
-  letter-spacing: .4px;
+  letter-spacing: .5px;
   white-space: nowrap;
 }
 
 .tabla td {
   padding: 13px 14px;
-  border-bottom: 1px solid #f3f4f6;
+  border-bottom: 1px solid #F3F4F6;
   font-size: 13.5px;
   color: var(--text-primary);
+  vertical-align: middle;
 }
-
-.tabla tbody tr:hover { background: #fafafa; }
+.tabla tbody tr:hover { background: #FAFAFA; }
 .tabla .numero { text-align: right; font-weight: 700; }
 
 .tabla-responsive { overflow-x: auto; -webkit-overflow-scrolling: touch; width: 100%; }
+.tabla-acciones { width: 100%; }
 
-.tabla .acciones { display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; }
+.tabla .acciones {
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+  align-items: center;
+  flex-wrap: wrap;
+}
 
 /* ============================================
    BADGES
@@ -564,12 +538,11 @@ body {
   font-weight: 700;
   white-space: nowrap;
 }
-
-.badge-pendiente { background: var(--warn-light); color: #92400e; }
+.badge-pendiente          { background: var(--warn-light);  color: #92400e; }
 .badge-aprobado,
-.badge-exitoso   { background: var(--good-light); color: #065f46; }
+.badge-exitoso            { background: var(--good-light);  color: #065f46; }
 .badge-rechazado,
-.badge-fallido   { background: var(--bad-light); color: #991b1b; }
+.badge-fallido            { background: var(--bad-light);   color: #991b1b; }
 
 /* ============================================
    FILTROS
@@ -583,19 +556,14 @@ body {
   padding: 18px;
   background: var(--surface-2);
   border-radius: var(--radius);
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--border);
 }
 
 /* ============================================
    SIN DATOS
    ============================================ */
 
-.sin-datos {
-  text-align: center;
-  padding: 40px 20px;
-  color: var(--text-muted);
-  font-size: 15px;
-}
+.sin-datos { text-align: center; padding: 40px 20px; color: var(--text-muted); font-size: 15px; }
 
 /* ============================================
    FOOTER
@@ -605,10 +573,10 @@ body {
   background: var(--kyn-ink);
   color: #9aa0ad;
   text-align: center;
-  padding: 18px;
+  padding: 16px;
   font-size: 12px;
   margin-top: auto;
-  border-top: 1px solid var(--kyn-line);
+  border-top: 3px solid var(--kyn-orange);
 }
 
 /* ============================================
@@ -617,11 +585,29 @@ body {
 
 .form-container {
   background: var(--surface-2);
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--border);
   border-radius: var(--radius-lg);
-  padding: 28px;
-  margin-bottom: 28px;
+  padding: 26px;
+  margin-bottom: 26px;
 }
+
+/* ============================================
+   REACT DATEPICKER
+   ============================================ */
+
+.react-datepicker-wrapper,
+.react-datepicker__input-container { width: 100%; }
+.react-datepicker__input-container input {
+  width: 100%; padding: 11px 13px; border: 1px solid #D1D5DB;
+  border-radius: var(--radius); font-size: 14px;
+}
+.react-datepicker__input-container input:focus {
+  outline: none; border-color: var(--kyn-orange);
+  box-shadow: 0 0 0 3px var(--kyn-orange-dim);
+}
+.react-datepicker__header { background: var(--kyn-orange); border: none; }
+.react-datepicker__day--selected { background: var(--kyn-orange); color: white; }
+.react-datepicker__time-list-item--selected { background: var(--kyn-orange); color: white; }
 
 /* ============================================
    RESPONSIVE — TABLET ≤ 768px
@@ -630,19 +616,23 @@ body {
 @media (max-width: 768px) {
   .header { padding: 14px 18px; }
   .header-left h1 { font-size: 15px; }
+  .header-right { width: 100%; justify-content: space-between; }
   .nav { padding: 0 10px; }
+  .nav-btn { padding: 12px 13px; font-size: 12.5px; }
   .main { padding: 16px 12px; }
-  .seccion { padding: 18px 14px; }
-  .seccion h2 { font-size: 18px; margin-bottom: 18px; }
+  .seccion { padding: 18px 14px; border-radius: 10px; }
+  .seccion h2 { font-size: 18px; margin-bottom: 18px; padding-bottom: 10px; }
   .formulario-mejorado { padding: 16px; }
   .form-row { grid-template-columns: 1fr; gap: 14px; }
   .dashboard-grid { grid-template-columns: repeat(2, 1fr); gap: 12px; }
   .card { padding: 18px; }
-  .card h3 { font-size: 11px; }
+  .card h3 { font-size: 10.5px; }
   .card .numero { font-size: 24px; }
   .filtros-dashboard { grid-template-columns: repeat(2, 1fr); gap: 10px; padding: 14px; }
   .tabla th, .tabla td { padding: 10px; font-size: 12px; }
   .btn-primary, .btn-cancelar { width: 100%; margin-right: 0; min-width: 0; }
+  .tabla .acciones { flex-direction: column; }
+  .tabla .acciones button { width: 100%; }
 }
 
 /* ============================================
@@ -652,6 +642,8 @@ body {
 @media (max-width: 480px) {
   .login-box { padding: 30px 20px; }
   .seccion { padding: 14px 10px; }
+  .seccion h2 { font-size: 17px; }
+  .formulario-mejorado { padding: 12px; }
   .dashboard-grid { grid-template-columns: 1fr; }
   .filtros-dashboard { grid-template-columns: 1fr; }
 }
