@@ -185,31 +185,39 @@ const Analytics = ({ registros = [], usuarios = [], token }) => {
 
       const totalH = registrosFiltro.reduce((s, r) => s + (r.horas || 0), 0);
 
-      const prompt = `Eres un analista de operaciones IT. Analiza estas ${registrosFiltro.length} actividades de horas extra (${totalH.toFixed(1)}h en total) del equipo Kyndryl Chile:
+      const prompt = `Eres un analista senior de operaciones IT especializado en servicios gestionados. Analiza estas ${registrosFiltro.length} actividades de horas extra (${totalH.toFixed(1)}h en total) del equipo Kyndryl Chile:
 
 ${descripcionesTexto}
 
-Agrupa las actividades en categorías temáticas (por ejemplo: Parchado/Mantenimiento, Migración/Upgrade, Monitoreo/Alertas, Incidentes de Producción, Soporte a Clientes, etc.). Para CADA grupo devuelve EXACTAMENTE este JSON:
+INSTRUCCIONES CLAVE DE AGRUPACIÓN:
+1. Agrupa por INTENCIÓN y PROPÓSITO REAL, NO por plataforma ni sistema (OCI, Azure, AWS, middleware son plataformas, no categorías).
+2. Consolida: "Parchados BAU", "Preventivo Parchado", "Parchado de Seguridad" y "Mantención/OCI/Parchado" son TODOS la misma categoría → "Parchado BAU / Preventivo".
+3. Si la misma actividad aparece en múltiples plataformas (OCI, Azure, SCL), va al MISMO grupo.
+4. Evita grupos demasiado genéricos como "Otros" o "Misceláneos" — intenta clasificar todo.
+5. Los grupos ideales para operaciones IT son: Parchado BAU / Preventivo, Migración y Upgrade, Monitoreo y Alertas, Incidentes de Producción, Configuración y Despliegue, Soporte a Usuarios/Clientes, Switchover / Continuidad, Instalación de Agentes/Software.
+6. Crea NUEVOS grupos si los datos lo justifican, pero no fragmentes innecesariamente.
+7. Suma correctamente las horas y registros de TODAS las actividades del grupo. El porcentaje es sobre el total de ${totalH.toFixed(1)}h.
+8. Para "tendencia": basate en si hay actividades repetidas semana a semana (creciente), estables, o solo ocurrieron una vez (decreciente).
+
+Devuelve EXACTAMENTE este JSON (sin markdown, sin texto extra):
 
 {
   "grupos": [
     {
-      "nombre": "Nombre del grupo",
-      "descripcion": "Qué tipo de actividades incluye (1 línea)",
+      "nombre": "Nombre corto y descriptivo del grupo",
+      "descripcion": "Qué actividades incluye concretamente (1 línea)",
       "registros": 5,
       "horas": 12.5,
       "porcentaje": 23.5,
       "tendencia": "creciente|estable|decreciente",
-      "actividades_frecuentes": ["actividad 1", "actividad 2", "actividad 3"],
-      "recomendacion": "Una recomendación concreta basada en el patrón (máx 120 caracteres)"
+      "actividades_frecuentes": ["ejemplo actividad 1", "ejemplo actividad 2", "ejemplo actividad 3"],
+      "recomendacion": "Recomendación concreta y accionable basada en el patrón (máx 130 caracteres)"
     }
   ],
-  "resumen_ejecutivo": "2-3 líneas con el hallazgo más importante y qué debería hacer el equipo al respecto.",
+  "resumen_ejecutivo": "2-3 líneas: hallazgo principal, qué categoría consume más recursos y qué debería hacer el equipo.",
   "actividad_mas_costosa": "Nombre del grupo con más horas",
   "actividad_mas_frecuente": "Nombre del grupo con más registros"
-}
-
-IMPORTANTE: Responde SOLO con el JSON. Sin texto previo, sin bloques de código markdown, sin explicaciones.`;
+}`;
 
       const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
         method: 'POST',
@@ -218,10 +226,16 @@ IMPORTANTE: Responde SOLO con el JSON. Sin texto previo, sin bloques de código 
           'Authorization': `Bearer ${process.env.REACT_APP_GROQ_API_KEY}`
         },
         body: JSON.stringify({
-          model: 'llama-3.1-8b-instant',
-          messages: [{ role: 'user', content: prompt }],
-          temperature: 0.3,
-          max_tokens: 2000
+          model: 'llama-3.1-70b-versatile',
+          messages: [
+            {
+              role: 'system',
+              content: 'Eres un analista IT experto en operaciones gestionadas. Tu tarea es agrupar actividades por propósito real, consolidando las que hacen lo mismo aunque estén en distintas plataformas. Responde SOLO con JSON válido, sin texto adicional ni bloques de código.'
+            },
+            { role: 'user', content: prompt }
+          ],
+          temperature: 0.1,
+          max_tokens: 2500
         })
       });
 
