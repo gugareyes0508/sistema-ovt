@@ -1230,7 +1230,8 @@ function App() {
                         </span>
                       </td>
                       <td>{r.genera_ovt === 'si' ? '✓' : '✗'}</td>
-                      <td className="acciones">
+                      <td style={{textAlign: 'center', verticalAlign: 'middle'}}>
+                        <div className="acciones">
                         {r.estado === 'pendiente' ? (
                           <button 
                             className="btn-editar"
@@ -1258,6 +1259,7 @@ function App() {
                             ✏️ Editar
                           </button>
                         )}
+                        </div>
                       </td>
                     </tr>
                   ))}
