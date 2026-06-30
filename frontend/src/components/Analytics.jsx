@@ -162,7 +162,7 @@ const Analytics = ({ registros = [], usuarios = [], token }) => {
 
     try {
       // Seleccionar registros según el rango elegido
-      const ahora = new Date();
+      // período según rango seleccionado
       const registrosFiltro = (registros || []).filter(r => {
         if (r.estado !== 'exitoso') return false;
         const f = toDate(r.fechaInicio);
