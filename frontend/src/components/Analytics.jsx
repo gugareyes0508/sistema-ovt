@@ -179,70 +179,95 @@ const Analytics = ({ registros = [], usuarios = [], token }) => {
       }
 
       // Construir input compacto para la IA: ticket | tipo | horas | descripción
-      const descripcionesTexto = registrosFiltro
-        .map(r => `- [${r.tipo?.toUpperCase() || 'N/A'}] ${(r.horas || 0)}h | ${(r.descripcion || '').substring(0, 150)}`)
+      // Limitar el input para no superar el contexto: máx 80 registros, descripción a 100 chars
+      const registrosTruncados = registrosFiltro.slice(0, 80);
+      const descripcionesTexto = registrosTruncados
+        .map(r => `- [${r.tipo?.toUpperCase() || 'N/A'}] ${(r.horas || 0)}h | ${(r.descripcion || '').substring(0, 100)}`)
         .join('\n');
 
       const totalH = registrosFiltro.reduce((s, r) => s + (r.horas || 0), 0);
 
-      const prompt = `Eres un analista senior de operaciones IT especializado en servicios gestionados. Analiza estas ${registrosFiltro.length} actividades de horas extra (${totalH.toFixed(1)}h en total) del equipo Kyndryl Chile:
+      const systemMsg = 'Eres un analista IT experto en operaciones gestionadas. Agrupa actividades por propósito real, consolidando las que hacen lo mismo aunque estén en distintas plataformas. Responde SOLO con JSON válido y completo, sin texto adicional ni bloques de código.';
+
+      const userMsg = `Analiza estas ${registrosTruncados.length} actividades de horas extra (${totalH.toFixed(1)}h) del equipo Kyndryl Chile:
 
 ${descripcionesTexto}
 
-INSTRUCCIONES CLAVE DE AGRUPACIÓN:
-1. Agrupa por INTENCIÓN y PROPÓSITO REAL, NO por plataforma ni sistema (OCI, Azure, AWS, middleware son plataformas, no categorías).
-2. Consolida: "Parchados BAU", "Preventivo Parchado", "Parchado de Seguridad" y "Mantención/OCI/Parchado" son TODOS la misma categoría → "Parchado BAU / Preventivo".
-3. Si la misma actividad aparece en múltiples plataformas (OCI, Azure, SCL), va al MISMO grupo.
-4. Evita grupos demasiado genéricos como "Otros" o "Misceláneos" — intenta clasificar todo.
-5. Los grupos ideales para operaciones IT son: Parchado BAU / Preventivo, Migración y Upgrade, Monitoreo y Alertas, Incidentes de Producción, Configuración y Despliegue, Soporte a Usuarios/Clientes, Switchover / Continuidad, Instalación de Agentes/Software.
-6. Crea NUEVOS grupos si los datos lo justifican, pero no fragmentes innecesariamente.
-7. Suma correctamente las horas y registros de TODAS las actividades del grupo. El porcentaje es sobre el total de ${totalH.toFixed(1)}h.
-8. Para "tendencia": basate en si hay actividades repetidas semana a semana (creciente), estables, o solo ocurrieron una vez (decreciente).
+REGLAS DE AGRUPACIÓN:
+1. Agrupa por PROPÓSITO REAL, no por plataforma (OCI, Azure, SCL son plataformas, no categorías).
+2. "Parchados BAU", "Parchado Preventivo", "Parchado de Seguridad" → mismo grupo "Parchado BAU/Preventivo".
+3. Misma actividad en múltiples plataformas → UN solo grupo.
+4. Categorías sugeridas: Parchado BAU/Preventivo, Migración/Upgrade, Monitoreo/Alertas, Incidentes, Configuración/Despliegue, Soporte, Switchover/Continuidad, Instalación Software.
+5. El porcentaje de cada grupo es sobre ${totalH.toFixed(1)}h total.
 
-Devuelve EXACTAMENTE este JSON (sin markdown, sin texto extra):
+Responde SOLO con este JSON sin markdown:
+{"grupos":[{"nombre":"string","descripcion":"string","registros":0,"horas":0.0,"porcentaje":0.0,"tendencia":"creciente|estable|decreciente","actividades_frecuentes":["a1","a2","a3"],"recomendacion":"string max 120 chars"}],"resumen_ejecutivo":"string","actividad_mas_costosa":"string","actividad_mas_frecuente":"string"}`;
 
-{
-  "grupos": [
-    {
-      "nombre": "Nombre corto y descriptivo del grupo",
-      "descripcion": "Qué actividades incluye concretamente (1 línea)",
-      "registros": 5,
-      "horas": 12.5,
-      "porcentaje": 23.5,
-      "tendencia": "creciente|estable|decreciente",
-      "actividades_frecuentes": ["ejemplo actividad 1", "ejemplo actividad 2", "ejemplo actividad 3"],
-      "recomendacion": "Recomendación concreta y accionable basada en el patrón (máx 130 caracteres)"
-    }
-  ],
-  "resumen_ejecutivo": "2-3 líneas: hallazgo principal, qué categoría consume más recursos y qué debería hacer el equipo.",
-  "actividad_mas_costosa": "Nombre del grupo con más horas",
-  "actividad_mas_frecuente": "Nombre del grupo con más registros"
-}`;
+      // Intentar con llama-3.3-70b, si falla caer a llama-3.1-8b-instant
+      const modelos = ['llama-3.3-70b-versatile', 'llama-3.1-8b-instant'];
+      let respuestaTexto = '';
 
-      const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${process.env.REACT_APP_GROQ_API_KEY}`
-        },
-        body: JSON.stringify({
-          model: 'llama-3.1-70b-versatile',
-          messages: [
-            {
-              role: 'system',
-              content: 'Eres un analista IT experto en operaciones gestionadas. Tu tarea es agrupar actividades por propósito real, consolidando las que hacen lo mismo aunque estén en distintas plataformas. Responde SOLO con JSON válido, sin texto adicional ni bloques de código.'
+      for (const modelo of modelos) {
+        try {
+          const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${process.env.REACT_APP_GROQ_API_KEY}`
             },
-            { role: 'user', content: prompt }
-          ],
-          temperature: 0.1,
-          max_tokens: 2500
-        })
-      });
+            body: JSON.stringify({
+              model: modelo,
+              messages: [
+                { role: 'system', content: systemMsg },
+                { role: 'user', content: userMsg }
+              ],
+              temperature: 0.1,
+              max_tokens: 3000
+            })
+          });
 
-      const data = await response.json();
-      const texto = data.choices?.[0]?.message?.content || '';
-      const limpio = texto.replace(/```json|```/g, '').trim();
+          if (!response.ok) {
+            const errData = await response.json().catch(() => ({}));
+            console.warn(`Modelo ${modelo} falló:`, errData?.error?.message);
+            continue; // probar siguiente modelo
+          }
+
+          const data = await response.json();
+          respuestaTexto = data.choices?.[0]?.message?.content || '';
+          console.log(`✅ Agrupación IA con modelo: ${modelo}`);
+          break;
+        } catch (fetchErr) {
+          console.warn(`Error con modelo ${modelo}:`, fetchErr.message);
+        }
+      }
+
+      if (!respuestaTexto) {
+        throw new Error('No se pudo obtener respuesta de ningún modelo GROQ disponible.');
+      }
+
+      // Limpiar y parsear JSON de forma robusta
+      let limpio = respuestaTexto
+        .replace(/```json/gi, '')
+        .replace(/```/g, '')
+        .trim();
+
+      // Si el JSON está truncado, intentar repararlo buscando el último objeto completo
+      if (!limpio.endsWith('}')) {
+        const lastBrace = limpio.lastIndexOf('}');
+        if (lastBrace !== -1) {
+          limpio = limpio.substring(0, lastBrace + 1);
+          // Asegurarse de que el JSON de nivel raíz esté cerrado
+          const openBraces = (limpio.match(/{/g) || []).length;
+          const closeBraces = (limpio.match(/}/g) || []).length;
+          for (let i = 0; i < openBraces - closeBraces; i++) limpio += '}';
+        }
+      }
+
       const parsed = JSON.parse(limpio);
+      if (!parsed.grupos || !Array.isArray(parsed.grupos)) {
+        throw new Error('La IA no devolvió el formato esperado. Intenta de nuevo.');
+      }
+
       setAgrupacion({ ...parsed, totalRegistros: registrosFiltro.length, totalHoras: totalH, rango: rangoAgrupacion });
     } catch (err) {
       console.error('Error Agrupación IA:', err);
