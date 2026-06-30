@@ -39,6 +39,12 @@ const Analytics = ({ registros = [], usuarios = [], token }) => {
   const [insightId, setInsightId] = useState(null);
   const [generationCount, setGenerationCount] = useState(0);
 
+  // Estados para Agrupación IA
+  const [agrupacion, setAgrupacion] = useState(null);
+  const [loadingAgrupacion, setLoadingAgrupacion] = useState(false);
+  const [errorAgrupacion, setErrorAgrupacion] = useState(null);
+  const [rangoAgrupacion, setRangoAgrupacion] = useState('mes'); // 'mes' | 'anio' | 'todo'
+
   const ahoraInicial = new Date();
   const [filtroMes, setFiltroMes] = useState(ahoraInicial.getMonth() + 1);
   const [filtroAnio, setFiltroAnio] = useState(ahoraInicial.getFullYear());
@@ -144,6 +150,92 @@ const Analytics = ({ registros = [], usuarios = [], token }) => {
     d.setUTCDate(d.getUTCDate() + 4 - dayNum);
     const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
     return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+  };
+
+  // ============================================
+  // Agrupación IA: lee todas las descripciones y agrupa por tipo de actividad
+  // ============================================
+  const generarAgrupacionIA = async () => {
+    setLoadingAgrupacion(true);
+    setErrorAgrupacion(null);
+    setAgrupacion(null);
+
+    try {
+      // Seleccionar registros según el rango elegido
+      const ahora = new Date();
+      const registrosFiltro = (registros || []).filter(r => {
+        if (r.estado !== 'exitoso') return false;
+        const f = toDate(r.fechaInicio);
+        if (rangoAgrupacion === 'mes') {
+          return f.getMonth() === filtroMes - 1 && f.getFullYear() === filtroAnio;
+        }
+        if (rangoAgrupacion === 'anio') return f.getFullYear() === filtroAnio;
+        return true; // 'todo'
+      });
+
+      if (registrosFiltro.length === 0) {
+        setErrorAgrupacion('No hay registros aprobados para el período seleccionado.');
+        return;
+      }
+
+      // Construir input compacto para la IA: ticket | tipo | horas | descripción
+      const descripcionesTexto = registrosFiltro
+        .map(r => `- [${r.tipo?.toUpperCase() || 'N/A'}] ${(r.horas || 0)}h | ${(r.descripcion || '').substring(0, 150)}`)
+        .join('\n');
+
+      const totalH = registrosFiltro.reduce((s, r) => s + (r.horas || 0), 0);
+
+      const prompt = `Eres un analista de operaciones IT. Analiza estas ${registrosFiltro.length} actividades de horas extra (${totalH.toFixed(1)}h en total) del equipo Kyndryl Chile:
+
+${descripcionesTexto}
+
+Agrupa las actividades en categorías temáticas (por ejemplo: Parchado/Mantenimiento, Migración/Upgrade, Monitoreo/Alertas, Incidentes de Producción, Soporte a Clientes, etc.). Para CADA grupo devuelve EXACTAMENTE este JSON:
+
+{
+  "grupos": [
+    {
+      "nombre": "Nombre del grupo",
+      "descripcion": "Qué tipo de actividades incluye (1 línea)",
+      "registros": 5,
+      "horas": 12.5,
+      "porcentaje": 23.5,
+      "tendencia": "creciente|estable|decreciente",
+      "actividades_frecuentes": ["actividad 1", "actividad 2", "actividad 3"],
+      "recomendacion": "Una recomendación concreta basada en el patrón (máx 120 caracteres)"
+    }
+  ],
+  "resumen_ejecutivo": "2-3 líneas con el hallazgo más importante y qué debería hacer el equipo al respecto.",
+  "actividad_mas_costosa": "Nombre del grupo con más horas",
+  "actividad_mas_frecuente": "Nombre del grupo con más registros"
+}
+
+IMPORTANTE: Responde SOLO con el JSON. Sin texto previo, sin bloques de código markdown, sin explicaciones.`;
+
+      const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${process.env.REACT_APP_GROQ_API_KEY}`
+        },
+        body: JSON.stringify({
+          model: 'llama-3.1-8b-instant',
+          messages: [{ role: 'user', content: prompt }],
+          temperature: 0.3,
+          max_tokens: 2000
+        })
+      });
+
+      const data = await response.json();
+      const texto = data.choices?.[0]?.message?.content || '';
+      const limpio = texto.replace(/```json|```/g, '').trim();
+      const parsed = JSON.parse(limpio);
+      setAgrupacion({ ...parsed, totalRegistros: registrosFiltro.length, totalHoras: totalH, rango: rangoAgrupacion });
+    } catch (err) {
+      console.error('Error Agrupación IA:', err);
+      setErrorAgrupacion('Error generando agrupación: ' + err.message + '. Verifica que REACT_APP_GROQ_API_KEY esté configurado.');
+    } finally {
+      setLoadingAgrupacion(false);
+    }
   };
 
   // Generar Insights con IA (GROQ) - con descartar
@@ -523,7 +615,8 @@ Sé conciso, específico y ORIGINAL.`;
           { id: 'tendencias', label: '📈 Tendencias' },
           { id: 'persona', label: '👥 Por Persona' },
           { id: 'area', label: '🏢 Por Área' },
-          { id: 'ia-insights', label: '🤖 IA Insights' }
+          { id: 'ia-insights', label: '🤖 IA Insights' },
+          { id: 'ia-agrupacion', label: '🔍 Agrupación IA' }
         ].map(tab => (
           <button
             key={tab.id}
@@ -751,6 +844,134 @@ Sé conciso, específico y ORIGINAL.`;
             >
               🚀 Generar Análisis IA
             </button>
+          )}
+        </div>
+      )}
+
+      {/* Tab: Agrupación IA */}
+      {activeTab === 'ia-agrupacion' && (
+        <div style={{ background: 'white', padding: '20px', borderRadius: '8px', border: '1px solid #eee' }}>
+          <h3 style={{ marginTop: 0, color: '#1f2937' }}>🔍 Agrupación por Tipo de Actividad (IA)</h3>
+          <p style={{ fontSize: '13px', color: '#6b7280', marginBottom: '20px' }}>
+            La IA lee todas las descripciones de los registros aprobados, las agrupa por categorías de actividad, detecta cuáles se repiten más y cuáles generan más tiempo.
+          </p>
+
+          {/* Controles */}
+          <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-end', flexWrap: 'wrap', background: '#f9fafb', padding: '14px', borderRadius: '8px', marginBottom: '20px' }}>
+            <div className="form-group" style={{ minWidth: '170px' }}>
+              <label style={{ fontSize: '12px', fontWeight: '600', color: '#555', display: 'block', marginBottom: '5px' }}>Período a analizar</label>
+              <select value={rangoAgrupacion} onChange={(e) => { setRangoAgrupacion(e.target.value); setAgrupacion(null); }}>
+                <option value="mes">Mes actual ({new Date(2024, filtroMes - 1).toLocaleString('es-CL', { month: 'long' })} {filtroAnio})</option>
+                <option value="anio">Año completo ({filtroAnio})</option>
+                <option value="todo">Todos los registros</option>
+              </select>
+            </div>
+            <button
+              onClick={generarAgrupacionIA}
+              disabled={loadingAgrupacion}
+              style={{
+                padding: '10px 20px', background: loadingAgrupacion ? '#9ca3af' : '#1f2937',
+                color: 'white', border: 'none', borderRadius: '8px',
+                cursor: loadingAgrupacion ? 'not-allowed' : 'pointer',
+                fontWeight: '700', fontSize: '13px'
+              }}
+            >
+              {loadingAgrupacion ? '⏳ Analizando...' : '🔍 Analizar Descripciones'}
+            </button>
+            {agrupacion && (
+              <button
+                onClick={() => setAgrupacion(null)}
+                style={{ padding: '10px 14px', background: '#f3f4f6', color: '#374151', border: '1px solid #d1d5db', borderRadius: '8px', cursor: 'pointer', fontSize: '13px' }}
+              >
+                🔄 Nueva Consulta
+              </button>
+            )}
+          </div>
+
+          {errorAgrupacion && (
+            <div style={{ background: '#fee2e2', border: '1px solid #fca5a5', borderRadius: '8px', padding: '14px', color: '#991b1b', fontSize: '13px', marginBottom: '16px' }}>
+              ❌ {errorAgrupacion}
+            </div>
+          )}
+
+          {loadingAgrupacion && (
+            <div style={{ textAlign: 'center', padding: '40px', color: '#6b7280' }}>
+              <div style={{ fontSize: '32px', marginBottom: '12px' }}>🤖</div>
+              <p style={{ fontWeight: '600' }}>La IA está leyendo y agrupando las descripciones...</p>
+              <p style={{ fontSize: '12px' }}>Esto puede tomar unos segundos según la cantidad de registros.</p>
+            </div>
+          )}
+
+          {agrupacion && (
+            <>
+              {/* Resumen ejecutivo */}
+              <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '10px', padding: '18px', marginBottom: '24px' }}>
+                <div style={{ fontWeight: '700', color: '#1e40af', marginBottom: '8px' }}>📋 Resumen Ejecutivo</div>
+                <p style={{ margin: 0, fontSize: '13.5px', color: '#1e3a8a', lineHeight: '1.6' }}>{agrupacion.resumen_ejecutivo}</p>
+                <div style={{ display: 'flex', gap: '20px', marginTop: '14px', fontSize: '12px', flexWrap: 'wrap' }}>
+                  <span>🏋️ <strong>Mayor carga:</strong> {agrupacion.actividad_mas_costosa}</span>
+                  <span>🔁 <strong>Más frecuente:</strong> {agrupacion.actividad_mas_frecuente}</span>
+                  <span>📊 <strong>Total analizado:</strong> {agrupacion.totalRegistros} registros · {agrupacion.totalHoras?.toFixed(1)}h</span>
+                </div>
+              </div>
+
+              {/* Cards por grupo */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '16px' }}>
+                {(agrupacion.grupos || []).sort((a, b) => b.horas - a.horas).map((grupo, idx) => {
+                  const colores = ['#2563eb', '#059669', '#d97706', '#dc2626', '#7c3aed', '#0891b2', '#be185d'];
+                  const color = colores[idx % colores.length];
+                  const tendenciaIcon = grupo.tendencia === 'creciente' ? '📈' : grupo.tendencia === 'decreciente' ? '📉' : '➡️';
+                  return (
+                    <div key={idx} style={{ background: 'white', border: `2px solid ${color}20`, borderRadius: '10px', overflow: 'hidden' }}>
+                      <div style={{ background: color, padding: '14px 16px', color: 'white' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <strong style={{ fontSize: '14px' }}>{grupo.nombre}</strong>
+                          <span style={{ fontSize: '11px', opacity: 0.9 }}>{tendenciaIcon} {grupo.tendencia}</span>
+                        </div>
+                        <div style={{ fontSize: '11.5px', opacity: 0.85, marginTop: '4px' }}>{grupo.descripcion}</div>
+                      </div>
+                      <div style={{ padding: '14px 16px' }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px', marginBottom: '12px', textAlign: 'center' }}>
+                          <div style={{ background: `${color}10`, borderRadius: '6px', padding: '8px' }}>
+                            <div style={{ fontSize: '18px', fontWeight: '800', color }}>{grupo.horas?.toFixed(1)}h</div>
+                            <div style={{ fontSize: '10px', color: '#6b7280' }}>Horas</div>
+                          </div>
+                          <div style={{ background: `${color}10`, borderRadius: '6px', padding: '8px' }}>
+                            <div style={{ fontSize: '18px', fontWeight: '800', color }}>{grupo.registros}</div>
+                            <div style={{ fontSize: '10px', color: '#6b7280' }}>Registros</div>
+                          </div>
+                          <div style={{ background: `${color}10`, borderRadius: '6px', padding: '8px' }}>
+                            <div style={{ fontSize: '18px', fontWeight: '800', color }}>{grupo.porcentaje?.toFixed(1)}%</div>
+                            <div style={{ fontSize: '10px', color: '#6b7280' }}>Del total</div>
+                          </div>
+                        </div>
+                        {grupo.actividades_frecuentes?.length > 0 && (
+                          <div style={{ marginBottom: '10px' }}>
+                            <div style={{ fontSize: '11px', fontWeight: '700', color: '#374151', marginBottom: '5px' }}>Actividades más frecuentes:</div>
+                            {grupo.actividades_frecuentes.map((act, i) => (
+                              <div key={i} style={{ fontSize: '11.5px', color: '#6b7280', padding: '2px 0' }}>· {act}</div>
+                            ))}
+                          </div>
+                        )}
+                        {grupo.recomendacion && (
+                          <div style={{ background: '#f9fafb', borderLeft: `3px solid ${color}`, padding: '8px 10px', borderRadius: '0 6px 6px 0', fontSize: '11.5px', color: '#374151' }}>
+                            💡 {grupo.recomendacion}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </>
+          )}
+
+          {!agrupacion && !loadingAgrupacion && !errorAgrupacion && (
+            <div style={{ textAlign: 'center', padding: '50px', color: '#9ca3af' }}>
+              <div style={{ fontSize: '48px', marginBottom: '14px' }}>🔍</div>
+              <p style={{ fontSize: '14px', fontWeight: '600' }}>Selecciona el período y haz clic en "Analizar Descripciones"</p>
+              <p style={{ fontSize: '12px' }}>La IA agrupará automáticamente tus actividades en categorías y te dirá cuáles consumen más tiempo y se repiten más.</p>
+            </div>
           )}
         </div>
       )}
