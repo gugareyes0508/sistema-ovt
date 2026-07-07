@@ -4,6 +4,7 @@ import TestGroq from './TestGroq';
 import NuevaProyeccionITSM from './components/NuevaProyeccionITSM';
 import MisProyeccionesITSM from './components/MisProyeccionesITSM';
 import ExcelUploadITSM from './components/ExcelUploadITSM';
+import ClaimDashboard from './components/ClaimDashboard';
 import OvtProyectado from './components/OvtProyectado';
 import ExcelUpload from './components/ExcelUpload';
 import Analytics from './components/Analytics';
@@ -748,6 +749,12 @@ function App() {
               onClick={() => setVista('ovt-proyectado')}
             >
               📅 OVT Proyectado
+            </button>
+            <button 
+              className={vista === 'claim' ? 'nav-btn active' : 'nav-btn'} 
+              onClick={() => setVista('claim')}
+            >
+              🕐 Control de Labor
             </button>
             <button 
               className={vista === 'usuarios' ? 'nav-btn active' : 'nav-btn'} 
@@ -2217,6 +2224,11 @@ function App() {
         {/* OVT Proyectado (Admin) */}
         {vista === 'ovt-proyectado' && usuario.rol === 'admin' && (
           <OvtProyectado token={token} apiUrl={API_URL} />
+        )}
+
+        {/* Control de Labor (Claim) */}
+        {vista === 'claim' && usuario.rol === 'admin' && (
+          <ClaimDashboard />
         )}
       </main>
 
