@@ -2228,7 +2228,7 @@ function App() {
 
         {/* Control de Labor (Claim) */}
         {vista === 'claim' && usuario.rol === 'admin' && (
-          <ClaimDashboard />
+          <ClaimDashboard token={token} apiUrl={API_URL} />
         )}
       </main>
 
