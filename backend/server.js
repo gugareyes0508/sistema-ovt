@@ -968,6 +968,86 @@ app.use((err, req, res, next) => {
 });
 
 // ============================================
+// CLAIMS — Control de Labor
+// Colección Firestore: claims_semanas
+// Cada documento = una semana procesada del Export.xlsx
+// ============================================
+
+// GET /api/claims → listar todas las semanas cargadas
+app.get('/api/claims', verificarToken, async (req, res) => {
+  try {
+    if (req.usuario.rol !== 'admin') return res.status(403).json({ error: 'Solo admin' });
+    const snap = await db.collection('claims_semanas').orderBy('fecha', 'asc').get();
+    const semanas = [];
+    snap.forEach(doc => semanas.push({ id: doc.id, ...doc.data() }));
+    res.json(semanas);
+  } catch (err) {
+    console.error('Error GET /api/claims:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/claims/upload → recibe array de semanas procesadas, guarda solo las nuevas
+app.post('/api/claims/upload', verificarToken, async (req, res) => {
+  try {
+    if (req.usuario.rol !== 'admin') return res.status(403).json({ error: 'Solo admin' });
+    const { semanas } = req.body;
+    if (!Array.isArray(semanas) || semanas.length === 0) {
+      return res.status(400).json({ error: 'No se recibieron semanas' });
+    }
+
+    // Verificar cuáles fechas ya existen
+    const existSnap = await db.collection('claims_semanas').get();
+    const existentes = new Set();
+    existSnap.forEach(doc => existentes.add(doc.data().fecha));
+
+    const nuevas = semanas.filter(s => !existentes.has(s.fecha));
+    if (nuevas.length === 0) {
+      return res.json({ message: 'Todas las semanas ya estaban cargadas', nuevas: 0, total: semanas.length });
+    }
+
+    const batch = db.batch();
+    nuevas.forEach(sem => {
+      const ref = db.collection('claims_semanas').doc(sem.fecha);
+      batch.set(ref, {
+        ...sem,
+        creadoPor: req.usuario.nombre,
+        creadoEn: new Date()
+      });
+    });
+    await batch.commit();
+
+    await db.collection('auditoria').add({
+      accion: 'CLAIMS_UPLOAD',
+      usuarioNombre: req.usuario.nombre,
+      semanasNuevas: nuevas.length,
+      semanasTotales: semanas.length,
+      timestamp: new Date()
+    });
+
+    res.json({ message: 'Carga exitosa', nuevas: nuevas.length, total: semanas.length });
+  } catch (err) {
+    console.error('Error POST /api/claims/upload:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// DELETE /api/claims → limpiar TODAS las semanas (solo admin)
+app.delete('/api/claims', verificarToken, async (req, res) => {
+  try {
+    if (req.usuario.rol !== 'admin') return res.status(403).json({ error: 'Solo admin' });
+    const snap = await db.collection('claims_semanas').get();
+    const batch = db.batch();
+    snap.forEach(doc => batch.delete(doc.ref));
+    await batch.commit();
+    res.json({ message: `${snap.size} semanas eliminadas` });
+  } catch (err) {
+    console.error('Error DELETE /api/claims:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ============================================
 // START SERVER
 // ============================================
 
