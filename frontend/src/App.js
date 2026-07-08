@@ -872,6 +872,7 @@ function App() {
             {puedeVer('mantenedor') && <button className={vista === 'mantenedor' ? 'nav-btn active' : 'nav-btn'} onClick={() => setVista('mantenedor')}>⚙️ Mantenedor</button>}
             {puedeVer('auditoria') && <button className={vista === 'auditoria' ? 'nav-btn active' : 'nav-btn'} onClick={() => setVista('auditoria')}>🔍 Auditoría</button>}
             <button className={vista === 'permisos-roles' ? 'nav-btn active' : 'nav-btn'} onClick={() => setVista('permisos-roles')}>🔐 Permisos</button>
+            <button className={vista === 'test-groq' ? 'nav-btn active' : 'nav-btn'} onClick={() => setVista('test-groq')}>🧪 Test GROQ</button>
           </>
         )}
       </nav>
