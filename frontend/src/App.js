@@ -267,11 +267,14 @@ function App() {
         contrasena
       });
 
+      // Limpiar clienteActivo anterior para que cada login arranque limpio
+      localStorage.removeItem('clienteActivo');
       localStorage.setItem('token', response.data.token);
       localStorage.setItem('usuario', JSON.stringify(response.data.usuario));
       localStorage.setItem('lastActivity', Date.now().toString());
       setToken(response.data.token);
       setUsuario(response.data.usuario);
+      setClienteActivo('');
       setVista('registros');
     } catch (err) {
       alert('Credenciales incorrectas');
