@@ -1192,6 +1192,60 @@ app.patch('/api/grupos-servicio/:id', verificarToken, async (req, res) => {
 });
 
 // ============================================
+// PERMISOS POR ROL — configuración de vistas
+// Colección: permisos_roles (doc único: 'config')
+// ============================================
+
+const PERMISOS_DEFAULT = {
+  admin:        { dashboard:true, analytics:true, 'ovt-proyectado':true, claim:true, usuarios:true, mantenedor:true, auditoria:true, registros:false, resumen:false, 'carga-excel':false, 'proyeccion-nueva':false, 'proyeccion-mis':false, 'permisos-roles':true },
+  dpe:          { dashboard:true, analytics:true, 'ovt-proyectado':true, claim:true, usuarios:true, mantenedor:false, auditoria:false, registros:false, resumen:false, 'carga-excel':false, 'proyeccion-nueva':false, 'proyeccion-mis':false, 'permisos-roles':false },
+  especialista: { dashboard:false, analytics:false, 'ovt-proyectado':false, claim:false, usuarios:false, mantenedor:false, auditoria:false, registros:true, resumen:true, 'carga-excel':true, 'proyeccion-nueva':false, 'proyeccion-mis':false, 'permisos-roles':false },
+  itsm:         { dashboard:false, analytics:false, 'ovt-proyectado':false, claim:false, usuarios:false, mantenedor:false, auditoria:false, registros:false, resumen:false, 'carga-excel':false, 'proyeccion-nueva':true, 'proyeccion-mis':true, 'permisos-roles':false },
+};
+
+// GET /api/permisos-roles — cualquier usuario autenticado puede leer
+app.get('/api/permisos-roles', verificarToken, async (req, res) => {
+  try {
+    const doc = await db.collection('permisos_roles').doc('config').get();
+    if (!doc.exists) {
+      // Sembrar defaults si no existen
+      await db.collection('permisos_roles').doc('config').set(PERMISOS_DEFAULT);
+      return res.json(PERMISOS_DEFAULT);
+    }
+    res.json(doc.data());
+  } catch (err) {
+    console.error('Error GET /api/permisos-roles:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/permisos-roles — solo admin puede guardar
+app.post('/api/permisos-roles', verificarToken, async (req, res) => {
+  try {
+    if (req.usuario.rol !== 'admin') return res.status(403).json({ error: 'Solo admin puede modificar permisos' });
+    const permisos = req.body;
+    if (!permisos || typeof permisos !== 'object') return res.status(400).json({ error: 'Payload inválido' });
+
+    // Forzar que admin siempre tenga todo true
+    Object.keys(permisos.admin || {}).forEach(k => { permisos.admin[k] = true; });
+
+    await db.collection('permisos_roles').doc('config').set(permisos);
+
+    await db.collection('auditoria').add({
+      accion: 'EDITAR_PERMISOS_ROLES',
+      usuarioAdminNombre: req.usuario.nombre,
+      timestamp: new Date(),
+      detalles: 'Configuración de permisos actualizada'
+    });
+
+    res.json({ success: true, message: 'Permisos actualizados correctamente' });
+  } catch (err) {
+    console.error('Error POST /api/permisos-roles:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ============================================
 // START SERVER
 // ============================================
 
