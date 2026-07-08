@@ -766,8 +766,6 @@ function App() {
   // ============================================
   // VISTA: APLICACIÓN PRINCIPAL
   // ============================================
-  const esDpeMultiCliente = usuario?.rol === 'dpe' && (usuario?.clientesIds||[]).length > 1;
-
   // Helper: ¿puede este usuario ver esta vista?
   // Admin siempre puede. Para el resto usa permisos de Firestore si están cargados.
   const puedeVer = (vista) => {
