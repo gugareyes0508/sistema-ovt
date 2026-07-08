@@ -8,6 +8,7 @@ import ClaimDashboard from './components/ClaimDashboard';
 import OvtProyectado from './components/OvtProyectado';
 import ExcelUpload from './components/ExcelUpload';
 import Analytics from './components/Analytics';
+import GestionUsuarios from './components/GestionUsuarios';
 import './App.css';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
@@ -68,6 +69,9 @@ const toTimeString = (fecha) => {
 function App() {
   const [token, setToken] = useState(localStorage.getItem('token'));
   const [usuario, setUsuario] = useState(JSON.parse(localStorage.getItem('usuario') || '{}'));
+  const [clienteActivo, setClienteActivo] = useState(localStorage.getItem('clienteActivo') || '');
+  const [seleccionandoCliente, setSeleccionandoCliente] = useState(false);
+  const [clientesInfo, setClientesInfo] = useState([]);
   const [registros, setRegistros] = useState([]);
   const [vista, setVista] = useState('registros');
 
@@ -77,8 +81,32 @@ function App() {
       setVista('dashboard');
     } else if (usuario?.rol === 'itsm') {
       setVista('proyeccion-mis');
+    } else if (usuario?.rol === 'dpe') {
+      setVista('claim');
     }
   }, [usuario?.rol]);
+
+  // Cargar info de clientes para DPE
+  useEffect(() => {
+    if (!token || (usuario?.rol !== 'dpe' && usuario?.rol !== 'admin')) return;
+    axios.get(`${API_URL}/api/clientes`, { headers: { Authorization: `Bearer ${token}` } })
+      .then(res => {
+        setClientesInfo(res.data || []);
+        // Si DPE tiene múltiples clientes y no hay clienteActivo, mostrar selector
+        if (usuario?.rol === 'dpe') {
+          const ids = usuario?.clientesIds || [];
+          if (!clienteActivo && ids.length > 0) {
+            if (ids.length === 1) {
+              setClienteActivo(ids[0]);
+              localStorage.setItem('clienteActivo', ids[0]);
+            } else {
+              setSeleccionandoCliente(true);
+            }
+          }
+        }
+      })
+      .catch(() => {});
+  }, [token, usuario?.rol]);
   const [auditoria, setAuditoria] = useState([]);
   const [editandoId, setEditandoId] = useState(null);
   const [usuarioList, setUsuarioList] = useState([]);
@@ -230,8 +258,11 @@ function App() {
     localStorage.removeItem('token');
     localStorage.removeItem('usuario');
     localStorage.removeItem('lastActivity');
+    localStorage.removeItem('clienteActivo');
     setToken(null);
     setUsuario({});
+    setClienteActivo('');
+    setSeleccionandoCliente(false);
   }, []);
 
   // ============================================
@@ -663,9 +694,56 @@ function App() {
     );
   }
 
+  // SELECTOR DE CLIENTE para DPE con múltiples clientes
+  if (seleccionandoCliente && usuario?.rol === 'dpe') {
+    const clientesDpe = clientesInfo.filter(c => (usuario.clientesIds||[]).includes(c.id));
+    return (
+      <div className="container-login">
+        <div className="login-box" style={{ maxWidth:'480px' }}>
+          <h1>👋 Hola, {usuario.nombre.split(' ')[0]}</h1>
+          <h2>Elige el cliente con el que quieres trabajar</h2>
+          <div style={{ display:'flex', flexDirection:'column', gap:'10px', margin:'10px 0 20px' }}>
+            {clientesDpe.map(c => (
+              <button key={c.id} type="button"
+                onClick={() => {
+                  setClienteActivo(c.id);
+                  localStorage.setItem('clienteActivo', c.id);
+                  setSeleccionandoCliente(false);
+                  setVista('claim');
+                }}
+                style={{ padding:'16px 20px', background:'#fff', border:'2px solid #e5e7eb', borderRadius:'10px',
+                  cursor:'pointer', textAlign:'left', fontSize:'14px', fontWeight:'600', color:'#111827',
+                  display:'flex', alignItems:'center', gap:'12px', transition:'border-color .2s' }}
+                onMouseOver={e => e.currentTarget.style.borderColor='#FF462D'}
+                onMouseOut={e => e.currentTarget.style.borderColor='#e5e7eb'}
+              >
+                <span style={{ width:'36px', height:'36px', borderRadius:'8px', background:'#FF462D', color:'#fff',
+                  display:'flex', alignItems:'center', justifyContent:'center', fontWeight:'800', fontSize:'14px', flexShrink:0 }}>
+                  {c.nombre.substring(0,2).toUpperCase()}
+                </span>
+                <div>
+                  <div>{c.nombre}</div>
+                  <div style={{ fontSize:'12px', color:'#9ca3af', fontWeight:'400', marginTop:'2px' }}>#{c.id}</div>
+                </div>
+                <span style={{ marginLeft:'auto', fontSize:'20px' }}>→</span>
+              </button>
+            ))}
+          </div>
+          <button onClick={manejarLogout}
+            style={{ background:'none', border:'none', color:'#9ca3af', fontSize:'13px', cursor:'pointer', textDecoration:'underline' }}>
+            Cerrar sesión
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   // ============================================
   // VISTA: APLICACIÓN PRINCIPAL
   // ============================================
+  const nombreClienteActivo = clientesInfo.find(c => c.id === clienteActivo)?.nombre || clienteActivo;
+  const esDpeMultiCliente = usuario?.rol === 'dpe' && (usuario?.clientesIds||[]).length > 1;
+
   return (
     <div className="app">
       {/* HEADER */}
@@ -674,6 +752,26 @@ function App() {
           <h1>🕐 Sistema OVT v2</h1>
         </div>
         <div className="header-right">
+          {/* Selector rápido de cliente para DPE multi-cliente */}
+          {esDpeMultiCliente && clienteActivo && (
+            <div style={{ position:'relative' }}>
+              <select
+                value={clienteActivo}
+                onChange={e => {
+                  setClienteActivo(e.target.value);
+                  localStorage.setItem('clienteActivo', e.target.value);
+                }}
+                style={{ padding:'6px 28px 6px 10px', borderRadius:'8px', border:'1.5px solid rgba(255,255,255,0.35)',
+                  background:'rgba(255,255,255,0.15)', color:'#fff', fontSize:'13px', fontWeight:'600', cursor:'pointer',
+                  appearance:'none', WebkitAppearance:'none' }}
+              >
+                {clientesInfo.filter(c=>(usuario.clientesIds||[]).includes(c.id)).map(c=>(
+                  <option key={c.id} value={c.id} style={{ background:'#111', color:'#fff' }}>{c.nombre}</option>
+                ))}
+              </select>
+              <span style={{ position:'absolute', right:'8px', top:'50%', transform:'translateY(-50%)', color:'rgba(255,255,255,0.7)', pointerEvents:'none', fontSize:'12px' }}>▾</span>
+            </div>
+          )}
           <span className="user-badge">
             {usuario.nombre} <br />
             <small>({usuario.rol})</small>
@@ -726,6 +824,23 @@ function App() {
               onClick={() => setVista('proyeccion-excel')}
             >
               📥 Cargar Excel
+            </button>
+          </>
+        )}
+
+        {usuario.rol === 'dpe' && (
+          <>
+            <button 
+              className={vista === 'claim' ? 'nav-btn active' : 'nav-btn'} 
+              onClick={() => setVista('claim')}
+            >
+              🕐 Control de Labor
+            </button>
+            <button 
+              className={vista === 'usuarios' ? 'nav-btn active' : 'nav-btn'} 
+              onClick={() => setVista('usuarios')}
+            >
+              👥 Gestión de Usuarios
             </button>
           </>
         )}
@@ -1531,376 +1646,8 @@ function App() {
         )}
 
         {/* SECCIÓN: GESTIÓN DE USUARIOS (Admin) */}
-        {vista === 'usuarios' && usuario.rol === 'admin' && (
-          <section className="seccion">
-            <h2>👥 Gestión de Perfiles y Usuarios</h2>
-
-            {/* Formulario Crear Usuario */}
-            <div className="form-container">
-              <h3>➕ Crear Nuevo Usuario</h3>
-              
-              <form onSubmit={(e) => {
-                e.preventDefault();
-                
-                const nuevoUsuario = {
-                  usuario: e.target.usuario.value,
-                  nombre: e.target.nombre.value,
-                  rol: e.target.rol.value,
-                  departamento: e.target.departamento.value,
-                  empresa: e.target.empresa.value,
-                  contrasena: e.target.contrasena.value
-                };
-
-                if (!nuevoUsuario.usuario || !nuevoUsuario.nombre || !nuevoUsuario.contrasena || !nuevoUsuario.rol) {
-                  alert('❌ Todos los campos son requeridos');
-                  return;
-                }
-
-                axios.post(`${API_URL}/api/admin/crear-usuario`, nuevoUsuario, {
-                  headers: { Authorization: `Bearer ${token}` }
-                })
-                .then(res => {
-                  alert(`✅ ${res.data.message}`);
-                  e.target.reset();
-                  cargarUsuarios();
-                })
-                .catch(err => {
-                  alert('❌ Error: ' + (err.response?.data?.error || err.message));
-                });
-              }}>
-                
-                <div className="form-group">
-                  <label>Rol * (Selecciona el tipo de usuario)</label>
-                  <select name="rol" defaultValue="especialista" required onChange={(e) => {
-                    const rol = e.target.value;
-                    const deptField = e.target.closest('form').querySelector('[name="departamento"]');
-                    if (rol === 'admin') {
-                      deptField.disabled = false;
-                    } else if (rol === 'itsm') {
-                      deptField.value = 'ITSM';
-                      deptField.disabled = true;
-                    } else {
-                      deptField.value = 'Especialista';
-                      deptField.disabled = true;
-                    }
-                  }}>
-                    <option value="admin">🔑 Admin</option>
-                    <option value="especialista">👤 Especialista</option>
-                    <option value="itsm">🛠️ ITSM</option>
-                  </select>
-                </div>
-
-                <div className="form-group">
-                  <label>Usuario * (ej: miguel.padilla)</label>
-                  <input 
-                    type="text" 
-                    name="usuario"
-                    placeholder="usuario_sin_espacios"
-                    required
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label>Nombre Completo *</label>
-                  <input 
-                    type="text" 
-                    name="nombre"
-                    placeholder="ej: Miguel Padilla"
-                    required
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label>Departamento/Equipo</label>
-                  <select name="departamento" defaultValue="Especialista">
-                    <optgroup label="Admin">
-                      <option value="DPE">DPE</option>
-                      <option value="Squad">Squad</option>
-                      <option value="TL">Team Lead (TL)</option>
-                    </optgroup>
-                    <optgroup label="Especialista">
-                      <option value="Middleware">Middleware</option>
-                      <option value="Operaciones Cloud">Operaciones Cloud</option>
-                    </optgroup>
-                    <optgroup label="ITSM">
-                      <option value="ITSM">ITSM</option>
-                    </optgroup>
-                  </select>
-                </div>
-
-                <div className="form-group">
-                  <label>Empresa (contratista) *</label>
-                  <select name="empresa" defaultValue="Kyndryl" required>
-                    <option value="Kyndryl">Kyndryl</option>
-                    <option value="Incosec">Incosec</option>
-                    <option value="Biznet">Biznet</option>
-                    <option value="Otro">Otro</option>
-                  </select>
-                  <small>Empresa a la que pertenece esta persona (usado para desglosar OVT y OVT Proyectado por empresa).</small>
-                </div>
-
-                <div className="form-group">
-                  <label>Contraseña Inicial *</label>
-                  <input 
-                    type="password" 
-                    name="contrasena"
-                    placeholder="ej: demo123"
-                    required
-                  />
-                  <small>Mínimo 4 caracteres. El usuario puede cambiarla después.</small>
-                </div>
-
-                <button type="submit" className="btn-guardar">
-                  ✅ Crear Usuario
-                </button>
-              </form>
-            </div>
-
-            {/* Tabla de usuarios por rol */}
-            <div style={{marginTop: '30px'}}>
-              <h3>📋 Usuarios Creados</h3>
-              
-              <div style={{display: 'flex', gap: '20px', marginTop: '15px', flexWrap: 'wrap'}}>
-                {/* Admins */}
-                <div style={{flex: 1, minWidth: '280px', background: '#f5f5f5', padding: '15px', borderRadius: '8px', border: '2px solid #2196F3'}}>
-                  <h4 style={{color: '#2196F3', marginTop: 0}}>🔑 Admins</h4>
-                  <p style={{fontSize: '12px', color: '#666'}}>
-                    • Miguel Padilla (DPE)<br/>
-                    • Hugo Araya (DPE)<br/>
-                    • Gustavo Reyes (Squad)<br/>
-                    • Najeeb Escobar (TL)<br/>
-                    • john Estrada (TL)
-                  </p>
-                </div>
-
-                {/* Especialistas */}
-                <div style={{flex: 1, minWidth: '280px', background: '#f5f5f5', padding: '15px', borderRadius: '8px', border: '2px solid #4CAF50'}}>
-                  <h4 style={{color: '#4CAF50', marginTop: 0}}>👤 Especialistas</h4>
-                  <p style={{fontSize: '12px', color: '#666'}}>
-                    • Jorge Maureira<br/>
-                    • Jhon Estrada<br/>
-                    • Luis Vasquez<br/>
-                    • ... (22 especialistas en total)
-                  </p>
-                </div>
-
-                {/* ITSM */}
-                <div style={{flex: 1, minWidth: '280px', background: '#f5f5f5', padding: '15px', borderRadius: '8px', border: '2px solid #FF9800'}}>
-                  <h4 style={{color: '#FF9800', marginTop: 0}}>🛠️ ITSM</h4>
-                  <p style={{fontSize: '12px', color: '#666'}}>
-                    • Danilo Isla
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {/* Info útil */}
-            <div style={{
-              background: '#e3f2fd',
-              padding: '15px',
-              borderRadius: '8px',
-              marginTop: '20px',
-              fontSize: '13px',
-              borderLeft: '4px solid #2196F3'
-            }}>
-              <strong>ℹ️ Información:</strong><br/>
-              <strong>🔑 Admin:</strong> Ve Dashboard, Mantenedor, Gestión de Usuarios, Auditoría<br/>
-              <strong>👤 Especialista:</strong> Ve Registrar Cambios/Alertas, Mi Resumen<br/>
-              <strong>🛠️ ITSM:</strong> Ve Dashboard ITSM (próximamente), Auditoría<br/>
-              • Contraseña inicial: Se puede cambiar después de login<br/>
-              • Se registra cada creación en auditoría
-            </div>
-
-            {/* SECCIÓN: RESETEAR CONTRASEÑA */}
-            <h3 style={{marginTop: '40px', borderTop: '2px solid #ddd', paddingTop: '20px'}}>🔐 Gestionar Usuarios</h3>
-            
-            <div className="form-group">
-              <label>🔍 Buscar Usuario</label>
-              <input 
-                type="text"
-                id="buscador-usuarios"
-                placeholder="Busca por usuario, nombre o departamento..."
-                onChange={(e) => {
-                  const busqueda = e.target.value.toLowerCase();
-                  const lista = document.querySelectorAll('[data-usuario-item]');
-                  lista.forEach(item => {
-                    const coincide = item.getAttribute('data-usuario-item').includes(busqueda) || 
-                                    item.getAttribute('data-nombre-item').toLowerCase().includes(busqueda) ||
-                                    item.getAttribute('data-dept-item').toLowerCase().includes(busqueda);
-                    item.style.display = coincide ? 'flex' : 'none';
-                  });
-                }}
-                style={{
-                  width: '100%',
-                  padding: '10px',
-                  fontSize: '14px',
-                  borderRadius: '6px',
-                  border: '1px solid #ddd',
-                  marginBottom: '15px'
-                }}
-              />
-            </div>
-
-            <div id="lista-usuarios-container">
-              {usuarioList && usuarioList.length > 0 ? (
-                usuarioList.map(u => (
-                  <div 
-                    key={u.usuario} 
-                    data-usuario-item={u.usuario}
-                    data-nombre-item={u.nombre}
-                    data-dept-item={u.departamento}
-                    style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      padding: '12px',
-                      background: '#f9f9f9',
-                      borderRadius: '6px',
-                      marginBottom: '8px',
-                      border: '1px solid #eee'
-                    }}
-                  >
-                    <div>
-                      <strong>{u.nombre}</strong><br/>
-                      <small style={{color: '#666'}}>@{u.usuario} • {u.rol} • {u.departamento}</small><br/>
-                      <small style={{color: '#2563eb', fontWeight: '600'}}>🏢 {u.empresa || 'Sin asignar'}</small>
-                    </div>
-                    <div style={{display: 'flex', gap: '8px'}}>
-                      <button
-                        onClick={() => {
-                          const opciones = ['Kyndryl', 'Incosec', 'Biznet', 'Otro'];
-                          const listaTexto = opciones.map((o, i) => `${i + 1}. ${o}`).join('\n');
-                          const seleccion = prompt(
-                            `Empresa/Cliente actual de ${u.nombre}: ${u.empresa || 'Sin asignar'}\n\nElige el número de la nueva empresa:\n${listaTexto}`,
-                            '1'
-                          );
-                          if (!seleccion) return;
-                          const indice = parseInt(seleccion, 10) - 1;
-                          if (isNaN(indice) || indice < 0 || indice >= opciones.length) {
-                            alert('❌ Opción inválida');
-                            return;
-                          }
-                          const nuevaEmpresa = opciones[indice];
-
-                          axios.post(`${API_URL}/api/admin/editar-usuario`,
-                            { usuario: u.usuario, empresa: nuevaEmpresa },
-                            { headers: { Authorization: `Bearer ${token}` } }
-                          )
-                          .then(() => {
-                            alert(`✅ Empresa de ${u.nombre} actualizada a: ${nuevaEmpresa}`);
-                            cargarUsuarios();
-                          })
-                          .catch(err => {
-                            alert('❌ Error: ' + (err.response?.data?.error || err.message));
-                          });
-                        }}
-                        style={{
-                          padding: '8px 16px',
-                          background: '#2563eb',
-                          color: 'white',
-                          border: 'none',
-                          borderRadius: '6px',
-                          cursor: 'pointer',
-                          fontSize: '12px',
-                          fontWeight: '600'
-                        }}
-                      >
-                        🏢 Empresa
-                      </button>
-                      <button
-                        onClick={() => {
-                          const nuevaContraseña = prompt(`Ingresa nueva contraseña para ${u.nombre}:\n(mínimo 4 caracteres)`, 'demo123');
-                          
-                          if (!nuevaContraseña) return;
-                          if (nuevaContraseña.length < 4) {
-                            alert('❌ La contraseña debe tener mínimo 4 caracteres');
-                            return;
-                          }
-
-                          axios.post(`${API_URL}/api/admin/resetear-contrasena`, 
-                            { 
-                              usuario: u.usuario, 
-                              contraseñaNueva: nuevaContraseña 
-                            },
-                            { headers: { Authorization: `Bearer ${token}` } }
-                          )
-                          .then(res => {
-                            alert(`✅ Contraseña reseteada\nNueva: ${nuevaContraseña}`);
-                          })
-                          .catch(err => {
-                            alert('❌ Error: ' + (err.response?.data?.error || err.message));
-                          });
-                        }}
-                        style={{
-                          padding: '8px 16px',
-                          background: '#FF9800',
-                          color: 'white',
-                          border: 'none',
-                          borderRadius: '6px',
-                          cursor: 'pointer',
-                          fontSize: '12px',
-                          fontWeight: '600'
-                        }}
-                      >
-                        🔐 Resetear
-                      </button>
-                      
-                      <button
-                        onClick={() => {
-                          if (u.usuario === 'admin') {
-                            alert('❌ No se puede eliminar al admin original');
-                            return;
-                          }
-                          if (!window.confirm(`¿Eliminar a ${u.nombre}? Esta acción no se puede deshacer.`)) return;
-
-                          axios.post(`${API_URL}/api/admin/eliminar-usuario`, 
-                            { usuario: u.usuario },
-                            { headers: { Authorization: `Bearer ${token}` } }
-                          )
-                          .then(res => {
-                            alert(`✅ Usuario ${u.nombre} eliminado`);
-                            cargarUsuarios();
-                          })
-                          .catch(err => {
-                            alert('❌ Error: ' + (err.response?.data?.error || err.message));
-                          });
-                        }}
-                        style={{
-                          padding: '8px 16px',
-                          background: '#f44336',
-                          color: 'white',
-                          border: 'none',
-                          borderRadius: '6px',
-                          cursor: 'pointer',
-                          fontSize: '12px',
-                          fontWeight: '600'
-                        }}
-                      >
-                        🗑️ Eliminar
-                      </button>
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <p style={{textAlign: 'center', color: '#999'}}>Cargando usuarios...</p>
-              )}
-            </div>
-
-            <div style={{
-              background: '#fff3cd',
-              padding: '12px',
-              borderRadius: '6px',
-              marginTop: '15px',
-              fontSize: '12px',
-              borderLeft: '4px solid #FF9800'
-            }}>
-              <strong>⚠️ Importante:</strong><br/>
-              • 🔐 Resetear: Asigna nueva contraseña al usuario<br/>
-              • 🗑️ Eliminar: Elimina permanentemente el usuario<br/>
-              • Se registra cada acción en auditoría<br/>
-              • El usuario puede cambiar su contraseña después de login
-            </div>
-          </section>
+        {vista === 'usuarios' && (usuario.rol === 'admin' || usuario.rol === 'dpe') && (
+          <GestionUsuarios token={token} apiUrl={API_URL} />
         )}
 
         {/* SECCIÓN: AUDITORÍA */}
