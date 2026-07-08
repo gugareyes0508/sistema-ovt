@@ -9,6 +9,7 @@ import OvtProyectado from './components/OvtProyectado';
 import ExcelUpload from './components/ExcelUpload';
 import Analytics from './components/Analytics';
 import GestionUsuarios from './components/GestionUsuarios';
+import PermisosRoles from './components/PermisosRoles';
 import './App.css';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
@@ -72,6 +73,7 @@ function App() {
   const [clienteActivo, setClienteActivo] = useState(localStorage.getItem('clienteActivo') || '');
   const [seleccionandoCliente, setSeleccionandoCliente] = useState(false);
   const [clientesInfo, setClientesInfo] = useState([]);
+  const [permisos, setPermisos] = useState(null); // permisos por rol cargados de Firestore
   const [registros, setRegistros] = useState([]);
   const [vista, setVista] = useState('registros');
 
@@ -85,6 +87,14 @@ function App() {
       setVista('dashboard');
     }
   }, [usuario?.rol]);
+
+  // Cargar permisos de roles al iniciar sesión
+  useEffect(() => {
+    if (!token) return;
+    axios.get(`${API_URL}/api/permisos-roles`, { headers: { Authorization: `Bearer ${token}` } })
+      .then(res => setPermisos(res.data))
+      .catch(() => setPermisos(null)); // si falla, usa la lógica hardcoded como fallback
+  }, [token]);
 
   // Cargar info de clientes para DPE
   useEffect(() => {
@@ -744,6 +754,15 @@ function App() {
   // ============================================
   const esDpeMultiCliente = usuario?.rol === 'dpe' && (usuario?.clientesIds||[]).length > 1;
 
+  // Helper: ¿puede este usuario ver esta vista?
+  // Admin siempre puede. Para el resto usa permisos de Firestore si están cargados.
+  const puedeVer = (vista) => {
+    if (!usuario?.rol) return false;
+    if (usuario.rol === 'admin') return true;
+    if (!permisos) return true; // fallback: no restricción si no se cargaron permisos
+    return !!permisos[usuario.rol]?.[vista];
+  };
+
   return (
     <div className="app">
       {/* HEADER */}
@@ -784,135 +803,40 @@ function App() {
       <nav className="nav">
         {usuario.rol === 'especialista' && (
           <>
-            <button 
-              className={vista === 'registros' ? 'nav-btn active' : 'nav-btn'} 
-              onClick={() => setVista('registros')}
-            >
-              📋 Registrar Cambio/Alerta
-            </button>
-            <button 
-              className={vista === 'resumen' ? 'nav-btn active' : 'nav-btn'} 
-              onClick={() => setVista('resumen')}
-            >
-              📊 Mi Resumen
-            </button>
-            <button 
-              className={vista === 'excel-upload' ? 'nav-btn active' : 'nav-btn'} 
-              onClick={() => setVista('excel-upload')}
-            >
-              📥 Cargar Excel
-            </button>
+            {puedeVer('registros') && <button className={vista === 'registros' ? 'nav-btn active' : 'nav-btn'} onClick={() => setVista('registros')}>📋 Registrar Cambio/Alerta</button>}
+            {puedeVer('resumen') && <button className={vista === 'resumen' ? 'nav-btn active' : 'nav-btn'} onClick={() => setVista('resumen')}>📊 Mi Resumen</button>}
+            {puedeVer('carga-excel') && <button className={vista === 'excel-upload' ? 'nav-btn active' : 'nav-btn'} onClick={() => setVista('excel-upload')}>📥 Cargar Excel</button>}
           </>
         )}
 
         {usuario.rol === 'itsm' && (
           <>
-            <button 
-              className={vista === 'proyeccion-nueva' ? 'nav-btn active' : 'nav-btn'} 
-              onClick={() => setVista('proyeccion-nueva')}
-            >
-              📋 Nueva Proyección
-            </button>
-            <button 
-              className={vista === 'proyeccion-mis' ? 'nav-btn active' : 'nav-btn'} 
-              onClick={() => setVista('proyeccion-mis')}
-            >
-              📊 Mis Proyecciones
-            </button>
-            <button 
-              className={vista === 'proyeccion-excel' ? 'nav-btn active' : 'nav-btn'} 
-              onClick={() => setVista('proyeccion-excel')}
-            >
-              📥 Cargar Excel
-            </button>
+            {puedeVer('proyeccion-nueva') && <button className={vista === 'proyeccion-nueva' ? 'nav-btn active' : 'nav-btn'} onClick={() => setVista('proyeccion-nueva')}>📋 Nueva Proyección</button>}
+            {puedeVer('proyeccion-mis') && <button className={vista === 'proyeccion-mis' ? 'nav-btn active' : 'nav-btn'} onClick={() => setVista('proyeccion-mis')}>📊 Mis Proyecciones</button>}
+            {puedeVer('proyeccion-excel') && <button className={vista === 'proyeccion-excel' ? 'nav-btn active' : 'nav-btn'} onClick={() => setVista('proyeccion-excel')}>📥 Cargar Excel</button>}
           </>
         )}
 
         {usuario.rol === 'dpe' && (
           <>
-            <button 
-              className={vista === 'dashboard' ? 'nav-btn active' : 'nav-btn'} 
-              onClick={() => setVista('dashboard')}
-            >
-              📊 Dashboard
-            </button>
-            <button 
-              className={vista === 'analytics' ? 'nav-btn active' : 'nav-btn'} 
-              onClick={() => setVista('analytics')}
-            >
-              📈 Analytics
-            </button>
-            <button 
-              className={vista === 'ovt-proyectado' ? 'nav-btn active' : 'nav-btn'} 
-              onClick={() => setVista('ovt-proyectado')}
-            >
-              📅 OVT Proyectado
-            </button>
-            <button 
-              className={vista === 'claim' ? 'nav-btn active' : 'nav-btn'} 
-              onClick={() => setVista('claim')}
-            >
-              🕐 Control de Labor
-            </button>
-            <button 
-              className={vista === 'usuarios' ? 'nav-btn active' : 'nav-btn'} 
-              onClick={() => setVista('usuarios')}
-            >
-              👥 Gestión de Usuarios
-            </button>
+            {puedeVer('dashboard') && <button className={vista === 'dashboard' ? 'nav-btn active' : 'nav-btn'} onClick={() => setVista('dashboard')}>📊 Dashboard</button>}
+            {puedeVer('analytics') && <button className={vista === 'analytics' ? 'nav-btn active' : 'nav-btn'} onClick={() => setVista('analytics')}>📈 Analytics</button>}
+            {puedeVer('ovt-proyectado') && <button className={vista === 'ovt-proyectado' ? 'nav-btn active' : 'nav-btn'} onClick={() => setVista('ovt-proyectado')}>📅 OVT Proyectado</button>}
+            {puedeVer('claim') && <button className={vista === 'claim' ? 'nav-btn active' : 'nav-btn'} onClick={() => setVista('claim')}>🕐 Control de Labor</button>}
+            {puedeVer('usuarios') && <button className={vista === 'usuarios' ? 'nav-btn active' : 'nav-btn'} onClick={() => setVista('usuarios')}>👥 Gestión de Usuarios</button>}
           </>
         )}
 
         {usuario.rol === 'admin' && (
           <>
-            <button 
-              className={vista === 'dashboard' ? 'nav-btn active' : 'nav-btn'} 
-              onClick={() => setVista('dashboard')}
-            >
-              📊 Dashboard
-            </button>
-            <button 
-              className={vista === 'analytics' ? 'nav-btn active' : 'nav-btn'} 
-              onClick={() => setVista('analytics')}
-            >
-              📈 Analytics
-            </button>
-            <button 
-              className={vista === 'ovt-proyectado' ? 'nav-btn active' : 'nav-btn'} 
-              onClick={() => setVista('ovt-proyectado')}
-            >
-              📅 OVT Proyectado
-            </button>
-            <button 
-              className={vista === 'claim' ? 'nav-btn active' : 'nav-btn'} 
-              onClick={() => setVista('claim')}
-            >
-              🕐 Control de Labor
-            </button>
-            <button 
-              className={vista === 'usuarios' ? 'nav-btn active' : 'nav-btn'} 
-              onClick={() => setVista('usuarios')}
-            >
-              👥 Gestión de Usuarios
-            </button>
-            <button 
-              className={vista === 'mantenedor' ? 'nav-btn active' : 'nav-btn'} 
-              onClick={() => setVista('mantenedor')}
-            >
-              ⚙️ Mantenedor
-            </button>
-            <button 
-              className={vista === 'auditoria' ? 'nav-btn active' : 'nav-btn'} 
-              onClick={() => setVista('auditoria')}
-            >
-              🔍 Auditoría
-            </button>
-            <button 
-              className={vista === 'test-groq' ? 'nav-btn active' : 'nav-btn'} 
-              onClick={() => setVista('test-groq')}
-            >
-              🧪 Test GROQ
-            </button>
+            {puedeVer('dashboard') && <button className={vista === 'dashboard' ? 'nav-btn active' : 'nav-btn'} onClick={() => setVista('dashboard')}>📊 Dashboard</button>}
+            {puedeVer('analytics') && <button className={vista === 'analytics' ? 'nav-btn active' : 'nav-btn'} onClick={() => setVista('analytics')}>📈 Analytics</button>}
+            {puedeVer('ovt-proyectado') && <button className={vista === 'ovt-proyectado' ? 'nav-btn active' : 'nav-btn'} onClick={() => setVista('ovt-proyectado')}>📅 OVT Proyectado</button>}
+            {puedeVer('claim') && <button className={vista === 'claim' ? 'nav-btn active' : 'nav-btn'} onClick={() => setVista('claim')}>🕐 Control de Labor</button>}
+            {puedeVer('usuarios') && <button className={vista === 'usuarios' ? 'nav-btn active' : 'nav-btn'} onClick={() => setVista('usuarios')}>👥 Gestión de Usuarios</button>}
+            {puedeVer('mantenedor') && <button className={vista === 'mantenedor' ? 'nav-btn active' : 'nav-btn'} onClick={() => setVista('mantenedor')}>⚙️ Mantenedor</button>}
+            {puedeVer('auditoria') && <button className={vista === 'auditoria' ? 'nav-btn active' : 'nav-btn'} onClick={() => setVista('auditoria')}>🔍 Auditoría</button>}
+            <button className={vista === 'permisos-roles' ? 'nav-btn active' : 'nav-btn'} onClick={() => setVista('permisos-roles')}>🔐 Permisos</button>
           </>
         )}
       </nav>
@@ -1992,8 +1916,13 @@ function App() {
         )}
 
         {/* Control de Labor (Claim) */}
-        {vista === 'claim' && usuario.rol === 'admin' && (
+        {vista === 'claim' && (usuario.rol === 'admin' || usuario.rol === 'dpe') && (
           <ClaimDashboard token={token} apiUrl={API_URL} />
+        )}
+
+        {/* Permisos de Roles — solo admin */}
+        {vista === 'permisos-roles' && usuario.rol === 'admin' && (
+          <PermisosRoles token={token} apiUrl={API_URL} />
         )}
       </main>
 
