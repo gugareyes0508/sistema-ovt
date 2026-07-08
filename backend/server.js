@@ -561,16 +561,33 @@ app.get('/api/registros', verificarToken, async (req, res) => {
   try {
     let query = db.collection('registros');
 
+    // Especialista: solo sus propios registros
     if (req.usuario.rol === 'especialista') {
       query = query.where('createdBy', '==', req.usuario.usuario);
     }
 
     const snapshot = await query.get();
-    const registros = [];
-
+    let registros = [];
     snapshot.forEach(doc => {
       registros.push({ id: doc.id, ...doc.data() });
     });
+
+    // DPE: filtrar por el cliente activo enviado en el header
+    if (req.usuario.rol === 'dpe') {
+      const clienteActivoId = req.headers['x-cliente-activo'] || '';
+      if (clienteActivoId) {
+        // Obtener nombre del cliente desde Firestore
+        const clienteDoc = await db.collection('clientes').doc(clienteActivoId).get();
+        const nombreCliente = clienteDoc.exists ? clienteDoc.data().nombre : null;
+        if (nombreCliente) {
+          registros = registros.filter(r =>
+            String(r.cliente || '').toLowerCase() === nombreCliente.toLowerCase()
+          );
+        } else {
+          registros = []; // cliente no encontrado → no mostrar nada
+        }
+      }
+    }
 
     registros.sort((a, b) => {
       const fechaA = a.createdAt?.toDate?.() || new Date(a.createdAt) || new Date(0);
@@ -1040,10 +1057,22 @@ app.use((err, req, res, next) => {
 // GET /api/claims → listar todas las semanas cargadas
 app.get('/api/claims', verificarToken, async (req, res) => {
   try {
-    if (req.usuario.rol !== 'admin') return res.status(403).json({ error: 'Solo admin' });
+    const esAdmin = req.usuario.rol === 'admin';
+    const esDpe = req.usuario.rol === 'dpe';
+    if (!esAdmin && !esDpe) return res.status(403).json({ error: 'Sin permisos' });
+
     const snap = await db.collection('claims_semanas').orderBy('fecha', 'asc').get();
-    const semanas = [];
+    let semanas = [];
     snap.forEach(doc => semanas.push({ id: doc.id, ...doc.data() }));
+
+    // DPE: filtrar por clienteId guardado en cada semana
+    if (esDpe) {
+      const clienteActivoId = req.headers['x-cliente-activo'] || '';
+      if (clienteActivoId) {
+        semanas = semanas.filter(s => s.clienteId === clienteActivoId);
+      }
+    }
+
     res.json(semanas);
   } catch (err) {
     console.error('Error GET /api/claims:', err);
@@ -1054,11 +1083,17 @@ app.get('/api/claims', verificarToken, async (req, res) => {
 // POST /api/claims/upload → recibe array de semanas procesadas, guarda solo las nuevas
 app.post('/api/claims/upload', verificarToken, async (req, res) => {
   try {
-    if (req.usuario.rol !== 'admin') return res.status(403).json({ error: 'Solo admin' });
+    const esAdmin = req.usuario.rol === 'admin';
+    const esDpe = req.usuario.rol === 'dpe';
+    if (!esAdmin && !esDpe) return res.status(403).json({ error: 'Sin permisos' });
+
     const { semanas } = req.body;
     if (!Array.isArray(semanas) || semanas.length === 0) {
       return res.status(400).json({ error: 'No se recibieron semanas' });
     }
+
+    // Determinar clienteId: DPE usa x-cliente-activo, admin usa 'bcochile' por defecto
+    const clienteActivoId = req.headers['x-cliente-activo'] || 'bcochile';
 
     // Verificar cuáles fechas ya existen
     const existSnap = await db.collection('claims_semanas').get();
@@ -1075,6 +1110,7 @@ app.post('/api/claims/upload', verificarToken, async (req, res) => {
       const ref = db.collection('claims_semanas').doc(sem.fecha);
       batch.set(ref, {
         ...sem,
+        clienteId: clienteActivoId,
         creadoPor: req.usuario.nombre,
         creadoEn: new Date()
       });
