@@ -62,7 +62,7 @@ const chartBase = { responsive:true, maintainAspectRatio:false, plugins:{ legend
             y:{ ticks:{font:{size:9},color:textMuted}, grid:{color:gridColor}, beginAtZero:true } } };
 
 // ─── componente principal ─────────────────────────────────────────────────
-const ClaimDashboard = ({ token, apiUrl }) => {
+const ClaimDashboard = ({ token, apiUrl, clienteActivo = '' }) => {
   const [semanas, setSemanas] = useState([]);
   const [cargando, setCargando] = useState(false);
   const [loadingDatos, setLoadingDatos] = useState(true);
@@ -72,11 +72,17 @@ const ClaimDashboard = ({ token, apiUrl }) => {
   const [tabAnalitca, setTabAnalitica] = useState('resumen');
   const fileRef = useRef();
 
+  const getHeaders = useCallback(() => {
+    const h = { Authorization: `Bearer ${token}` };
+    if (clienteActivo) h['x-cliente-activo'] = clienteActivo;
+    return h;
+  }, [token, clienteActivo]);
+
   // ── cargar datos de Firestore al montar ──
   const cargarDatos = useCallback(async () => {
     setLoadingDatos(true);
     try {
-      const res = await axios.get(`${apiUrl}/api/claims`, { headers: { Authorization: `Bearer ${token}` } });
+      const res = await axios.get(`${apiUrl}/api/claims`, { headers: getHeaders() });
       setSemanas(res.data || []);
       if (res.data?.length > 0) {
         const ultima = res.data[res.data.length - 1];
@@ -84,7 +90,7 @@ const ClaimDashboard = ({ token, apiUrl }) => {
       }
     } catch (err) { console.error('Error cargando claims:', err.message); }
     finally { setLoadingDatos(false); }
-  }, [apiUrl, token]);
+  }, [apiUrl, getHeaders]);
 
   useEffect(() => { cargarDatos(); }, [cargarDatos]);
 
@@ -149,7 +155,7 @@ const ClaimDashboard = ({ token, apiUrl }) => {
       }
 
       const nuevasSemanas = Object.values(porSemana).sort((a,b) => a.fecha.localeCompare(b.fecha));
-      const res = await axios.post(`${apiUrl}/api/claims/upload`, { semanas: nuevasSemanas }, { headers: { Authorization: `Bearer ${token}` } });
+      const res = await axios.post(`${apiUrl}/api/claims/upload`, { semanas: nuevasSemanas }, { headers: getHeaders() });
       alert(`✅ ${res.data.message}\nNuevas: ${res.data.nuevas} · Total en archivo: ${res.data.total}`);
       await cargarDatos();
     } catch (err) {
@@ -160,7 +166,7 @@ const ClaimDashboard = ({ token, apiUrl }) => {
   const limpiarDatos = async () => {
     if (!window.confirm('¿Eliminar TODOS los datos de Claims de Firestore? No se puede deshacer.')) return;
     try {
-      await axios.delete(`${apiUrl}/api/claims`, { headers: { Authorization: `Bearer ${token}` } });
+      await axios.delete(`${apiUrl}/api/claims`, { headers: getHeaders() });
       setSemanas([]); setUltimaCarga(null);
       alert('✅ Datos eliminados');
     } catch (err) { alert('Error: ' + err.message); }

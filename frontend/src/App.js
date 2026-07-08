@@ -14,6 +14,13 @@ import './App.css';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
 
+// Helper para construir headers con token y cliente activo (para DPE)
+const buildHeaders = (token, clienteActivo = '') => {
+  const h = { Authorization: `Bearer ${token}` };
+  if (clienteActivo) h['x-cliente-activo'] = clienteActivo;
+  return h;
+};
+
 // FUNCIONES HELPER PARA FECHAS
 const toDate = (fecha) => {
   if (fecha instanceof Date) return fecha;
@@ -154,13 +161,13 @@ function App() {
     if (!token) return;
     try {
       const response = await axios.get(`${API_URL}/api/registros`, {
-        headers: { Authorization: `Bearer ${token}` }
+        headers: buildHeaders(token, clienteActivo)
       });
       setRegistros(response.data || []);
     } catch (err) {
       console.error('Error:', err.message);
     }
-  }, [token]);
+  }, [token, clienteActivo]);
 
   // Cargar dashboard
   // Cargar dashboard (datos no usados actualmente)
@@ -720,7 +727,7 @@ function App() {
                   setClienteActivo(c.id);
                   localStorage.setItem('clienteActivo', c.id);
                   setSeleccionandoCliente(false);
-                  setVista('claim');
+                  setVista('dashboard');
                 }}
                 style={{ padding:'16px 20px', background:'#fff', border:'2px solid #e5e7eb', borderRadius:'10px',
                   cursor:'pointer', textAlign:'left', fontSize:'14px', fontWeight:'600', color:'#111827',
@@ -777,8 +784,11 @@ function App() {
               <select
                 value={clienteActivo}
                 onChange={e => {
-                  setClienteActivo(e.target.value);
-                  localStorage.setItem('clienteActivo', e.target.value);
+                  const nuevoCliente = e.target.value;
+                  setClienteActivo(nuevoCliente);
+                  localStorage.setItem('clienteActivo', nuevoCliente);
+                  setRegistros([]); // limpiar datos del cliente anterior
+                  setVista('dashboard');
                 }}
                 style={{ padding:'6px 28px 6px 10px', borderRadius:'8px', border:'1.5px solid rgba(255,255,255,0.35)',
                   background:'rgba(255,255,255,0.15)', color:'#fff', fontSize:'13px', fontWeight:'600', cursor:'pointer',
@@ -1912,12 +1922,12 @@ function App() {
 
         {/* OVT Proyectado (Admin) */}
         {vista === 'ovt-proyectado' && (usuario.rol === 'admin' || usuario.rol === 'dpe') && (
-          <OvtProyectado token={token} apiUrl={API_URL} />
+          <OvtProyectado token={token} apiUrl={API_URL} clienteActivo={clienteActivo} />
         )}
 
         {/* Control de Labor (Claim) */}
         {vista === 'claim' && (usuario.rol === 'admin' || usuario.rol === 'dpe') && (
-          <ClaimDashboard token={token} apiUrl={API_URL} />
+          <ClaimDashboard token={token} apiUrl={API_URL} clienteActivo={clienteActivo} />
         )}
 
         {/* Permisos de Roles — solo admin */}
