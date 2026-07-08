@@ -111,8 +111,8 @@ const SEED_USUARIOS = {
   'miguel.padilla': { nombre: 'Miguel Padilla', rol: 'dpe', departamento: 'DPE', contrasena: 'demo123', empresa: 'Kyndryl', clientesIds: ['bcochile'], haceOVT: false, grupoServicioId: '' },
   'hugo.araya': { nombre: 'Hugo Araya', rol: 'dpe', departamento: 'DPE', contrasena: 'demo123', empresa: 'Kyndryl', clientesIds: ['bcochile'], haceOVT: false, grupoServicioId: '' },
   'gustavo.reyes': { nombre: 'Gustavo Reyes', rol: 'admin', departamento: 'Squad', contrasena: 'demo123', empresa: 'Kyndryl', clientesIds: ['bcochile'], haceOVT: false, grupoServicioId: '' },
-  'najeeb.escobar': { nombre: 'Najeeb Escobar', rol: 'dpe', departamento: 'TL', contrasena: 'demo123', empresa: 'Kyndryl', clientesIds: ['bcochile'], haceOVT: false, grupoServicioId: '' },
-  'john.estrada': { nombre: 'john Estrada', rol: 'dpe', departamento: 'TL', contrasena: 'demo123', empresa: 'Kyndryl', clientesIds: ['bcochile'], haceOVT: false, grupoServicioId: '' },
+  'najeeb.escobar': { nombre: 'Najeeb Escobar', rol: 'teamleader', departamento: 'TL', contrasena: 'demo123', empresa: 'Kyndryl', clientesIds: ['bcochile'], haceOVT: false, grupoServicioId: '' },
+  'john.estrada': { nombre: 'John Estrada', rol: 'teamleader', departamento: 'TL', contrasena: 'demo123', empresa: 'Kyndryl', clientesIds: ['bcochile'], haceOVT: false, grupoServicioId: '' },
   'maria.admin': { nombre: 'Maria Admin', rol: 'coordinador', departamento: 'Coordinación', contrasena: 'demo123', empresa: 'Kyndryl', clientesIds: ['bcochile'], haceOVT: false, grupoServicioId: '' },
   'danilo.isla': { nombre: 'Danilo Isla', rol: 'itsm', departamento: 'ITSM', contrasena: 'demo123', empresa: 'Kyndryl', clientesIds: ['bcochile'], haceOVT: false, grupoServicioId: '' },
   'jorge.maureira': { nombre: 'Jorge Maureira', rol: 'especialista', departamento: 'Middleware', contrasena: 'demo123', empresa: 'Kyndryl', clientesIds: ['bcochile'], haceOVT: true, grupoServicioId: '' },
@@ -559,10 +559,11 @@ app.post('/api/admin/eliminar-usuario', verificarToken, async (req, res) => {
 
 app.get('/api/registros', verificarToken, async (req, res) => {
   try {
+    const rol = req.usuario.rol;
     let query = db.collection('registros');
 
     // Especialista: solo sus propios registros
-    if (req.usuario.rol === 'especialista') {
+    if (rol === 'especialista') {
       query = query.where('createdBy', '==', req.usuario.usuario);
     }
 
@@ -573,10 +574,9 @@ app.get('/api/registros', verificarToken, async (req, res) => {
     });
 
     // DPE: filtrar por el cliente activo enviado en el header
-    if (req.usuario.rol === 'dpe') {
+    if (rol === 'dpe') {
       const clienteActivoId = req.headers['x-cliente-activo'] || '';
       if (clienteActivoId) {
-        // Obtener nombre del cliente desde Firestore
         const clienteDoc = await db.collection('clientes').doc(clienteActivoId).get();
         const nombreCliente = clienteDoc.exists ? clienteDoc.data().nombre : null;
         if (nombreCliente) {
@@ -588,6 +588,9 @@ app.get('/api/registros', verificarToken, async (req, res) => {
         }
       }
     }
+
+    // TL: ve todos los registros (puede aprobar/rechazar)
+    // No se aplica filtro adicional — mismo comportamiento que admin
 
     registros.sort((a, b) => {
       const fechaA = a.createdAt?.toDate?.() || new Date(a.createdAt) || new Date(0);
@@ -1238,6 +1241,7 @@ app.patch('/api/grupos-servicio/:id', verificarToken, async (req, res) => {
 const PERMISOS_DEFAULT = {
   admin:        { dashboard:true, analytics:true, 'ovt-proyectado':true, claim:true, usuarios:true, mantenedor:true, auditoria:true, registros:false, resumen:false, 'carga-excel':false, 'proyeccion-nueva':false, 'proyeccion-mis':false, 'permisos-roles':true },
   dpe:          { dashboard:true, analytics:true, 'ovt-proyectado':true, claim:true, usuarios:true, mantenedor:false, auditoria:false, registros:false, resumen:false, 'carga-excel':false, 'proyeccion-nueva':false, 'proyeccion-mis':false, 'permisos-roles':false },
+  teamleader:   { dashboard:true, analytics:true, 'ovt-proyectado':false, claim:false, usuarios:false, mantenedor:false, auditoria:false, registros:false, resumen:false, 'carga-excel':false, 'proyeccion-nueva':false, 'proyeccion-mis':false, 'permisos-roles':false },
   especialista: { dashboard:false, analytics:false, 'ovt-proyectado':false, claim:false, usuarios:false, mantenedor:false, auditoria:false, registros:true, resumen:true, 'carga-excel':true, 'proyeccion-nueva':false, 'proyeccion-mis':false, 'permisos-roles':false },
   itsm:         { dashboard:false, analytics:false, 'ovt-proyectado':false, claim:false, usuarios:false, mantenedor:false, auditoria:false, registros:false, resumen:false, 'carga-excel':false, 'proyeccion-nueva':true, 'proyeccion-mis':true, 'permisos-roles':false },
 };
