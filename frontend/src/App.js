@@ -82,7 +82,7 @@ function App() {
     } else if (usuario?.rol === 'itsm') {
       setVista('proyeccion-mis');
     } else if (usuario?.rol === 'dpe') {
-      setVista('claim');
+      setVista('dashboard');
     }
   }, [usuario?.rol]);
 
@@ -831,6 +831,24 @@ function App() {
         {usuario.rol === 'dpe' && (
           <>
             <button 
+              className={vista === 'dashboard' ? 'nav-btn active' : 'nav-btn'} 
+              onClick={() => setVista('dashboard')}
+            >
+              📊 Dashboard
+            </button>
+            <button 
+              className={vista === 'analytics' ? 'nav-btn active' : 'nav-btn'} 
+              onClick={() => setVista('analytics')}
+            >
+              📈 Analytics
+            </button>
+            <button 
+              className={vista === 'ovt-proyectado' ? 'nav-btn active' : 'nav-btn'} 
+              onClick={() => setVista('ovt-proyectado')}
+            >
+              📅 OVT Proyectado
+            </button>
+            <button 
               className={vista === 'claim' ? 'nav-btn active' : 'nav-btn'} 
               onClick={() => setVista('claim')}
             >
@@ -1129,7 +1147,7 @@ function App() {
         )}
 
         {/* SECCIÓN: ANALYTICS */}
-        {vista === 'analytics' && usuario.rol === 'admin' && (
+        {vista === 'analytics' && (usuario.rol === 'admin' || usuario.rol === 'dpe') && (
           <section className="seccion">
             <Analytics registros={registros} usuarios={usuarioList} token={token} />
           </section>
@@ -1392,7 +1410,7 @@ function App() {
         )}
 
         {/* SECCIÓN: DASHBOARD (Admin) */}
-        {vista === 'dashboard' && usuario.rol === 'admin' && (
+        {vista === 'dashboard' && (usuario.rol === 'admin' || usuario.rol === 'dpe') && (
           <section className="seccion">
             <h2>📊 Dashboard - Gestión de Registros</h2>
             
@@ -1969,7 +1987,7 @@ function App() {
         )}
 
         {/* OVT Proyectado (Admin) */}
-        {vista === 'ovt-proyectado' && usuario.rol === 'admin' && (
+        {vista === 'ovt-proyectado' && (usuario.rol === 'admin' || usuario.rol === 'dpe') && (
           <OvtProyectado token={token} apiUrl={API_URL} />
         )}
 
