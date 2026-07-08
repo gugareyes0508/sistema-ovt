@@ -103,13 +103,20 @@ function App() {
       .catch(() => setPermisos(null)); // si falla, usa la lógica hardcoded como fallback
   }, [token]);
 
-  // Cargar info de clientes para DPE
+  // Cargar info de clientes para DPE y admin
   useEffect(() => {
     if (!token || (usuario?.rol !== 'dpe' && usuario?.rol !== 'admin')) return;
     axios.get(`${API_URL}/api/clientes`, { headers: { Authorization: `Bearer ${token}` } })
       .then(res => {
-        setClientesInfo(res.data || []);
-        // Si DPE tiene múltiples clientes y no hay clienteActivo, mostrar selector
+        const lista = res.data || [];
+        setClientesInfo(lista);
+        // Admin: setear primer cliente si no hay uno activo
+        if (usuario?.rol === 'admin' && !clienteActivo && lista.length > 0) {
+          const primerCliente = lista[0].id;
+          setClienteActivo(primerCliente);
+          localStorage.setItem('clienteActivo', primerCliente);
+        }
+        // DPE: selector si tiene múltiples clientes
         if (usuario?.rol === 'dpe') {
           const ids = usuario?.clientesIds || [];
           if (!clienteActivo && ids.length > 0) {
@@ -773,13 +780,16 @@ function App() {
   return (
     <div className="app">
       {/* HEADER */}
-      <header className="header">
+      <header className="header" style={{ display:'grid', gridTemplateColumns:'1fr auto 1fr', alignItems:'center', gap:'12px' }}>
+
+        {/* IZQUIERDA — marca */}
         <div className="header-left">
           <h1>🕐 Sistema OVT v2</h1>
         </div>
-        <div className="header-right">
-          {/* Selector rápido de cliente para DPE multi-cliente */}
-          {esDpeMultiCliente && clienteActivo && (
+
+        {/* CENTRO — pill de cliente activo (solo DPE o admin con cliente activo) */}
+        <div style={{ display:'flex', justifyContent:'center' }}>
+          {(usuario?.rol === 'dpe' || usuario?.rol === 'admin') && clienteActivo && clientesInfo.length > 0 && (
             <div style={{ position:'relative' }}>
               <select
                 value={clienteActivo}
@@ -787,20 +797,37 @@ function App() {
                   const nuevoCliente = e.target.value;
                   setClienteActivo(nuevoCliente);
                   localStorage.setItem('clienteActivo', nuevoCliente);
-                  setRegistros([]); // limpiar datos del cliente anterior
+                  setRegistros([]);
                   setVista('dashboard');
                 }}
-                style={{ padding:'6px 28px 6px 10px', borderRadius:'8px', border:'1.5px solid rgba(255,255,255,0.35)',
-                  background:'rgba(255,255,255,0.15)', color:'#fff', fontSize:'13px', fontWeight:'600', cursor:'pointer',
-                  appearance:'none', WebkitAppearance:'none' }}
+                style={{
+                  appearance:'none', WebkitAppearance:'none',
+                  padding:'7px 36px 7px 14px',
+                  borderRadius:'20px',
+                  border:'1.5px solid rgba(255,255,255,0.4)',
+                  background:'rgba(0,0,0,0.18)',
+                  color:'#fff',
+                  fontSize:'13px',
+                  fontWeight:'700',
+                  cursor: clientesInfo.filter(c=>(usuario.clientesIds||[usuario?.clientesIds?.[0]||'bcochile']).includes(c.id)).length > 1 ? 'pointer' : 'default',
+                  letterSpacing:'0.1px'
+                }}
               >
-                {clientesInfo.filter(c=>(usuario.clientesIds||[]).includes(c.id)).map(c=>(
-                  <option key={c.id} value={c.id} style={{ background:'#111', color:'#fff' }}>{c.nombre}</option>
-                ))}
+                {clientesInfo
+                  .filter(c => (usuario.rol === 'admin') ? true : (usuario.clientesIds||[]).includes(c.id))
+                  .map(c => (
+                    <option key={c.id} value={c.id} style={{ background:'#11131a', color:'#fff' }}>{c.nombre}</option>
+                  ))}
               </select>
-              <span style={{ position:'absolute', right:'8px', top:'50%', transform:'translateY(-50%)', color:'rgba(255,255,255,0.7)', pointerEvents:'none', fontSize:'12px' }}>▾</span>
+              {/* punto verde de estado + flecha */}
+              <span style={{ position:'absolute', left:'10px', top:'50%', transform:'translateY(-50%)', width:'7px', height:'7px', borderRadius:'50%', background:'#4ade80', pointerEvents:'none', display:'none' }}></span>
+              <span style={{ position:'absolute', right:'12px', top:'50%', transform:'translateY(-50%)', color:'rgba(255,255,255,0.8)', pointerEvents:'none', fontSize:'11px' }}>▾</span>
             </div>
           )}
+        </div>
+
+        {/* DERECHA — usuario + salir */}
+        <div className="header-right" style={{ justifyContent:'flex-end' }}>
           <span className="user-badge">
             {usuario.nombre} <br />
             <small>({usuario.rol})</small>
