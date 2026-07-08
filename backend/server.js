@@ -107,38 +107,35 @@ const db = admin.firestore();
 // colección 'usuarios' en Firestore — así los usuarios creados/editados/eliminados
 // desde Gestión de Usuarios persisten entre reinicios del servidor (Railway).
 const SEED_USUARIOS = {
-  'admin': { nombre: 'Administrador', rol: 'admin', departamento: 'Admin', contrasena: 'demo123', empresa: 'Kyndryl' },
-  'miguel.padilla': { nombre: 'Miguel Padilla', rol: 'admin', departamento: 'DPE', contrasena: 'demo123', empresa: 'Kyndryl' },
-  'hugo.araya': { nombre: 'Hugo Araya', rol: 'admin', departamento: 'DPE', contrasena: 'demo123', empresa: 'Kyndryl' },
-  'gustavo.reyes': { nombre: 'Gustavo Reyes', rol: 'admin', departamento: 'Squad', contrasena: 'demo123', empresa: 'Kyndryl' },
-  'najeeb.escobar': { nombre: 'Najeeb Escobar', rol: 'admin', departamento: 'TL', contrasena: 'demo123', empresa: 'Kyndryl' },
-  'john.estrada': { nombre: 'john Estrada', rol: 'admin', departamento: 'TL', contrasena: 'demo123', empresa: 'Kyndryl' },
-  'maria.admin': { nombre: 'Maria Admin', rol: 'coordinador', departamento: 'Coordinación', contrasena: 'demo123', empresa: 'Kyndryl' },
-  'danilo.isla': { nombre: 'Danilo Isla', rol: 'itsm', departamento: 'ITSM', contrasena: 'demo123', empresa: 'Kyndryl' },
-  'jorge.maureira': { nombre: 'Jorge Maureira', rol: 'especialista', departamento: 'Middleware', contrasena: 'demo123', empresa: 'Kyndryl' },
-  'jhon.estrada': { nombre: 'Jhon Estrada', rol: 'especialista', departamento: 'Operaciones Cloud', contrasena: 'demo123', empresa: 'Kyndryl' },
-  'luis.vasquez': { nombre: 'Luis Vasquez', rol: 'especialista', departamento: 'Middleware', contrasena: 'demo123', empresa: 'Kyndryl' },
-  'moises.junco': { nombre: 'Moises Junco', rol: 'especialista', departamento: 'Operaciones Cloud', contrasena: 'demo123', empresa: 'Kyndryl' },
-  'manuel.urbina': { nombre: 'Manuel Urbina Hernández', rol: 'especialista', departamento: 'Middleware', contrasena: 'demo123', empresa: 'Kyndryl' },
-  'benjamin.fierro': { nombre: 'Benjamín Fierro', rol: 'especialista', departamento: 'Operaciones Cloud', contrasena: 'demo123', empresa: 'Kyndryl' },
-  'mauricio.serrano': { nombre: 'Mauricio Antonio Serrano Gonzalez', rol: 'especialista', departamento: 'Middleware', contrasena: 'demo123', empresa: 'Kyndryl' },
-  'ricardo.rojas': { nombre: 'Ricardo Andrés Rojas Ramos', rol: 'especialista', departamento: 'Operaciones Cloud', contrasena: 'demo123', empresa: 'Kyndryl' },
-  'ariel.garate': { nombre: 'Ariel Garate', rol: 'especialista', departamento: 'Middleware', contrasena: 'demo123', empresa: 'Kyndryl' },
-  'rodrigo.sanhueza': { nombre: 'Rodrigo Alejandro Sanhueza', rol: 'especialista', departamento: 'Middleware', contrasena: 'demo123', empresa: 'Kyndryl' },
-  'sebastian.arroyo': { nombre: 'Sebastian Arroyo Vigouroux', rol: 'especialista', departamento: 'Operaciones Cloud', contrasena: 'demo123', empresa: 'Kyndryl' },
-  'cristian.madariaga': { nombre: 'Cristian Madariaga', rol: 'especialista', departamento: 'Middleware', contrasena: 'demo123', empresa: 'Kyndryl' },
-  'miguel.martinez': { nombre: 'Miguel Martinez', rol: 'especialista', departamento: 'Operaciones Cloud', contrasena: 'demo123', empresa: 'Kyndryl' },
-  'fabian.tobar': { nombre: 'Fabian Tobar', rol: 'especialista', departamento: 'Middleware', contrasena: 'demo123', empresa: 'Kyndryl' },
-  'gustavo.perolo': { nombre: 'Gustavo Perolo', rol: 'especialista', departamento: 'Operaciones Cloud', contrasena: 'demo123', empresa: 'Kyndryl' },
-  'leonardo.silva': { nombre: 'Leonardo Silva', rol: 'especialista', departamento: 'Middleware', contrasena: 'demo123', empresa: 'Kyndryl' },
-  'cristian.lecaros': { nombre: 'Cristian Lecaros', rol: 'especialista', departamento: 'Operaciones Cloud', contrasena: 'demo123', empresa: 'Kyndryl' },
-  'rodrigo.escobedo': { nombre: 'Rodrigo Escobedo', rol: 'especialista', departamento: 'Middleware', contrasena: 'demo123', empresa: 'Kyndryl' },
-  'alexis.alfonzo': { nombre: 'Alexis José Alfonzo', rol: 'especialista', departamento: 'Operaciones Cloud', contrasena: 'demo123', empresa: 'Kyndryl' }
+  'admin': { nombre: 'Administrador', rol: 'admin', departamento: 'Admin', contrasena: 'demo123', empresa: 'Kyndryl', clientesIds: ['bcochile'], haceOVT: true, grupoServicioId: '' },
+  'miguel.padilla': { nombre: 'Miguel Padilla', rol: 'dpe', departamento: 'DPE', contrasena: 'demo123', empresa: 'Kyndryl', clientesIds: ['bcochile'], haceOVT: false, grupoServicioId: '' },
+  'hugo.araya': { nombre: 'Hugo Araya', rol: 'dpe', departamento: 'DPE', contrasena: 'demo123', empresa: 'Kyndryl', clientesIds: ['bcochile'], haceOVT: false, grupoServicioId: '' },
+  'gustavo.reyes': { nombre: 'Gustavo Reyes', rol: 'admin', departamento: 'Squad', contrasena: 'demo123', empresa: 'Kyndryl', clientesIds: ['bcochile'], haceOVT: false, grupoServicioId: '' },
+  'najeeb.escobar': { nombre: 'Najeeb Escobar', rol: 'dpe', departamento: 'TL', contrasena: 'demo123', empresa: 'Kyndryl', clientesIds: ['bcochile'], haceOVT: false, grupoServicioId: '' },
+  'john.estrada': { nombre: 'john Estrada', rol: 'dpe', departamento: 'TL', contrasena: 'demo123', empresa: 'Kyndryl', clientesIds: ['bcochile'], haceOVT: false, grupoServicioId: '' },
+  'maria.admin': { nombre: 'Maria Admin', rol: 'coordinador', departamento: 'Coordinación', contrasena: 'demo123', empresa: 'Kyndryl', clientesIds: ['bcochile'], haceOVT: false, grupoServicioId: '' },
+  'danilo.isla': { nombre: 'Danilo Isla', rol: 'itsm', departamento: 'ITSM', contrasena: 'demo123', empresa: 'Kyndryl', clientesIds: ['bcochile'], haceOVT: false, grupoServicioId: '' },
+  'jorge.maureira': { nombre: 'Jorge Maureira', rol: 'especialista', departamento: 'Middleware', contrasena: 'demo123', empresa: 'Kyndryl', clientesIds: ['bcochile'], haceOVT: true, grupoServicioId: '' },
+  'jhon.estrada': { nombre: 'Jhon Estrada', rol: 'especialista', departamento: 'Operaciones Cloud', contrasena: 'demo123', empresa: 'Kyndryl', clientesIds: ['bcochile'], haceOVT: true, grupoServicioId: '' },
+  'luis.vasquez': { nombre: 'Luis Vasquez', rol: 'especialista', departamento: 'Middleware', contrasena: 'demo123', empresa: 'Kyndryl', clientesIds: ['bcochile'], haceOVT: true, grupoServicioId: '' },
+  'moises.junco': { nombre: 'Moises Junco', rol: 'especialista', departamento: 'Operaciones Cloud', contrasena: 'demo123', empresa: 'Kyndryl', clientesIds: ['bcochile'], haceOVT: true, grupoServicioId: '' },
+  'manuel.urbina': { nombre: 'Manuel Urbina Hernández', rol: 'especialista', departamento: 'Middleware', contrasena: 'demo123', empresa: 'Kyndryl', clientesIds: ['bcochile'], haceOVT: true, grupoServicioId: '' },
+  'benjamin.fierro': { nombre: 'Benjamín Fierro', rol: 'especialista', departamento: 'Operaciones Cloud', contrasena: 'demo123', empresa: 'Kyndryl', clientesIds: ['bcochile'], haceOVT: true, grupoServicioId: '' },
+  'mauricio.serrano': { nombre: 'Mauricio Antonio Serrano Gonzalez', rol: 'especialista', departamento: 'Middleware', contrasena: 'demo123', empresa: 'Kyndryl', clientesIds: ['bcochile'], haceOVT: true, grupoServicioId: '' },
+  'ricardo.rojas': { nombre: 'Ricardo Andrés Rojas Ramos', rol: 'especialista', departamento: 'Operaciones Cloud', contrasena: 'demo123', empresa: 'Kyndryl', clientesIds: ['bcochile'], haceOVT: true, grupoServicioId: '' },
+  'ariel.garate': { nombre: 'Ariel Garate', rol: 'especialista', departamento: 'Middleware', contrasena: 'demo123', empresa: 'Kyndryl', clientesIds: ['bcochile'], haceOVT: true, grupoServicioId: '' },
+  'rodrigo.sanhueza': { nombre: 'Rodrigo Alejandro Sanhueza', rol: 'especialista', departamento: 'Middleware', contrasena: 'demo123', empresa: 'Kyndryl', clientesIds: ['bcochile'], haceOVT: true, grupoServicioId: '' },
+  'sebastian.arroyo': { nombre: 'Sebastian Arroyo Vigouroux', rol: 'especialista', departamento: 'Operaciones Cloud', contrasena: 'demo123', empresa: 'Kyndryl', clientesIds: ['bcochile'], haceOVT: true, grupoServicioId: '' },
+  'cristian.madariaga': { nombre: 'Cristian Madariaga', rol: 'especialista', departamento: 'Middleware', contrasena: 'demo123', empresa: 'Kyndryl', clientesIds: ['bcochile'], haceOVT: true, grupoServicioId: '' },
+  'miguel.martinez': { nombre: 'Miguel Martinez', rol: 'especialista', departamento: 'Operaciones Cloud', contrasena: 'demo123', empresa: 'Kyndryl', clientesIds: ['bcochile'], haceOVT: true, grupoServicioId: '' },
+  'fabian.tobar': { nombre: 'Fabian Tobar', rol: 'especialista', departamento: 'Middleware', contrasena: 'demo123', empresa: 'Kyndryl', clientesIds: ['bcochile'], haceOVT: true, grupoServicioId: '' },
+  'gustavo.perolo': { nombre: 'Gustavo Perolo', rol: 'especialista', departamento: 'Operaciones Cloud', contrasena: 'demo123', empresa: 'Kyndryl', clientesIds: ['bcochile'], haceOVT: true, grupoServicioId: '' },
+  'leonardo.silva': { nombre: 'Leonardo Silva', rol: 'especialista', departamento: 'Middleware', contrasena: 'demo123', empresa: 'Kyndryl', clientesIds: ['bcochile'], haceOVT: true, grupoServicioId: '' },
+  'cristian.lecaros': { nombre: 'Cristian Lecaros', rol: 'especialista', departamento: 'Operaciones Cloud', contrasena: 'demo123', empresa: 'Kyndryl', clientesIds: ['bcochile'], haceOVT: true, grupoServicioId: '' },
+  'rodrigo.escobedo': { nombre: 'Rodrigo Escobedo', rol: 'especialista', departamento: 'Middleware', contrasena: 'demo123', empresa: 'Kyndryl', clientesIds: ['bcochile'], haceOVT: true, grupoServicioId: '' },
+  'alexis.alfonzo': { nombre: 'Alexis José Alfonzo', rol: 'especialista', departamento: 'Operaciones Cloud', contrasena: 'demo123', empresa: 'Kyndryl', clientesIds: ['bcochile'], haceOVT: true, grupoServicioId: '' }
 };
 
-// Carga la semilla a Firestore SOLO si la colección 'usuarios' está vacía
-// (primera vez que corre el sistema con esta versión). Es idempotente:
-// si ya hay usuarios guardados, no hace nada y respeta lo que el admin haya gestionado.
 async function inicializarUsuarios() {
   try {
     const snapshot = await db.collection('usuarios').limit(1).get();
@@ -156,6 +153,40 @@ async function inicializarUsuarios() {
     console.error('✗ Error sembrando usuarios en Firestore:', err.message);
   }
 }
+
+// Semilla de clientes y grupos de servicio iniciales
+async function inicializarClientesYGrupos() {
+  try {
+    const snapClientes = await db.collection('clientes').limit(1).get();
+    if (!snapClientes.empty) {
+      console.log('✓ Colección "clientes" ya existe en Firestore');
+      return;
+    }
+    // Crear cliente inicial
+    await db.collection('clientes').doc('bcochile').set({
+      nombre: 'Banco de Chile',
+      activo: true,
+      creadoEn: new Date()
+    });
+    // Crear grupos de servicio iniciales
+    const grupos = [
+      { nombre: 'Middleware', descripcion: 'Equipo de middleware y aplicaciones' },
+      { nombre: 'Operaciones Cloud', descripcion: 'Operaciones en plataformas cloud (OCI, Azure, AWS)' },
+      { nombre: 'COE', descripcion: 'Center of Excellence' },
+      { nombre: 'ITSM', descripcion: 'IT Service Management' }
+    ];
+    const batchG = db.batch();
+    for (const g of grupos) {
+      const ref = db.collection('grupos_servicio').doc();
+      batchG.set(ref, { ...g, clienteId: 'bcochile', activo: true, creadoEn: new Date() });
+    }
+    await batchG.commit();
+    console.log('✓ Cliente "Banco de Chile" y 4 grupos de servicio sembrados en Firestore');
+  } catch (err) {
+    console.error('✗ Error sembrando clientes/grupos:', err.message);
+  }
+}
+
 
 // ============================================
 // MIDDLEWARE: Verificar Token
@@ -202,7 +233,7 @@ app.post('/api/auth/login', async (req, res) => {
     }
 
     const token = jwt.sign(
-      { usuario, nombre: user.nombre, rol: user.rol },
+      { usuario, nombre: user.nombre, rol: user.rol, clientesIds: user.clientesIds || ['bcochile'] },
       JWT_SECRET,
       { expiresIn: '24h' }
     );
@@ -217,7 +248,16 @@ app.post('/api/auth/login', async (req, res) => {
 
     res.json({
       token,
-      usuario: { usuario, nombre: user.nombre, rol: user.rol }
+      usuario: {
+        usuario,
+        nombre: user.nombre,
+        rol: user.rol,
+        empresa: user.empresa || 'Kyndryl',
+        haceOVT: user.haceOVT !== false,
+        clientesIds: user.clientesIds || ['bcochile'],
+        grupoServicioId: user.grupoServicioId || '',
+        departamento: user.departamento || ''
+      }
     });
   } catch (err) {
     console.error('Error en login:', err);
@@ -230,23 +270,33 @@ app.post('/api/auth/login', async (req, res) => {
 // ============================================
 app.get('/api/admin/listar-usuarios', verificarToken, async (req, res) => {
   try {
-    if (req.usuario.usuario !== 'admin') {
-      return res.status(403).json({ error: 'No tienes permisos' });
-    }
+    const esAdmin = req.usuario.rol === 'admin';
+    const esDpe = req.usuario.rol === 'dpe';
+    if (!esAdmin && !esDpe) return res.status(403).json({ error: 'No tienes permisos' });
 
     const snapshot = await db.collection('usuarios').get();
     const usuariosList = [];
     snapshot.forEach(doc => {
-      const datos = doc.data();
+      const d = doc.data();
+      // DPE solo ve usuarios de sus clientes
+      if (esDpe) {
+        const clientesDpe = req.usuario.clientesIds || [];
+        const clientesUsuario = d.clientesIds || ['bcochile'];
+        const tieneAcceso = clientesDpe.some(c => clientesUsuario.includes(c));
+        if (!tieneAcceso) return;
+      }
       usuariosList.push({
         usuario: doc.id,
-        nombre: datos.nombre,
-        rol: datos.rol,
-        departamento: datos.departamento || 'N/A',
-        empresa: datos.empresa || 'Sin asignar'
+        nombre: d.nombre,
+        rol: d.rol,
+        departamento: d.departamento || '',
+        empresa: d.empresa || 'Kyndryl',
+        clientesIds: d.clientesIds || ['bcochile'],
+        grupoServicioId: d.grupoServicioId || '',
+        haceOVT: d.haceOVT !== false
       });
     });
-
+    usuariosList.sort((a, b) => a.nombre.localeCompare(b.nombre));
     res.json({ success: true, usuarios: usuariosList });
   } catch (err) {
     console.error('Error listando usuarios:', err);
@@ -281,41 +331,48 @@ app.get('/api/especialistas', verificarToken, async (req, res) => {
 
 app.post('/api/admin/crear-usuario', verificarToken, async (req, res) => {
   try {
-    if (req.usuario.usuario !== 'admin') {
-      return res.status(403).json({ error: 'No tienes permisos para crear usuarios' });
-    }
+    const esAdmin = req.usuario.rol === 'admin';
+    const esDpe = req.usuario.rol === 'dpe';
+    if (!esAdmin && !esDpe) return res.status(403).json({ error: 'No tienes permisos para crear usuarios' });
 
-    const { usuario, nombre, rol, departamento, contrasena, empresa } = req.body;
+    const { usuario, nombre, rol, departamento, contrasena, empresa, clientesIds, grupoServicioId, haceOVT } = req.body;
 
-    if (!usuario || !nombre || !contrasena) {
-      return res.status(400).json({ error: 'Faltan campos requeridos' });
+    if (!usuario || !nombre || !contrasena) return res.status(400).json({ error: 'Faltan campos requeridos' });
+
+    // DPE solo puede crear usuarios para sus clientes
+    const clientesAsignados = clientesIds && Array.isArray(clientesIds) && clientesIds.length > 0
+      ? clientesIds
+      : (esDpe ? (req.usuario.clientesIds || ['bcochile']) : ['bcochile']);
+
+    if (esDpe) {
+      const clientesDpe = req.usuario.clientesIds || [];
+      const sinAcceso = clientesAsignados.filter(c => !clientesDpe.includes(c));
+      if (sinAcceso.length > 0) return res.status(403).json({ error: 'No tienes acceso a uno o más clientes indicados' });
     }
 
     const existente = await db.collection('usuarios').doc(usuario).get();
-    if (existente.exists) {
-      return res.status(400).json({ error: 'Ese nombre de usuario ya existe' });
-    }
+    if (existente.exists) return res.status(400).json({ error: 'Ese nombre de usuario ya existe' });
 
     await db.collection('usuarios').doc(usuario).set({
       nombre,
       contrasena,
-      rol: rol || 'admin',
+      rol: rol || 'especialista',
       departamento: departamento || '',
-      empresa: empresa || 'Kyndryl'
+      empresa: empresa || 'Kyndryl',
+      clientesIds: clientesAsignados,
+      grupoServicioId: grupoServicioId || '',
+      haceOVT: haceOVT !== false
     });
 
     await db.collection('auditoria').add({
       accion: 'CREAR_USUARIO',
       usuarioAdminNombre: req.usuario.nombre,
       usuarioCreado: usuario,
+      clientesIds: clientesAsignados,
       timestamp: new Date()
     });
 
-    res.json({
-      success: true,
-      message: `Usuario ${usuario} creado correctamente`,
-      usuario: { usuario, nombre, rol: rol || 'admin' }
-    });
+    res.json({ success: true, message: `Usuario ${usuario} creado correctamente`, usuario: { usuario, nombre, rol: rol || 'especialista' } });
   } catch (err) {
     console.error('Error creando usuario:', err);
     res.status(500).json({ error: err.message });
@@ -403,30 +460,37 @@ app.post('/api/admin/resetear-contrasena', verificarToken, async (req, res) => {
 // ============================================
 app.post('/api/admin/editar-usuario', verificarToken, async (req, res) => {
   try {
-    if (req.usuario.usuario !== 'admin') {
-      return res.status(403).json({ error: 'No tienes permisos para editar usuarios' });
-    }
+    const esAdmin = req.usuario.rol === 'admin';
+    const esDpe = req.usuario.rol === 'dpe';
+    if (!esAdmin && !esDpe) return res.status(403).json({ error: 'No tienes permisos para editar usuarios' });
 
-    const { usuario, empresa, nombre, departamento } = req.body;
-
-    if (!usuario) {
-      return res.status(400).json({ error: 'Usuario requerido' });
-    }
+    const { usuario, empresa, nombre, departamento, haceOVT, grupoServicioId, clientesIds, rol } = req.body;
+    if (!usuario) return res.status(400).json({ error: 'Usuario requerido' });
 
     const userRef = db.collection('usuarios').doc(usuario);
     const userDoc = await userRef.get();
-    if (!userDoc.exists) {
-      return res.status(404).json({ error: 'Usuario no encontrado' });
+    if (!userDoc.exists) return res.status(404).json({ error: 'Usuario no encontrado' });
+
+    // DPE verifica que el usuario pertenece a sus clientes
+    if (esDpe) {
+      const clientesDpe = req.usuario.clientesIds || [];
+      const clientesUsuario = userDoc.data().clientesIds || ['bcochile'];
+      const tieneAcceso = clientesDpe.some(c => clientesUsuario.includes(c));
+      if (!tieneAcceso) return res.status(403).json({ error: 'No tienes acceso a este usuario' });
+      // DPE no puede cambiar rol a admin
+      if (rol === 'admin') return res.status(403).json({ error: 'DPE no puede asignar rol admin' });
     }
 
     const cambios = {};
     if (empresa !== undefined) cambios.empresa = empresa;
     if (nombre !== undefined && nombre !== '') cambios.nombre = nombre;
     if (departamento !== undefined && departamento !== '') cambios.departamento = departamento;
+    if (haceOVT !== undefined) cambios.haceOVT = Boolean(haceOVT);
+    if (grupoServicioId !== undefined) cambios.grupoServicioId = grupoServicioId;
+    if (clientesIds !== undefined && Array.isArray(clientesIds)) cambios.clientesIds = clientesIds;
+    if (rol !== undefined) cambios.rol = rol;
 
-    if (Object.keys(cambios).length === 0) {
-      return res.status(400).json({ error: 'No se enviaron campos para actualizar' });
-    }
+    if (Object.keys(cambios).length === 0) return res.status(400).json({ error: 'No se enviaron campos para actualizar' });
 
     await userRef.update(cambios);
 
@@ -1048,6 +1112,86 @@ app.delete('/api/claims', verificarToken, async (req, res) => {
 });
 
 // ============================================
+// CLIENTES — CRUD
+// ============================================
+
+// Listar clientes (admin ve todos, DPE ve solo los suyos)
+app.get('/api/clientes', verificarToken, async (req, res) => {
+  try {
+    const snap = await db.collection('clientes').get();
+    const todos = [];
+    snap.forEach(doc => todos.push({ id: doc.id, ...doc.data() }));
+    if (req.usuario.rol === 'admin') return res.json(todos);
+    // DPE: filtra por sus clientes
+    const suyos = (req.usuario.clientesIds || []);
+    res.json(todos.filter(c => suyos.includes(c.id)));
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Crear cliente (solo admin)
+app.post('/api/clientes', verificarToken, async (req, res) => {
+  try {
+    if (req.usuario.rol !== 'admin') return res.status(403).json({ error: 'Solo admin' });
+    const { id, nombre } = req.body;
+    if (!id || !nombre) return res.status(400).json({ error: 'id y nombre requeridos' });
+    const existe = await db.collection('clientes').doc(id).get();
+    if (existe.exists) return res.status(400).json({ error: 'Ya existe un cliente con ese ID' });
+    await db.collection('clientes').doc(id).set({ nombre, activo: true, creadoEn: new Date() });
+    res.json({ success: true, id, nombre });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ============================================
+// GRUPOS DE SERVICIO — CRUD
+// ============================================
+
+// Listar grupos (filtrados por clienteId)
+app.get('/api/grupos-servicio', verificarToken, async (req, res) => {
+  try {
+    const { clienteId } = req.query;
+    let query = db.collection('grupos_servicio').where('activo', '==', true);
+    if (clienteId) query = query.where('clienteId', '==', clienteId);
+    const snap = await query.get();
+    const grupos = [];
+    snap.forEach(doc => grupos.push({ id: doc.id, ...doc.data() }));
+    grupos.sort((a, b) => a.nombre.localeCompare(b.nombre));
+    res.json(grupos);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Crear grupo (admin o DPE de ese cliente)
+app.post('/api/grupos-servicio', verificarToken, async (req, res) => {
+  try {
+    const { clienteId, nombre, descripcion } = req.body;
+    if (!clienteId || !nombre) return res.status(400).json({ error: 'clienteId y nombre requeridos' });
+    // Verificar permisos
+    const esAdmin = req.usuario.rol === 'admin';
+    const esDpe = req.usuario.rol === 'dpe' && (req.usuario.clientesIds || []).includes(clienteId);
+    if (!esAdmin && !esDpe) return res.status(403).json({ error: 'Sin permisos para este cliente' });
+    const ref = await db.collection('grupos_servicio').add({
+      clienteId, nombre, descripcion: descripcion || '', activo: true, creadoEn: new Date(), creadoPor: req.usuario.nombre
+    });
+    res.json({ success: true, id: ref.id, nombre });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Editar grupo
+app.patch('/api/grupos-servicio/:id', verificarToken, async (req, res) => {
+  try {
+    const esAdmin = req.usuario.rol === 'admin';
+    const esDpe = req.usuario.rol === 'dpe';
+    if (!esAdmin && !esDpe) return res.status(403).json({ error: 'Sin permisos' });
+    const { nombre, descripcion, activo } = req.body;
+    const cambios = {};
+    if (nombre !== undefined) cambios.nombre = nombre;
+    if (descripcion !== undefined) cambios.descripcion = descripcion;
+    if (activo !== undefined) cambios.activo = activo;
+    await db.collection('grupos_servicio').doc(req.params.id).update(cambios);
+    res.json({ success: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ============================================
 // START SERVER
 // ============================================
 
@@ -1059,8 +1203,9 @@ app.listen(PORT, async () => {
   console.log('✓ Firebase: CONECTADO');
   console.log('✓ Auditoría: ACTIVA');
   console.log('✓ Telegram:', TELEGRAM_BOT_TOKEN ? 'CONFIGURADO' : 'NO CONFIGURADO');
-  console.log('✓ Campo N° Ticket: HABILITADO');
-  console.log('✓ Usuarios: persistidos en Firestore (colección "usuarios")');
+  console.log('✓ Multi-cliente: ACTIVO (clientes + grupos_servicio)');
+  console.log('✓ Rol DPE: HABILITADO');
   console.log('==================================================');
   await inicializarUsuarios();
+  await inicializarClientesYGrupos();
 });
