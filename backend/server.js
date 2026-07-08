@@ -1223,6 +1223,18 @@ app.patch('/api/grupos-servicio/:id', verificarToken, async (req, res) => {
     const esAdmin = req.usuario.rol === 'admin';
     const esDpe = req.usuario.rol === 'dpe';
     if (!esAdmin && !esDpe) return res.status(403).json({ error: 'Sin permisos' });
+
+    const grupoDoc = await db.collection('grupos_servicio').doc(req.params.id).get();
+    if (!grupoDoc.exists) return res.status(404).json({ error: 'Grupo no encontrado' });
+
+    // DPE solo puede editar grupos de sus clientes
+    if (esDpe) {
+      const clientesDpe = req.usuario.clientesIds || [];
+      if (!clientesDpe.includes(grupoDoc.data().clienteId)) {
+        return res.status(403).json({ error: 'No tienes acceso a este grupo' });
+      }
+    }
+
     const { nombre, descripcion, activo } = req.body;
     const cambios = {};
     if (nombre !== undefined) cambios.nombre = nombre;
@@ -1230,6 +1242,43 @@ app.patch('/api/grupos-servicio/:id', verificarToken, async (req, res) => {
     if (activo !== undefined) cambios.activo = activo;
     await db.collection('grupos_servicio').doc(req.params.id).update(cambios);
     res.json({ success: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// DELETE /api/grupos-servicio/:id — admin y DPE (solo de sus clientes)
+app.delete('/api/grupos-servicio/:id', verificarToken, async (req, res) => {
+  try {
+    const esAdmin = req.usuario.rol === 'admin';
+    const esDpe = req.usuario.rol === 'dpe';
+    if (!esAdmin && !esDpe) return res.status(403).json({ error: 'Sin permisos' });
+
+    const grupoDoc = await db.collection('grupos_servicio').doc(req.params.id).get();
+    if (!grupoDoc.exists) return res.status(404).json({ error: 'Grupo no encontrado' });
+
+    // DPE solo puede eliminar grupos de sus clientes
+    if (esDpe) {
+      const clientesDpe = req.usuario.clientesIds || [];
+      if (!clientesDpe.includes(grupoDoc.data().clienteId)) {
+        return res.status(403).json({ error: 'No tienes acceso a este grupo' });
+      }
+    }
+
+    // Verificar que no haya usuarios asignados a este grupo
+    const usuariosConGrupo = await db.collection('usuarios')
+      .where('grupoServicioId', '==', req.params.id).limit(1).get();
+    if (!usuariosConGrupo.empty) {
+      return res.status(400).json({ error: 'No se puede eliminar: hay usuarios asignados a este grupo. Reasigna los usuarios primero.' });
+    }
+
+    await db.collection('grupos_servicio').doc(req.params.id).delete();
+    await db.collection('auditoria').add({
+      accion: 'ELIMINAR_GRUPO',
+      usuarioNombre: req.usuario.nombre,
+      grupoId: req.params.id,
+      grupoNombre: grupoDoc.data().nombre,
+      timestamp: new Date()
+    });
+    res.json({ success: true, message: 'Grupo eliminado' });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
