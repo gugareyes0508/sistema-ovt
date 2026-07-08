@@ -106,6 +106,7 @@ function App() {
         }
       })
       .catch(() => {});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, usuario?.rol]);
   const [auditoria, setAuditoria] = useState([]);
   const [editandoId, setEditandoId] = useState(null);
@@ -741,7 +742,6 @@ function App() {
   // ============================================
   // VISTA: APLICACIÓN PRINCIPAL
   // ============================================
-  const nombreClienteActivo = clientesInfo.find(c => c.id === clienteActivo)?.nombre || clienteActivo;
   const esDpeMultiCliente = usuario?.rol === 'dpe' && (usuario?.clientesIds||[]).length > 1;
 
   return (

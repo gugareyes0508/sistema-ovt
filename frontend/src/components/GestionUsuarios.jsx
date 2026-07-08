@@ -47,6 +47,7 @@ const GestionUsuarios = ({ token, apiUrl }) => {
       setGrupos(resG.data || []);
     } catch (err) { console.error(err); }
     finally { setLoading(false); }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [apiUrl, token]);
 
   useEffect(() => { cargar(); }, [cargar]);
