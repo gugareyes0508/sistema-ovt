@@ -584,7 +584,7 @@ app.get('/api/registros', verificarToken, async (req, res) => {
             String(r.cliente || '').toLowerCase() === nombreCliente.toLowerCase()
           );
         } else {
-          registros = []; // cliente no encontrado → no mostrar nada
+          registros = [];
         }
       }
     }
@@ -1069,7 +1069,10 @@ app.get('/api/claims', verificarToken, async (req, res) => {
     if (esDpe) {
       const clienteActivoId = req.headers['x-cliente-activo'] || '';
       if (clienteActivoId) {
-        semanas = semanas.filter(s => s.clienteId === clienteActivoId);
+        semanas = semanas.filter(s =>
+          // Si no tiene clienteId, asumir bcochile (datos migrados antes del campo)
+          (s.clienteId || 'bcochile') === clienteActivoId
+        );
       }
     }
 
