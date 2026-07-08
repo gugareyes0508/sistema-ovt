@@ -10,7 +10,9 @@ const Badge = ({ text, color='#6b7280' }) => (
     background:`${color}18`, color, border:`1px solid ${color}40`, whiteSpace:'nowrap' }}>{text}</span>
 );
 
-const GestionUsuarios = ({ token, apiUrl }) => {
+const GestionUsuarios = ({ token, apiUrl, rolUsuario = 'admin' }) => {
+  const esAdmin = rolUsuario === 'admin';
+
   const [usuarios, setUsuarios] = useState([]);
   const [clientes, setClientes] = useState([]);
   const [grupos, setGrupos] = useState([]);
@@ -27,10 +29,14 @@ const GestionUsuarios = ({ token, apiUrl }) => {
   const [modalCliente, setModalCliente] = useState({ abierto:false });
   const [nuevoClienteId, setNuevoClienteId] = useState('');
   const [nuevoClienteNombre, setNuevoClienteNombre] = useState('');
-  // Modal grupo
+  // Modal grupo (crear)
   const [modalGrupo, setModalGrupo] = useState({ abierto:false, clienteId:'' });
   const [nuevoGrupoNombre, setNuevoGrupoNombre] = useState('');
   const [nuevoGrupoDesc, setNuevoGrupoDesc] = useState('');
+  // Modal editar grupo
+  const [modalEditGrupo, setModalEditGrupo] = useState({ abierto:false, grupo:null });
+  const [editGrupoNombre, setEditGrupoNombre] = useState('');
+  const [editGrupoDesc, setEditGrupoDesc] = useState('');
 
   const headers = { Authorization: `Bearer ${token}` };
 
@@ -136,6 +142,30 @@ const GestionUsuarios = ({ token, apiUrl }) => {
     } catch (err) { alert('❌ ' + (err.response?.data?.error || err.message)); }
   };
 
+  // ── Editar grupo ──
+  const abrirEditarGrupo = (grupo) => {
+    setModalEditGrupo({ abierto:true, grupo });
+    setEditGrupoNombre(grupo.nombre);
+    setEditGrupoDesc(grupo.descripcion || '');
+  };
+
+  const guardarEditGrupo = async () => {
+    if (!editGrupoNombre) { alert('Nombre requerido'); return; }
+    try {
+      await axios.patch(`${apiUrl}/api/grupos-servicio/${modalEditGrupo.grupo.id}`, { nombre: editGrupoNombre, descripcion: editGrupoDesc }, { headers });
+      alert('✅ Grupo actualizado'); setModalEditGrupo({abierto:false, grupo:null}); cargar();
+    } catch (err) { alert('❌ ' + (err.response?.data?.error || err.message)); }
+  };
+
+  // ── Eliminar grupo ──
+  const eliminarGrupo = async (grupo) => {
+    if (!window.confirm(`¿Eliminar el grupo "${grupo.nombre}"?\nLos usuarios asignados a este grupo perderán su grupo.`)) return;
+    try {
+      await axios.delete(`${apiUrl}/api/grupos-servicio/${grupo.id}`, { headers });
+      alert('✅ Grupo eliminado'); cargar();
+    } catch (err) { alert('❌ ' + (err.response?.data?.error || err.message)); }
+  };
+
   // ── helpers UI ──
   const Input = ({ label, ...props }) => (
     <div style={{ marginBottom:'12px' }}>
@@ -174,7 +204,13 @@ const GestionUsuarios = ({ token, apiUrl }) => {
             </div>
             <div style={{ display:'flex', flexWrap:'wrap', gap:'6px' }}>
               {gruposPorCliente(c.id).map(g => (
-                <span key={g.id} style={{ fontSize:'11px', background:'#e0f2fe', color:'#0369a1', padding:'2px 8px', borderRadius:'4px' }}>{g.nombre}</span>
+                <div key={g.id} style={{ display:'flex', alignItems:'center', gap:'4px', background:'#e0f2fe', borderRadius:'4px', padding:'2px 4px 2px 8px' }}>
+                  <span style={{ fontSize:'11px', color:'#0369a1' }}>{g.nombre}</span>
+                  <button onClick={() => abrirEditarGrupo(g)} title="Editar grupo"
+                    style={{ background:'none', border:'none', cursor:'pointer', fontSize:'11px', padding:'0 2px', color:'#0369a1', lineHeight:1 }}>✏️</button>
+                  <button onClick={() => eliminarGrupo(g)} title="Eliminar grupo"
+                    style={{ background:'none', border:'none', cursor:'pointer', fontSize:'11px', padding:'0 2px', color:'#dc2626', lineHeight:1 }}>✕</button>
+                </div>
               ))}
               {gruposPorCliente(c.id).length === 0 && <span style={{ fontSize:'11px', color:'#9ca3af' }}>Sin grupos</span>}
             </div>
@@ -183,12 +219,15 @@ const GestionUsuarios = ({ token, apiUrl }) => {
             </div>
           </div>
         ))}
-        <div style={{ border:'1.5px dashed #d1d5db', borderRadius:'10px', padding:'14px 16px', display:'flex', alignItems:'center', justifyContent:'center' }}>
-          <button onClick={() => setModalCliente({abierto:true})}
-            style={{ fontSize:'13px', color:'#6b7280', background:'none', border:'none', cursor:'pointer', fontWeight:'600' }}>
-            🏦 + Nuevo Cliente
-          </button>
-        </div>
+        {/* Nuevo Cliente — SOLO ADMIN */}
+        {esAdmin && (
+          <div style={{ border:'1.5px dashed #d1d5db', borderRadius:'10px', padding:'14px 16px', display:'flex', alignItems:'center', justifyContent:'center' }}>
+            <button onClick={() => setModalCliente({abierto:true})}
+              style={{ fontSize:'13px', color:'#6b7280', background:'none', border:'none', cursor:'pointer', fontWeight:'600' }}>
+              🏦 + Nuevo Cliente
+            </button>
+          </div>
+        )}
       </div>
 
       {/* FILTROS + BOTÓN CREAR */}
@@ -383,7 +422,31 @@ const GestionUsuarios = ({ token, apiUrl }) => {
         </div>
       )}
 
-      {/* ── MODAL GRUPO ── */}
+      {/* ── MODAL EDITAR GRUPO ── */}
+      {modalEditGrupo.abierto && (
+        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.4)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:9999 }}>
+          <div style={{ background:'#fff', borderRadius:'14px', padding:'28px', width:'100%', maxWidth:'400px', boxShadow:'0 20px 60px rgba(0,0,0,0.3)' }}>
+            <h3 style={{ marginTop:0, marginBottom:'6px' }}>✏️ Editar Grupo</h3>
+            <p style={{ fontSize:'12px', color:'#9ca3af', marginBottom:'20px' }}>
+              Cliente: <strong>{nombreCliente(modalEditGrupo.grupo?.clienteId)}</strong>
+            </p>
+            <div style={{ marginBottom:'12px' }}>
+              <label style={{ display:'block', fontSize:'12px', fontWeight:'600', color:'#6b7280', marginBottom:'5px' }}>Nombre *</label>
+              <input value={editGrupoNombre} onChange={e=>setEditGrupoNombre(e.target.value)}
+                style={{ width:'100%', padding:'9px 12px', border:'1px solid #d1d5db', borderRadius:'8px', fontSize:'13px', boxSizing:'border-box' }} />
+            </div>
+            <div style={{ marginBottom:'20px' }}>
+              <label style={{ display:'block', fontSize:'12px', fontWeight:'600', color:'#6b7280', marginBottom:'5px' }}>Descripción</label>
+              <input value={editGrupoDesc} onChange={e=>setEditGrupoDesc(e.target.value)}
+                style={{ width:'100%', padding:'9px 12px', border:'1px solid #d1d5db', borderRadius:'8px', fontSize:'13px', boxSizing:'border-box' }} />
+            </div>
+            <div style={{ display:'flex', gap:'10px' }}>
+              <button onClick={guardarEditGrupo} style={{ flex:1, padding:'11px', background:'#FF462D', color:'#fff', border:'none', borderRadius:'8px', fontWeight:'700', cursor:'pointer' }}>✅ Guardar</button>
+              <button onClick={()=>setModalEditGrupo({abierto:false,grupo:null})} style={{ flex:1, padding:'11px', background:'#f3f4f6', color:'#374151', border:'1px solid #d1d5db', borderRadius:'8px', fontWeight:'600', cursor:'pointer' }}>Cancelar</button>
+            </div>
+          </div>
+        </div>
+      )}
       {modalGrupo.abierto && (
         <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.4)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:9999 }}>
           <div style={{ background:'#fff', borderRadius:'14px', padding:'28px', width:'100%', maxWidth:'400px', boxShadow:'0 20px 60px rgba(0,0,0,0.3)' }}>
