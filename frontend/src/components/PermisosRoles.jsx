@@ -21,6 +21,7 @@ const VISTAS = [
 const ROLES = [
   { id:'admin',        label:'admin',        color:'#dc2626', bg:'#fee2e2' },
   { id:'dpe',          label:'dpe',          color:'#2563eb', bg:'#eff6ff' },
+  { id:'teamleader',   label:'teamleader',   color:'#7c3aed', bg:'#ede9fe' },
   { id:'especialista', label:'especialista', color:'#d97706', bg:'#fef3c7' },
   { id:'itsm',         label:'itsm',         color:'#059669', bg:'#d1fae5' },
 ];
@@ -30,6 +31,7 @@ const GRUPOS = ['Admin/DPE','Especialista','ITSM'];
 const PERMISOS_DEFAULT = {
   admin:        { dashboard:true, analytics:true, 'ovt-proyectado':true, claim:true, usuarios:true, mantenedor:true, auditoria:true, 'permisos-roles':true, registros:false, resumen:false, 'carga-excel':false, 'proyeccion-nueva':false, 'proyeccion-mis':false, 'proyeccion-excel':false },
   dpe:          { dashboard:true, analytics:true, 'ovt-proyectado':true, claim:true, usuarios:true, mantenedor:false, auditoria:false, 'permisos-roles':false, registros:false, resumen:false, 'carga-excel':false, 'proyeccion-nueva':false, 'proyeccion-mis':false, 'proyeccion-excel':false },
+  teamleader:   { dashboard:true, analytics:true, 'ovt-proyectado':false, claim:false, usuarios:false, mantenedor:false, auditoria:false, 'permisos-roles':false, registros:false, resumen:false, 'carga-excel':false, 'proyeccion-nueva':false, 'proyeccion-mis':false, 'proyeccion-excel':false },
   especialista: { dashboard:false, analytics:false, 'ovt-proyectado':false, claim:false, usuarios:false, mantenedor:false, auditoria:false, 'permisos-roles':false, registros:true, resumen:true, 'carga-excel':true, 'proyeccion-nueva':false, 'proyeccion-mis':false, 'proyeccion-excel':false },
   itsm:         { dashboard:false, analytics:false, 'ovt-proyectado':false, claim:false, usuarios:false, mantenedor:false, auditoria:false, 'permisos-roles':false, registros:false, resumen:false, 'carga-excel':false, 'proyeccion-nueva':true, 'proyeccion-mis':true, 'proyeccion-excel':true },
 };

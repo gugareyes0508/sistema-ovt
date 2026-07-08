@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 
-const ROLES = ['admin','dpe','itsm','especialista'];
+const ROLES = ['admin','dpe','teamleader','itsm','especialista'];
 const EMPRESAS = ['Kyndryl','Incosec','Biznet','Otra'];
-const ROL_COLORS = { admin:'#dc2626', dpe:'#2563eb', itsm:'#059669', especialista:'#d97706', coordinador:'#7c3aed' };
+const ROL_COLORS = { admin:'#dc2626', dpe:'#2563eb', teamleader:'#7c3aed', itsm:'#059669', especialista:'#d97706', coordinador:'#7c3aed' };
 
 const Badge = ({ text, color='#6b7280' }) => (
   <span style={{ display:'inline-block', padding:'2px 8px', borderRadius:'12px', fontSize:'11px', fontWeight:'600',

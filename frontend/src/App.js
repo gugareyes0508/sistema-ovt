@@ -92,6 +92,8 @@ function App() {
       setVista('proyeccion-mis');
     } else if (usuario?.rol === 'dpe') {
       setVista('dashboard');
+    } else if (usuario?.rol === 'teamleader') {
+      setVista('dashboard');
     }
   }, [usuario?.rol]);
 
@@ -865,6 +867,13 @@ function App() {
           </>
         )}
 
+        {usuario.rol === 'teamleader' && (
+          <>
+            <button className={vista === 'dashboard' ? 'nav-btn active' : 'nav-btn'} onClick={() => setVista('dashboard')}>📊 Dashboard</button>
+            {puedeVer('analytics') && <button className={vista === 'analytics' ? 'nav-btn active' : 'nav-btn'} onClick={() => setVista('analytics')}>📈 Analytics</button>}
+          </>
+        )}
+
         {usuario.rol === 'admin' && (
           <>
             {puedeVer('dashboard') && <button className={vista === 'dashboard' ? 'nav-btn active' : 'nav-btn'} onClick={() => setVista('dashboard')}>📊 Dashboard</button>}
@@ -1110,7 +1119,7 @@ function App() {
         )}
 
         {/* SECCIÓN: ANALYTICS */}
-        {vista === 'analytics' && (usuario.rol === 'admin' || usuario.rol === 'dpe') && (
+        {vista === 'analytics' && (usuario.rol === 'admin' || usuario.rol === 'dpe' || usuario.rol === 'teamleader') && (
           <section className="seccion">
             <Analytics registros={registros} usuarios={usuarioList} token={token} />
           </section>
@@ -1373,7 +1382,7 @@ function App() {
         )}
 
         {/* SECCIÓN: DASHBOARD (Admin) */}
-        {vista === 'dashboard' && (usuario.rol === 'admin' || usuario.rol === 'dpe') && (
+        {vista === 'dashboard' && (usuario.rol === 'admin' || usuario.rol === 'dpe' || usuario.rol === 'teamleader') && (
           <section className="seccion">
             <h2>📊 Dashboard - Gestión de Registros</h2>
             
