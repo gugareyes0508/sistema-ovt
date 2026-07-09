@@ -783,17 +783,22 @@ function App() {
   return (
     <div className="app">
       {/* HEADER */}
-      <header className="header" style={{ display:'grid', gridTemplateColumns:'1fr auto 1fr', alignItems:'center', gap:'12px' }}>
+      <header className="header">
 
-        {/* IZQUIERDA — marca */}
+        {/* IZQUIERDA — wordmark */}
         <div className="header-left">
-          <h1>🕐 Sistema OVT v2</h1>
+          <h1>
+            kyndryl
+            <span className="header-separator"></span>
+            <span className="header-module">Sistema OVT</span>
+          </h1>
         </div>
 
-        {/* CENTRO — pill de cliente activo (solo DPE o admin con cliente activo) */}
+        {/* CENTRO — pill cliente */}
         <div style={{ display:'flex', justifyContent:'center' }}>
           {(usuario?.rol === 'dpe' || usuario?.rol === 'admin') && clienteActivo && clientesInfo.length > 0 && (
-            <div style={{ position:'relative' }}>
+            <div className="header-client-pill">
+              <div className="header-client-dot"></div>
               <select
                 value={clienteActivo}
                 onChange={e => {
@@ -803,88 +808,75 @@ function App() {
                   setRegistros([]);
                   setVista('dashboard');
                 }}
-                style={{
-                  appearance:'none', WebkitAppearance:'none',
-                  padding:'7px 36px 7px 14px',
-                  borderRadius:'20px',
-                  border:'1.5px solid rgba(255,255,255,0.4)',
-                  background:'rgba(0,0,0,0.18)',
-                  color:'#fff',
-                  fontSize:'13px',
-                  fontWeight:'700',
-                  cursor: clientesInfo.filter(c=>(usuario.clientesIds||[usuario?.clientesIds?.[0]||'bcochile']).includes(c.id)).length > 1 ? 'pointer' : 'default',
-                  letterSpacing:'0.1px'
-                }}
               >
                 {clientesInfo
                   .filter(c => (usuario.rol === 'admin') ? true : (usuario.clientesIds||[]).includes(c.id))
                   .map(c => (
-                    <option key={c.id} value={c.id} style={{ background:'#11131a', color:'#fff' }}>{c.nombre}</option>
+                    <option key={c.id} value={c.id}>{c.nombre}</option>
                   ))}
               </select>
-              {/* punto verde de estado + flecha */}
-              <span style={{ position:'absolute', left:'10px', top:'50%', transform:'translateY(-50%)', width:'7px', height:'7px', borderRadius:'50%', background:'#4ade80', pointerEvents:'none', display:'none' }}></span>
-              <span style={{ position:'absolute', right:'12px', top:'50%', transform:'translateY(-50%)', color:'rgba(255,255,255,0.8)', pointerEvents:'none', fontSize:'11px' }}>▾</span>
             </div>
           )}
         </div>
 
         {/* DERECHA — usuario + salir */}
-        <div className="header-right" style={{ justifyContent:'flex-end' }}>
+        <div className="header-right">
           <span className="user-badge">
-            {usuario.nombre} <br />
+            {usuario.nombre}
             <small>({usuario.rol})</small>
           </span>
-          <button className="btn-logout" onClick={manejarLogout}>Salir</button>
+          <button className="btn-logout" onClick={manejarLogout}>
+            Salir
+          </button>
         </div>
       </header>
 
-      {/* NAVEGACIÓN */}
+      {/* NAVEGACIÓN — sin emojis, íconos Tabler */}
       <nav className="nav">
         {usuario.rol === 'especialista' && (
           <>
-            {puedeVer('registros') && <button className={vista === 'registros' ? 'nav-btn active' : 'nav-btn'} onClick={() => setVista('registros')}>📋 Registrar Cambio/Alerta</button>}
-            {puedeVer('resumen') && <button className={vista === 'resumen' ? 'nav-btn active' : 'nav-btn'} onClick={() => setVista('resumen')}>📊 Mi Resumen</button>}
-            {puedeVer('carga-excel') && <button className={vista === 'excel-upload' ? 'nav-btn active' : 'nav-btn'} onClick={() => setVista('excel-upload')}>📥 Cargar Excel</button>}
+            {puedeVer('registros') && <button className={vista === 'registros' ? 'nav-btn active' : 'nav-btn'} onClick={() => setVista('registros')}><i className="ti ti-edit" aria-hidden="true"></i>Registrar cambio</button>}
+            {puedeVer('resumen') && <button className={vista === 'resumen' ? 'nav-btn active' : 'nav-btn'} onClick={() => setVista('resumen')}><i className="ti ti-chart-bar" aria-hidden="true"></i>Mi resumen</button>}
+            {puedeVer('carga-excel') && <button className={vista === 'excel-upload' ? 'nav-btn active' : 'nav-btn'} onClick={() => setVista('excel-upload')}><i className="ti ti-upload" aria-hidden="true"></i>Cargar Excel</button>}
           </>
         )}
 
         {usuario.rol === 'itsm' && (
           <>
-            {puedeVer('proyeccion-nueva') && <button className={vista === 'proyeccion-nueva' ? 'nav-btn active' : 'nav-btn'} onClick={() => setVista('proyeccion-nueva')}>📋 Nueva Proyección</button>}
-            {puedeVer('proyeccion-mis') && <button className={vista === 'proyeccion-mis' ? 'nav-btn active' : 'nav-btn'} onClick={() => setVista('proyeccion-mis')}>📊 Mis Proyecciones</button>}
-            {puedeVer('proyeccion-excel') && <button className={vista === 'proyeccion-excel' ? 'nav-btn active' : 'nav-btn'} onClick={() => setVista('proyeccion-excel')}>📥 Cargar Excel</button>}
+            {puedeVer('proyeccion-nueva') && <button className={vista === 'proyeccion-nueva' ? 'nav-btn active' : 'nav-btn'} onClick={() => setVista('proyeccion-nueva')}><i className="ti ti-plus" aria-hidden="true"></i>Nueva proyección</button>}
+            {puedeVer('proyeccion-mis') && <button className={vista === 'proyeccion-mis' ? 'nav-btn active' : 'nav-btn'} onClick={() => setVista('proyeccion-mis')}><i className="ti ti-chart-bar" aria-hidden="true"></i>Mis proyecciones</button>}
+            {puedeVer('proyeccion-excel') && <button className={vista === 'proyeccion-excel' ? 'nav-btn active' : 'nav-btn'} onClick={() => setVista('proyeccion-excel')}><i className="ti ti-upload" aria-hidden="true"></i>Cargar Excel</button>}
           </>
         )}
 
         {usuario.rol === 'dpe' && (
           <>
-            {puedeVer('dashboard') && <button className={vista === 'dashboard' ? 'nav-btn active' : 'nav-btn'} onClick={() => setVista('dashboard')}>📊 Dashboard</button>}
-            {puedeVer('analytics') && <button className={vista === 'analytics' ? 'nav-btn active' : 'nav-btn'} onClick={() => setVista('analytics')}>📈 Analytics</button>}
-            {puedeVer('ovt-proyectado') && <button className={vista === 'ovt-proyectado' ? 'nav-btn active' : 'nav-btn'} onClick={() => setVista('ovt-proyectado')}>📅 OVT Proyectado</button>}
-            {puedeVer('claim') && <button className={vista === 'claim' ? 'nav-btn active' : 'nav-btn'} onClick={() => setVista('claim')}>🕐 Control de Labor</button>}
-            {puedeVer('usuarios') && <button className={vista === 'usuarios' ? 'nav-btn active' : 'nav-btn'} onClick={() => setVista('usuarios')}>👥 Gestión de Usuarios</button>}
+            {puedeVer('dashboard') && <button className={vista === 'dashboard' ? 'nav-btn active' : 'nav-btn'} onClick={() => setVista('dashboard')}><i className="ti ti-layout-dashboard" aria-hidden="true"></i>Dashboard</button>}
+            {puedeVer('analytics') && <button className={vista === 'analytics' ? 'nav-btn active' : 'nav-btn'} onClick={() => setVista('analytics')}><i className="ti ti-chart-bar" aria-hidden="true"></i>Analytics</button>}
+            {puedeVer('ovt-proyectado') && <button className={vista === 'ovt-proyectado' ? 'nav-btn active' : 'nav-btn'} onClick={() => setVista('ovt-proyectado')}><i className="ti ti-calendar" aria-hidden="true"></i>OVT proyectado</button>}
+            {puedeVer('claim') && <button className={vista === 'claim' ? 'nav-btn active' : 'nav-btn'} onClick={() => setVista('claim')}><i className="ti ti-clock" aria-hidden="true"></i>Control de labor</button>}
+            {puedeVer('usuarios') && <button className={vista === 'usuarios' ? 'nav-btn active' : 'nav-btn'} onClick={() => setVista('usuarios')}><i className="ti ti-users" aria-hidden="true"></i>Usuarios</button>}
           </>
         )}
 
         {usuario.rol === 'teamleader' && (
           <>
-            <button className={vista === 'dashboard' ? 'nav-btn active' : 'nav-btn'} onClick={() => setVista('dashboard')}>📊 Dashboard</button>
-            {puedeVer('analytics') && <button className={vista === 'analytics' ? 'nav-btn active' : 'nav-btn'} onClick={() => setVista('analytics')}>📈 Analytics</button>}
+            <button className={vista === 'dashboard' ? 'nav-btn active' : 'nav-btn'} onClick={() => setVista('dashboard')}><i className="ti ti-layout-dashboard" aria-hidden="true"></i>Dashboard</button>
+            {puedeVer('analytics') && <button className={vista === 'analytics' ? 'nav-btn active' : 'nav-btn'} onClick={() => setVista('analytics')}><i className="ti ti-chart-bar" aria-hidden="true"></i>Analytics</button>}
           </>
         )}
 
         {usuario.rol === 'admin' && (
           <>
-            {puedeVer('dashboard') && <button className={vista === 'dashboard' ? 'nav-btn active' : 'nav-btn'} onClick={() => setVista('dashboard')}>📊 Dashboard</button>}
-            {puedeVer('analytics') && <button className={vista === 'analytics' ? 'nav-btn active' : 'nav-btn'} onClick={() => setVista('analytics')}>📈 Analytics</button>}
-            {puedeVer('ovt-proyectado') && <button className={vista === 'ovt-proyectado' ? 'nav-btn active' : 'nav-btn'} onClick={() => setVista('ovt-proyectado')}>📅 OVT Proyectado</button>}
-            {puedeVer('claim') && <button className={vista === 'claim' ? 'nav-btn active' : 'nav-btn'} onClick={() => setVista('claim')}>🕐 Control de Labor</button>}
-            {puedeVer('usuarios') && <button className={vista === 'usuarios' ? 'nav-btn active' : 'nav-btn'} onClick={() => setVista('usuarios')}>👥 Gestión de Usuarios</button>}
-            {puedeVer('mantenedor') && <button className={vista === 'mantenedor' ? 'nav-btn active' : 'nav-btn'} onClick={() => setVista('mantenedor')}>⚙️ Mantenedor</button>}
-            {puedeVer('auditoria') && <button className={vista === 'auditoria' ? 'nav-btn active' : 'nav-btn'} onClick={() => setVista('auditoria')}>🔍 Auditoría</button>}
-            <button className={vista === 'permisos-roles' ? 'nav-btn active' : 'nav-btn'} onClick={() => setVista('permisos-roles')}>🔐 Permisos</button>
-            <button className={vista === 'test-groq' ? 'nav-btn active' : 'nav-btn'} onClick={() => setVista('test-groq')}>🧪 Test GROQ</button>
+            {puedeVer('dashboard') && <button className={vista === 'dashboard' ? 'nav-btn active' : 'nav-btn'} onClick={() => setVista('dashboard')}><i className="ti ti-layout-dashboard" aria-hidden="true"></i>Dashboard</button>}
+            {puedeVer('analytics') && <button className={vista === 'analytics' ? 'nav-btn active' : 'nav-btn'} onClick={() => setVista('analytics')}><i className="ti ti-chart-bar" aria-hidden="true"></i>Analytics</button>}
+            {puedeVer('ovt-proyectado') && <button className={vista === 'ovt-proyectado' ? 'nav-btn active' : 'nav-btn'} onClick={() => setVista('ovt-proyectado')}><i className="ti ti-calendar" aria-hidden="true"></i>OVT proyectado</button>}
+            {puedeVer('claim') && <button className={vista === 'claim' ? 'nav-btn active' : 'nav-btn'} onClick={() => setVista('claim')}><i className="ti ti-clock" aria-hidden="true"></i>Control de labor</button>}
+            {puedeVer('usuarios') && <button className={vista === 'usuarios' ? 'nav-btn active' : 'nav-btn'} onClick={() => setVista('usuarios')}><i className="ti ti-users" aria-hidden="true"></i>Usuarios</button>}
+            {puedeVer('mantenedor') && <button className={vista === 'mantenedor' ? 'nav-btn active' : 'nav-btn'} onClick={() => setVista('mantenedor')}><i className="ti ti-settings" aria-hidden="true"></i>Mantenedor</button>}
+            {puedeVer('auditoria') && <button className={vista === 'auditoria' ? 'nav-btn active' : 'nav-btn'} onClick={() => setVista('auditoria')}><i className="ti ti-file-text" aria-hidden="true"></i>Auditoría</button>}
+            <button className={vista === 'permisos-roles' ? 'nav-btn active' : 'nav-btn'} onClick={() => setVista('permisos-roles')}><i className="ti ti-shield" aria-hidden="true"></i>Permisos</button>
+            <button className={vista === 'test-groq' ? 'nav-btn active' : 'nav-btn'} onClick={() => setVista('test-groq')}><i className="ti ti-robot" aria-hidden="true"></i>Test IA</button>
           </>
         )}
       </nav>
@@ -1637,7 +1629,7 @@ function App() {
 
         {/* SECCIÓN: GESTIÓN DE USUARIOS (Admin) */}
         {vista === 'usuarios' && (usuario.rol === 'admin' || usuario.rol === 'dpe') && (
-          <GestionUsuarios token={token} apiUrl={API_URL} />
+          <GestionUsuarios token={token} apiUrl={API_URL} rolUsuario={usuario.rol} />
         )}
 
         {/* SECCIÓN: AUDITORÍA */}
