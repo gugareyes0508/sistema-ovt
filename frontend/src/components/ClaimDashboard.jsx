@@ -88,6 +88,242 @@ const chartBase = { responsive:true, maintainAspectRatio:false, plugins:{ legend
             y:{ ticks:{font:{size:9},color:textMuted}, grid:{color:gridColor}, beginAtZero:true } } };
 
 // ─── componente principal ─────────────────────────────────────────────────
+// ─── Sub-componente: Tab Por Grupo ───────────────────────────────────────────
+const GrupoTab = ({ grupoOrdenado, gruposPorPersona, filtradas, totalH, gruposFS, todasPersonasExcel, sinGrupo, sinGrupoConHoras, COLORES_GRUPO, COLOR_SIN_GRUPO, fmt, fmtK, KPI }) => {
+  const [grupoSel, setGrupoSel] = React.useState(0);
+  const [detalleGrupo, setDetalleGrupo] = React.useState(null);
+
+  // Ordenar por costo descendente
+  const gruposPorCosto = [...grupoOrdenado].sort((a, b) => b[1].costo - a[1].costo);
+  const maxCosto = gruposPorCosto[0]?.[1].costo || 1;
+
+  // Datos del grupo seleccionado para el chart dual
+  const grupoActual = gruposPorCosto[grupoSel];
+  const colorActual = grupoActual ? (grupoActual[0] === 'Sin grupo asignado' ? COLOR_SIN_GRUPO : COLORES_GRUPO[grupoSel % COLORES_GRUPO.length]) : '#2a78d6';
+
+  const semanasLabels = filtradas.map(s => s.label);
+
+  const horasPorSemana = filtradas.map(s =>
+    Object.entries(s.personas || {}).reduce((sum, [emp, datos]) =>
+      gruposPorPersona[emp]?.grupoNombre === grupoActual?.[0] ? sum + (datos.horas || 0) : sum, 0)
+  );
+  const costoPorSemana = filtradas.map(s =>
+    Object.entries(s.personas || {}).reduce((sum, [emp, datos]) =>
+      gruposPorPersona[emp]?.grupoNombre === grupoActual?.[0] ? sum + (datos.costo || 0) : sum, 0)
+  );
+
+  // Personas del grupo para el panel detalle
+  const personasDelGrupo = (nombreGrupo) => {
+    const personas = {};
+    filtradas.forEach(s => {
+      Object.entries(s.personas || {}).forEach(([emp, datos]) => {
+        if (gruposPorPersona[emp]?.grupoNombre === nombreGrupo) {
+          if (!personas[emp]) personas[emp] = { horas: 0, costo: 0 };
+          personas[emp].horas += datos.horas || 0;
+          personas[emp].costo += datos.costo || 0;
+        }
+      });
+    });
+    return Object.entries(personas).sort((a, b) => b[1].costo - a[1].costo);
+  };
+
+  const chartRef = React.useRef(null);
+  const chartInstance = React.useRef(null);
+
+  React.useEffect(() => {
+    if (!chartRef.current || semanasLabels.length === 0) return;
+    if (chartInstance.current) chartInstance.current.destroy();
+    chartInstance.current = new ChartJS(chartRef.current, {
+      type: 'bar',
+      data: {
+        labels: semanasLabels,
+        datasets: [
+          {
+            label: 'Horas', type: 'bar', data: horasPorSemana,
+            backgroundColor: colorActual + 'AA', borderColor: colorActual, borderWidth: 1, yAxisID: 'y'
+          },
+          {
+            label: 'Costo USD', type: 'line', data: costoPorSemana,
+            borderColor: '#e24b4a', backgroundColor: 'transparent',
+            borderWidth: 2.5, tension: 0.3, fill: false,
+            pointRadius: 5, pointBackgroundColor: '#e24b4a', pointBorderColor: '#fff', pointBorderWidth: 2,
+            yAxisID: 'y2'
+          }
+        ]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false }, tooltip: { mode: 'index', intersect: false } },
+        scales: {
+          x: { ticks: { font: { size: 9 }, color: '#888', maxRotation: 45, autoSkip: false }, grid: { display: false } },
+          y: { position: 'left', beginAtZero: true, ticks: { font: { size: 9 }, color: '#888', callback: v => v + 'h' }, grid: { color: 'rgba(128,128,128,0.12)' } },
+          y2: { position: 'right', beginAtZero: true, ticks: { font: { size: 9 }, color: '#e24b4a', callback: v => '$' + Math.round(v / 1000) + 'K' }, grid: { display: false } }
+        }
+      }
+    });
+    return () => { if (chartInstance.current) chartInstance.current.destroy(); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [grupoSel, filtradas.length]);
+
+  return (
+    <div>
+      {/* KPIs */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '12px', marginBottom: '20px' }}>
+        <KPI icon="🏢" label="Grupos con datos" value={grupoOrdenado.filter(([k]) => k !== 'Sin grupo asignado').length} sub={`de ${gruposFS.length} configurados`} color="#2563eb" />
+        <KPI icon="⚠️" label="Personas sin grupo" value={sinGrupo.length} sub="en Excel sin asignar" color="#d97706" />
+        <KPI icon="✓" label="Personas cruzadas" value={[...todasPersonasExcel].length - sinGrupo.length} sub="match exitoso" color="#059669" />
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '16px', marginBottom: '16px' }}>
+
+        {/* Barras por costo + clic detalle */}
+        <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: '10px', padding: '16px 18px' }}>
+          <h4 style={{ margin: '0 0 4px', fontSize: '13px', fontWeight: '600' }}>Grupos — ordenados por costo</h4>
+          <p style={{ fontSize: '11px', color: '#9ca3af', margin: '0 0 12px' }}>Haz clic en una barra para ver detalle de personas</p>
+          {gruposPorCosto.map(([nombre, v], i) => {
+            const color = nombre === 'Sin grupo asignado' ? COLOR_SIN_GRUPO : COLORES_GRUPO[i % COLORES_GRUPO.length];
+            return (
+              <div key={nombre}
+                onClick={() => setDetalleGrupo(detalleGrupo === nombre ? null : nombre)}
+                style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', padding: '5px 6px', borderRadius: '8px', cursor: 'pointer',
+                  background: detalleGrupo === nombre ? '#eff6ff' : 'transparent', transition: 'background .1s' }}
+                onMouseOver={e => { if (detalleGrupo !== nombre) e.currentTarget.style.background = '#f9fafb'; }}
+                onMouseOut={e => { if (detalleGrupo !== nombre) e.currentTarget.style.background = 'transparent'; }}
+              >
+                <div style={{ fontSize: '11px', color: '#6b7280', width: '130px', flexShrink: 0, textAlign: 'right', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{nombre}</div>
+                <div style={{ flex: 1, background: '#e5e7eb', borderRadius: '3px', height: '10px', overflow: 'hidden' }}>
+                  <div style={{ width: `${Math.round(v.costo / maxCosto * 100)}%`, height: '100%', background: color, borderRadius: '3px' }} />
+                </div>
+                <div style={{ fontSize: '11px', color: '#9ca3af', width: '52px', flexShrink: 0, textAlign: 'right' }}>{fmtK(v.costo)}</div>
+                <span style={{ fontSize: '12px', color: detalleGrupo === nombre ? '#2563eb' : '#9ca3af' }}>
+                  {detalleGrupo === nombre ? '▲' : '▼'}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Gráfico dual — barras horas + línea costo */}
+        <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: '10px', padding: '16px 18px' }}>
+          <h4 style={{ margin: '0 0 4px', fontSize: '13px', fontWeight: '600' }}>Tendencia semanal — horas y costo</h4>
+          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '12px' }}>
+            {gruposPorCosto.slice(0, 6).map(([nombre], i) => {
+              const color = nombre === 'Sin grupo asignado' ? COLOR_SIN_GRUPO : COLORES_GRUPO[i % COLORES_GRUPO.length];
+              return (
+                <button key={nombre} onClick={() => setGrupoSel(i)}
+                  style={{ fontSize: '10px', padding: '3px 9px', borderRadius: '12px', border: 'none', cursor: 'pointer',
+                    background: grupoSel === i ? color : '#f3f4f6',
+                    color: grupoSel === i ? '#fff' : '#6b7280',
+                    fontWeight: grupoSel === i ? '700' : '400' }}>
+                  {nombre.length > 14 ? nombre.slice(0, 14) + '…' : nombre}
+                </button>
+              );
+            })}
+          </div>
+          <div style={{ position: 'relative', height: '200px' }}>
+            <canvas ref={chartRef} />
+          </div>
+          <div style={{ display: 'flex', gap: '16px', marginTop: '8px' }}>
+            <span style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '11px', color: '#6b7280' }}>
+              <span style={{ width: '12px', height: '10px', background: colorActual + 'AA', display: 'inline-block', borderRadius: '2px' }}></span>Horas (eje izq.)
+            </span>
+            <span style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '11px', color: '#6b7280' }}>
+              <span style={{ width: '16px', height: '2px', background: '#e24b4a', display: 'inline-block', borderRadius: '1px' }}></span>Costo USD (eje der.)
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* Panel detalle de personas — aparece al hacer clic */}
+      {detalleGrupo && (() => {
+        const idx = gruposPorCosto.findIndex(([k]) => k === detalleGrupo);
+        const color = detalleGrupo === 'Sin grupo asignado' ? COLOR_SIN_GRUPO : COLORES_GRUPO[idx % COLORES_GRUPO.length];
+        const personas = personasDelGrupo(detalleGrupo);
+        const totalGH = personas.reduce((s, [, v]) => s + v.horas, 0);
+        const totalGC = personas.reduce((s, [, v]) => s + v.costo, 0);
+        return (
+          <div style={{ background: '#fff', border: `2px solid ${color}`, borderRadius: '10px', padding: '16px 18px', marginBottom: '16px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
+              <div>
+                <h4 style={{ margin: 0, fontSize: '14px', fontWeight: '700', color }}>{detalleGrupo}</h4>
+                <p style={{ margin: '3px 0 0', fontSize: '11px', color: '#9ca3af' }}>
+                  {personas.length} personas · {fmt(totalGH)}h · {fmtK(totalGC)} · Rate prom: ${totalGH > 0 ? fmt(totalGC / totalGH) : '—'}/h
+                </p>
+              </div>
+              <button onClick={() => setDetalleGrupo(null)}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '16px', color: '#9ca3af', padding: '4px' }}>✕</button>
+            </div>
+            <table className="tabla" style={{ minWidth: 0 }}>
+              <thead>
+                <tr>
+                  <th>Persona</th>
+                  <th style={{ textAlign: 'right' }}>Horas</th>
+                  <th style={{ textAlign: 'right' }}>Costo</th>
+                  <th style={{ textAlign: 'right' }}>Rate/h</th>
+                  <th style={{ textAlign: 'center' }}>% grupo</th>
+                </tr>
+              </thead>
+              <tbody>
+                {personas.map(([nombre, v]) => (
+                  <tr key={nombre}>
+                    <td>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: color + '22', color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', fontWeight: '700', flexShrink: 0 }}>
+                          {nombre.split(' ').slice(0, 2).map(w => w[0]).join('').toUpperCase()}
+                        </div>
+                        <span style={{ fontSize: '12px' }}>{nombre}</span>
+                      </div>
+                    </td>
+                    <td style={{ textAlign: 'right', fontWeight: '600' }}>{fmt(v.horas)}h</td>
+                    <td style={{ textAlign: 'right', fontWeight: '600' }}>{fmtK(v.costo)}</td>
+                    <td style={{ textAlign: 'right', color: '#d97706', fontWeight: '600' }}>
+                      {v.horas > 0 ? '$' + fmt(v.costo / v.horas) : '—'}/h
+                    </td>
+                    <td style={{ textAlign: 'center' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px', justifyContent: 'center' }}>
+                        <div style={{ width: '50px', height: '5px', background: '#e5e7eb', borderRadius: '2px', overflow: 'hidden' }}>
+                          <div style={{ width: `${totalGH > 0 ? Math.round(v.horas / totalGH * 100) : 0}%`, height: '100%', background: color, borderRadius: '2px' }} />
+                        </div>
+                        <span style={{ fontSize: '10px', color: '#9ca3af' }}>{totalGH > 0 ? Math.round(v.horas / totalGH * 100) : 0}%</span>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        );
+      })()}
+
+      {/* Personas sin match */}
+      {sinGrupoConHoras.length > 0 && (
+        <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: '10px', padding: '16px 18px' }}>
+          <h4 style={{ margin: '0 0 4px', fontSize: '13px', fontWeight: '600' }}>⚠️ Personas sin grupo — pendientes de asignar</h4>
+          <p style={{ fontSize: '11px', color: '#9ca3af', margin: '0 0 10px' }}>Ve a Gestión de Usuarios para asignar grupo a estos especialistas.</p>
+          <table className="tabla" style={{ minWidth: 0 }}>
+            <thead><tr><th>Nombre en Excel</th><th>Horas</th><th>Estado</th></tr></thead>
+            <tbody>
+              {sinGrupoConHoras.map(p => (
+                <tr key={p.nombre}>
+                  <td style={{ fontSize: '11.5px' }}>{p.nombre}</td>
+                  <td>{fmt(p.horas)}h</td>
+                  <td>
+                    <span style={{ fontSize: '10px', padding: '2px 8px', borderRadius: '4px', fontWeight: '600',
+                      background: p.matched ? '#fef3c7' : '#fee2e2',
+                      color: p.matched ? '#92400e' : '#991b1b' }}>
+                      {p.matched ? 'Sin grupo' : 'Sin match'}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+};
+
 const ClaimDashboard = ({ token, apiUrl, clienteActivo = '' }) => {
   const [semanas, setSemanas] = useState([]);
   const [cargando, setCargando] = useState(false);
@@ -626,109 +862,21 @@ const ClaimDashboard = ({ token, apiUrl, clienteActivo = '' }) => {
               {/* ── TAB TENDENCIA (todas las semanas) ── */}
               {/* ── TAB POR GRUPO ── */}
               {tabAnalitca === 'grupo' && (
-                <div>
-                  {/* KPIs de grupo */}
-                  <div style={{ ...grid3, gridTemplateColumns:'repeat(auto-fit, minmax(160px, 1fr))', marginBottom:'20px' }}>
-                    <KPI icon="🏢" label="Grupos con datos" value={grupoOrdenado.filter(([k])=>k!=='Sin grupo asignado').length} sub={`de ${gruposFS.length} configurados`} color="#2563eb" />
-                    <KPI icon="⚠️" label="Personas sin grupo" value={sinGrupo.length} sub="en Excel sin asignar" color="#d97706" />
-                    <KPI icon="✓" label="Personas cruzadas" value={[...todasPersonasExcel].length - sinGrupo.length} sub="match exitoso" color="#059669" />
-                  </div>
-
-                  {/* Barras + tabla */}
-                  <div style={grid2}>
-                    <div style={{ background:'#fff', border:'1px solid #e5e7eb', borderRadius:'10px', padding:'16px 18px' }}>
-                      <h4 style={{ margin:'0 0 14px', fontSize:'13px', fontWeight:'600' }}>Horas por grupo</h4>
-                      {grupoOrdenado.map(([nombre, v], i) => (
-                        <MiniBar key={nombre} label={nombre}
-                          value={v.horas} max={maxGrupoH}
-                          color={nombre === 'Sin grupo asignado' ? COLOR_SIN_GRUPO : COLORES_GRUPO[i % COLORES_GRUPO.length]}
-                          right={fmt(v.horas)+'h'} />
-                      ))}
-                    </div>
-                    <div style={{ background:'#fff', border:'1px solid #e5e7eb', borderRadius:'10px', padding:'16px 18px' }}>
-                      <h4 style={{ margin:'0 0 12px', fontSize:'13px', fontWeight:'600' }}>Costo y Rate/h por grupo</h4>
-                      <table className="tabla" style={{ minWidth:0 }}>
-                        <thead><tr><th>Grupo</th><th>Personas</th><th>Horas</th><th>Costo</th><th>Rate/h</th></tr></thead>
-                        <tbody>
-                          {grupoOrdenado.map(([nombre, v], i) => (
-                            <tr key={nombre}>
-                              <td style={{ fontSize:'12px' }}>
-                                <span style={{ display:'inline-block', width:'8px', height:'8px', borderRadius:'2px', marginRight:'6px',
-                                  background: nombre === 'Sin grupo asignado' ? COLOR_SIN_GRUPO : COLORES_GRUPO[i % COLORES_GRUPO.length] }}></span>
-                                {nombre}
-                              </td>
-                              <td style={{ textAlign:'center' }}>{v.personas.size}</td>
-                              <td>{fmt(v.horas)}h</td>
-                              <td>{fmtK(v.costo)}</td>
-                              <td style={{ color:'#d97706', fontWeight:'600' }}>${v.horas > 0 ? fmt(v.costo/v.horas) : 0}/h</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-
-                  {/* Tendencia semanal por grupo */}
-                  <ChartCard title="Tendencia semanal de horas por grupo — barras apiladas" height={220}>
-                    <Bar data={chartGrupoSemanal} options={{ ...barOpts, plugins:{ legend:{ display:true, position:'bottom', labels:{ font:{size:10}, boxWidth:10, padding:12 } }, tooltip:{ mode:'index', intersect:false } } }} />
-                  </ChartCard>
-
-                  {/* Donut + tabla sin grupo */}
-                  <div style={{ ...grid2, marginTop:'16px' }}>
-                    <div style={{ background:'#fff', border:'1px solid #e5e7eb', borderRadius:'10px', padding:'16px 18px' }}>
-                      <h4 style={{ margin:'0 0 12px', fontSize:'13px', fontWeight:'600' }}>Distribución % por grupo</h4>
-                      <div style={{ display:'flex', alignItems:'center', gap:'16px' }}>
-                        <div style={{ position:'relative', width:'120px', height:'120px', flexShrink:0 }}>
-                          <Doughnut data={chartDonutGrupo} options={{ responsive:true, maintainAspectRatio:false, cutout:'62%', plugins:{ legend:{display:false} } }} />
-                        </div>
-                        <div>
-                          {grupoOrdenado.map(([k,v], i) => (
-                            <div key={k} style={{ display:'flex', alignItems:'center', gap:'6px', fontSize:'11px', color:'#6b7280', marginBottom:'5px' }}>
-                              <div style={{ width:'9px', height:'9px', borderRadius:'2px', flexShrink:0,
-                                background: k === 'Sin grupo asignado' ? COLOR_SIN_GRUPO : COLORES_GRUPO[i % COLORES_GRUPO.length] }}></div>
-                              <span>{k}</span>
-                              <span style={{ marginLeft:'auto', fontWeight:'600', color:'#374151' }}>{totalH > 0 ? fmt(v.horas/totalH*100) : 0}%</span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Tabla personas sin grupo */}
-                    <div style={{ background:'#fff', border:'1px solid #e5e7eb', borderRadius:'10px', padding:'16px 18px' }}>
-                      <h4 style={{ margin:'0 0 4px', fontSize:'13px', fontWeight:'600' }}>⚠️ Personas sin grupo — pendientes de asignar</h4>
-                      {sinGrupoConHoras.length === 0 ? (
-                        <div style={{ textAlign:'center', padding:'20px', color:'#9ca3af', fontSize:'13px' }}>
-                          ✅ Todas las personas tienen grupo asignado
-                        </div>
-                      ) : (
-                        <>
-                          <p style={{ fontSize:'11px', color:'#9ca3af', margin:'0 0 10px' }}>
-                            Ve a Gestión de Usuarios para asignar grupo a estos especialistas.
-                          </p>
-                          <table className="tabla" style={{ minWidth:0 }}>
-                            <thead><tr><th>Nombre en Excel</th><th>Horas</th><th>Estado</th></tr></thead>
-                            <tbody>
-                              {sinGrupoConHoras.map(p => (
-                                <tr key={p.nombre}>
-                                  <td style={{ fontSize:'11.5px' }}>{p.nombre}</td>
-                                  <td>{fmt(p.horas)}h</td>
-                                  <td>
-                                    <span style={{ fontSize:'10px', padding:'2px 8px', borderRadius:'4px', fontWeight:'600',
-                                      background: p.matched ? '#fef3c7' : '#fee2e2',
-                                      color: p.matched ? '#92400e' : '#991b1b' }}>
-                                      {p.matched ? 'Sin grupo' : 'Sin match'}
-                                    </span>
-                                  </td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                </div>
+                <GrupoTab
+                  grupoOrdenado={grupoOrdenado}
+                  gruposPorPersona={gruposPorPersona}
+                  filtradas={filtradas}
+                  totalH={totalH}
+                  gruposFS={gruposFS}
+                  todasPersonasExcel={todasPersonasExcel}
+                  sinGrupo={sinGrupo}
+                  sinGrupoConHoras={sinGrupoConHoras}
+                  COLORES_GRUPO={COLORES_GRUPO}
+                  COLOR_SIN_GRUPO={COLOR_SIN_GRUPO}
+                  fmt={fmt}
+                  fmtK={fmtK}
+                  KPI={KPI}
+                />
               )}
 
               {tabAnalitca === 'tendencia' && (
