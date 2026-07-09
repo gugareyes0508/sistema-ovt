@@ -497,8 +497,6 @@ const ClaimDashboard = ({ token, apiUrl, clienteActivo = '' }) => {
     });
   });
   const grupoOrdenado = Object.entries(grupoTotal).sort((a,b) => b[1].horas - a[1].horas);
-  const maxGrupoH = grupoOrdenado[0]?.[1].horas || 1;
-
   // Personas sin match o sin grupo
   const sinGrupo = [...todasPersonasExcel].filter(p => gruposPorPersona[p]?.grupoId === '__sin_grupo__');
   const sinGrupoConHoras = sinGrupo.map(p => {
@@ -506,37 +504,6 @@ const ClaimDashboard = ({ token, apiUrl, clienteActivo = '' }) => {
     const c = filtradas.reduce((sum,s) => sum + ((s.personas||{})[p]?.costo||0), 0);
     return { nombre:p, horas:h, costo:c, matched: gruposPorPersona[p]?.matched };
   }).sort((a,b) => b.horas - a.horas);
-
-  // Chart tendencia por grupo (barras apiladas semanales)
-  const gruposUnicos = grupoOrdenado.filter(([k]) => k !== 'Sin grupo asignado').map(([k]) => k);
-  const chartGrupoSemanal = {
-    labels: filtradas.map(s => s.label),
-    datasets: [
-      ...gruposUnicos.map((g, i) => ({
-        label: g,
-        data: filtradas.map(s => {
-          return Object.entries(s.personas||{}).reduce((sum,[emp,datos]) => {
-            return (gruposPorPersona[emp]?.grupoNombre === g) ? sum + (datos.horas||0) : sum;
-          }, 0);
-        }),
-        backgroundColor: COLORES_GRUPO[i % COLORES_GRUPO.length],
-        stack: 'g'
-      })),
-      {
-        label: 'Sin grupo', stack: 'g',
-        data: filtradas.map(s => Object.entries(s.personas||{}).reduce((sum,[emp,datos]) =>
-          gruposPorPersona[emp]?.grupoId === '__sin_grupo__' ? sum + (datos.horas||0) : sum, 0)),
-        backgroundColor: COLOR_SIN_GRUPO
-      }
-    ]
-  };
-
-  const chartDonutGrupo = {
-    labels: grupoOrdenado.map(([k]) => k),
-    datasets:[{ data: grupoOrdenado.map(([,v]) => v.horas),
-      backgroundColor: grupoOrdenado.map(([k],i) => k === 'Sin grupo asignado' ? COLOR_SIN_GRUPO : COLORES_GRUPO[i % COLORES_GRUPO.length]),
-      borderWidth:0 }]
-  };
 
   // Agregación WBS
   const wbsTotal = {};
