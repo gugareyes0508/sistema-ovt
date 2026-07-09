@@ -12,12 +12,38 @@ ChartJS.register(CategoryScale, LinearScale, BarElement, LineElement, PointEleme
 const MESES = ['','Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 const NIVEL_MAP = { RDO005:'Associate', RDO006:'Senior Associate', RDO007:'Lead Specialist', RDO008:'Senior Lead', RCO008:'Architect', RDOT05:'Trainee', RDSB06:'Sr Associate SB' };
 const TABS_ANALITICA = [
-  { id:'resumen', label:'📊 Resumen' },
-  { id:'wbs', label:'🗂️ Por WBS' },
-  { id:'personas', label:'👥 Por Persona' },
-  { id:'nivel', label:'🏅 Por Nivel' },
+  { id:'resumen',   label:'📊 Resumen' },
+  { id:'wbs',       label:'🗂️ Por WBS' },
+  { id:'personas',  label:'👥 Por Persona' },
+  { id:'nivel',     label:'🏅 Por Nivel' },
+  { id:'grupo',     label:'🏢 Por Grupo' },
   { id:'tendencia', label:'📈 Tendencia' }
 ];
+const COLORES_GRUPO = ['#2a78d6','#059669','#7c3aed','#e24b4a','#1baf7a','#d97706','#0891b2','#be185d'];
+const COLOR_SIN_GRUPO = '#d97706';
+
+// ── Lógica de match de nombres Excel ↔ Firestore ────────────────────────────
+const normalizarNombre = (s) => (s||'').toLowerCase()
+  .normalize('NFD').replace(/[\u0300-\u036f]/g,'') // quitar tildes
+  .replace(/[^a-z\s]/g,'').trim();
+
+const matchearNombre = (empName, usuarios) => {
+  const emp = normalizarNombre(empName);
+  // 1) exacto normalizado
+  const exacto = usuarios.find(u => normalizarNombre(u.nombre) === emp);
+  if (exacto) return exacto;
+  // 2) partial: al menos 2 palabras en común de longitud >= 3
+  const palabrasEmp = emp.split(/\s+/).filter(p => p.length >= 3);
+  let mejorMatch = null; let mejorScore = 0;
+  usuarios.forEach(u => {
+    const palabrasU = normalizarNombre(u.nombre).split(/\s+/).filter(p => p.length >= 3);
+    const comunes = palabrasEmp.filter(pe => palabrasU.some(pu => pu.includes(pe) || pe.includes(pu)));
+    if (comunes.length >= 2 && comunes.length > mejorScore) {
+      mejorScore = comunes.length; mejorMatch = u;
+    }
+  });
+  return mejorMatch;
+};
 
 const fmt = (n, dec=1) => (Math.round(n * Math.pow(10,dec)) / Math.pow(10,dec)).toFixed(dec);
 const fmtK = (n) => n >= 1000 ? '$' + fmt(n/1000) + 'K' : '$' + Math.round(n);
@@ -70,6 +96,9 @@ const ClaimDashboard = ({ token, apiUrl, clienteActivo = '' }) => {
   const [filtroMes, setFiltroMes] = useState(new Date().getMonth() + 1);
   const [filtroAnio, setFiltroAnio] = useState(new Date().getFullYear());
   const [tabAnalitca, setTabAnalitica] = useState('resumen');
+  // Datos para cruce por grupo
+  const [usuariosFS, setUsuariosFS] = useState([]);
+  const [gruposFS, setGruposFS] = useState([]);
   const fileRef = useRef();
 
   const getHeaders = useCallback(() => {
@@ -93,6 +122,20 @@ const ClaimDashboard = ({ token, apiUrl, clienteActivo = '' }) => {
   }, [apiUrl, getHeaders]);
 
   useEffect(() => { cargarDatos(); }, [cargarDatos]);
+
+  // Cargar usuarios y grupos para cruce por grupo
+  useEffect(() => {
+    if (!token) return;
+    const h = { Authorization: `Bearer ${token}` };
+    Promise.all([
+      axios.get(`${apiUrl}/api/admin/listar-usuarios`, { headers: h }),
+      axios.get(`${apiUrl}/api/grupos-servicio`, { headers: h })
+    ]).then(([resU, resG]) => {
+      setUsuariosFS(resU.data.usuarios || []);
+      setGruposFS(resG.data || []);
+    }).catch(() => {});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token, apiUrl]);
 
   // ── procesar Excel y subir a Firestore ──
   const procesarExcel = async (file) => {
@@ -183,6 +226,81 @@ const ClaimDashboard = ({ token, apiUrl, clienteActivo = '' }) => {
   const totalCosto = filtradas.reduce((sum,s) => sum + s.costo, 0);
   const semsConOT = filtradas.filter(s => s.ot > 0 || s.sb > 0).length;
   const promSem = filtradas.length ? totalH / filtradas.length : 0;
+
+  // ── Agregación por Grupo de Servicio ──────────────────────────────────────
+  // Construir mapa empName → { grupoId, grupoNombre }
+  const mapaGrupos = {};
+  gruposFS.forEach(g => { mapaGrupos[g.id] = g.nombre; });
+
+  const gruposPorPersona = {}; // nombreExcel → { grupoId, grupoNombre, matched }
+  const todasPersonasExcel = new Set();
+  filtradas.forEach(s => Object.keys(s.personas||{}).forEach(p => todasPersonasExcel.add(p)));
+
+  todasPersonasExcel.forEach(empName => {
+    const userMatch = matchearNombre(empName, usuariosFS);
+    if (userMatch && userMatch.grupoServicioId) {
+      gruposPorPersona[empName] = {
+        grupoId: userMatch.grupoServicioId,
+        grupoNombre: mapaGrupos[userMatch.grupoServicioId] || userMatch.grupoServicioId,
+        matched: true
+      };
+    } else {
+      gruposPorPersona[empName] = { grupoId: '__sin_grupo__', grupoNombre: 'Sin grupo asignado', matched: !!userMatch };
+    }
+  });
+
+  // Acumular horas/costo por grupo
+  const grupoTotal = {};
+  filtradas.forEach(s => {
+    Object.entries(s.personas||{}).forEach(([empName, datos]) => {
+      const { grupoNombre } = gruposPorPersona[empName] || { grupoNombre: 'Sin grupo asignado' };
+      if (!grupoTotal[grupoNombre]) grupoTotal[grupoNombre] = { horas:0, costo:0, personas:new Set() };
+      grupoTotal[grupoNombre].horas += datos.horas || 0;
+      grupoTotal[grupoNombre].costo += datos.costo || 0;
+      grupoTotal[grupoNombre].personas.add(empName);
+    });
+  });
+  const grupoOrdenado = Object.entries(grupoTotal).sort((a,b) => b[1].horas - a[1].horas);
+  const maxGrupoH = grupoOrdenado[0]?.[1].horas || 1;
+
+  // Personas sin match o sin grupo
+  const sinGrupo = [...todasPersonasExcel].filter(p => gruposPorPersona[p]?.grupoId === '__sin_grupo__');
+  const sinGrupoConHoras = sinGrupo.map(p => {
+    const h = filtradas.reduce((sum,s) => sum + ((s.personas||{})[p]?.horas||0), 0);
+    const c = filtradas.reduce((sum,s) => sum + ((s.personas||{})[p]?.costo||0), 0);
+    return { nombre:p, horas:h, costo:c, matched: gruposPorPersona[p]?.matched };
+  }).sort((a,b) => b.horas - a.horas);
+
+  // Chart tendencia por grupo (barras apiladas semanales)
+  const gruposUnicos = grupoOrdenado.filter(([k]) => k !== 'Sin grupo asignado').map(([k]) => k);
+  const chartGrupoSemanal = {
+    labels: filtradas.map(s => s.label),
+    datasets: [
+      ...gruposUnicos.map((g, i) => ({
+        label: g,
+        data: filtradas.map(s => {
+          return Object.entries(s.personas||{}).reduce((sum,[emp,datos]) => {
+            return (gruposPorPersona[emp]?.grupoNombre === g) ? sum + (datos.horas||0) : sum;
+          }, 0);
+        }),
+        backgroundColor: COLORES_GRUPO[i % COLORES_GRUPO.length],
+        stack: 'g'
+      })),
+      {
+        label: 'Sin grupo', stack: 'g',
+        data: filtradas.map(s => Object.entries(s.personas||{}).reduce((sum,[emp,datos]) =>
+          gruposPorPersona[emp]?.grupoId === '__sin_grupo__' ? sum + (datos.horas||0) : sum, 0)),
+        backgroundColor: COLOR_SIN_GRUPO
+      }
+    ]
+  };
+
+  const chartDonutGrupo = {
+    labels: grupoOrdenado.map(([k]) => k),
+    datasets:[{ data: grupoOrdenado.map(([,v]) => v.horas),
+      backgroundColor: grupoOrdenado.map(([k],i) => k === 'Sin grupo asignado' ? COLOR_SIN_GRUPO : COLORES_GRUPO[i % COLORES_GRUPO.length]),
+      borderWidth:0 }]
+  };
 
   // Agregación WBS
   const wbsTotal = {};
@@ -506,6 +624,113 @@ const ClaimDashboard = ({ token, apiUrl, clienteActivo = '' }) => {
               )}
 
               {/* ── TAB TENDENCIA (todas las semanas) ── */}
+              {/* ── TAB POR GRUPO ── */}
+              {tabAnalitca === 'grupo' && (
+                <div>
+                  {/* KPIs de grupo */}
+                  <div style={{ ...grid3, gridTemplateColumns:'repeat(auto-fit, minmax(160px, 1fr))', marginBottom:'20px' }}>
+                    <KPI icon="🏢" label="Grupos con datos" value={grupoOrdenado.filter(([k])=>k!=='Sin grupo asignado').length} sub={`de ${gruposFS.length} configurados`} color="#2563eb" />
+                    <KPI icon="⚠️" label="Personas sin grupo" value={sinGrupo.length} sub="en Excel sin asignar" color="#d97706" />
+                    <KPI icon="✓" label="Personas cruzadas" value={[...todasPersonasExcel].length - sinGrupo.length} sub="match exitoso" color="#059669" />
+                  </div>
+
+                  {/* Barras + tabla */}
+                  <div style={grid2}>
+                    <div style={{ background:'#fff', border:'1px solid #e5e7eb', borderRadius:'10px', padding:'16px 18px' }}>
+                      <h4 style={{ margin:'0 0 14px', fontSize:'13px', fontWeight:'600' }}>Horas por grupo</h4>
+                      {grupoOrdenado.map(([nombre, v], i) => (
+                        <MiniBar key={nombre} label={nombre}
+                          value={v.horas} max={maxGrupoH}
+                          color={nombre === 'Sin grupo asignado' ? COLOR_SIN_GRUPO : COLORES_GRUPO[i % COLORES_GRUPO.length]}
+                          right={fmt(v.horas)+'h'} />
+                      ))}
+                    </div>
+                    <div style={{ background:'#fff', border:'1px solid #e5e7eb', borderRadius:'10px', padding:'16px 18px' }}>
+                      <h4 style={{ margin:'0 0 12px', fontSize:'13px', fontWeight:'600' }}>Costo y Rate/h por grupo</h4>
+                      <table className="tabla" style={{ minWidth:0 }}>
+                        <thead><tr><th>Grupo</th><th>Personas</th><th>Horas</th><th>Costo</th><th>Rate/h</th></tr></thead>
+                        <tbody>
+                          {grupoOrdenado.map(([nombre, v], i) => (
+                            <tr key={nombre}>
+                              <td style={{ fontSize:'12px' }}>
+                                <span style={{ display:'inline-block', width:'8px', height:'8px', borderRadius:'2px', marginRight:'6px',
+                                  background: nombre === 'Sin grupo asignado' ? COLOR_SIN_GRUPO : COLORES_GRUPO[i % COLORES_GRUPO.length] }}></span>
+                                {nombre}
+                              </td>
+                              <td style={{ textAlign:'center' }}>{v.personas.size}</td>
+                              <td>{fmt(v.horas)}h</td>
+                              <td>{fmtK(v.costo)}</td>
+                              <td style={{ color:'#d97706', fontWeight:'600' }}>${v.horas > 0 ? fmt(v.costo/v.horas) : 0}/h</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  {/* Tendencia semanal por grupo */}
+                  <ChartCard title="Tendencia semanal de horas por grupo — barras apiladas" height={220}>
+                    <Bar data={chartGrupoSemanal} options={{ ...barOpts, plugins:{ legend:{ display:true, position:'bottom', labels:{ font:{size:10}, boxWidth:10, padding:12 } }, tooltip:{ mode:'index', intersect:false } } }} />
+                  </ChartCard>
+
+                  {/* Donut + tabla sin grupo */}
+                  <div style={{ ...grid2, marginTop:'16px' }}>
+                    <div style={{ background:'#fff', border:'1px solid #e5e7eb', borderRadius:'10px', padding:'16px 18px' }}>
+                      <h4 style={{ margin:'0 0 12px', fontSize:'13px', fontWeight:'600' }}>Distribución % por grupo</h4>
+                      <div style={{ display:'flex', alignItems:'center', gap:'16px' }}>
+                        <div style={{ position:'relative', width:'120px', height:'120px', flexShrink:0 }}>
+                          <Doughnut data={chartDonutGrupo} options={{ responsive:true, maintainAspectRatio:false, cutout:'62%', plugins:{ legend:{display:false} } }} />
+                        </div>
+                        <div>
+                          {grupoOrdenado.map(([k,v], i) => (
+                            <div key={k} style={{ display:'flex', alignItems:'center', gap:'6px', fontSize:'11px', color:'#6b7280', marginBottom:'5px' }}>
+                              <div style={{ width:'9px', height:'9px', borderRadius:'2px', flexShrink:0,
+                                background: k === 'Sin grupo asignado' ? COLOR_SIN_GRUPO : COLORES_GRUPO[i % COLORES_GRUPO.length] }}></div>
+                              <span>{k}</span>
+                              <span style={{ marginLeft:'auto', fontWeight:'600', color:'#374151' }}>{totalH > 0 ? fmt(v.horas/totalH*100) : 0}%</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Tabla personas sin grupo */}
+                    <div style={{ background:'#fff', border:'1px solid #e5e7eb', borderRadius:'10px', padding:'16px 18px' }}>
+                      <h4 style={{ margin:'0 0 4px', fontSize:'13px', fontWeight:'600' }}>⚠️ Personas sin grupo — pendientes de asignar</h4>
+                      {sinGrupoConHoras.length === 0 ? (
+                        <div style={{ textAlign:'center', padding:'20px', color:'#9ca3af', fontSize:'13px' }}>
+                          ✅ Todas las personas tienen grupo asignado
+                        </div>
+                      ) : (
+                        <>
+                          <p style={{ fontSize:'11px', color:'#9ca3af', margin:'0 0 10px' }}>
+                            Ve a Gestión de Usuarios para asignar grupo a estos especialistas.
+                          </p>
+                          <table className="tabla" style={{ minWidth:0 }}>
+                            <thead><tr><th>Nombre en Excel</th><th>Horas</th><th>Estado</th></tr></thead>
+                            <tbody>
+                              {sinGrupoConHoras.map(p => (
+                                <tr key={p.nombre}>
+                                  <td style={{ fontSize:'11.5px' }}>{p.nombre}</td>
+                                  <td>{fmt(p.horas)}h</td>
+                                  <td>
+                                    <span style={{ fontSize:'10px', padding:'2px 8px', borderRadius:'4px', fontWeight:'600',
+                                      background: p.matched ? '#fef3c7' : '#fee2e2',
+                                      color: p.matched ? '#92400e' : '#991b1b' }}>
+                                      {p.matched ? 'Sin grupo' : 'Sin match'}
+                                    </span>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {tabAnalitca === 'tendencia' && (
                 <div>
                   <ChartCard title="Tendencia de horas y costo USD — todas las semanas cargadas" height={240}>
