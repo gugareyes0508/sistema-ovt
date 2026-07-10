@@ -708,15 +708,24 @@ function App() {
     return (
       <div className="container-login">
         <div className="login-box">
-          <h1>🕐 Sistema OVT</h1>
-          <h2>Control de Overtime</h2>
+          <div className="login-brand">
+            <span className="login-wordmark">kyndryl</span>
+            <div className="login-sep"></div>
+            <span className="login-client-chip">Sistema OVT</span>
+          </div>
+          <h1>Control de<br/>Overtime</h1>
+          <h2>Acceso corporativo · Kyndryl Chile</h2>
           <form onSubmit={manejarLogin}>
-            <input type="text" name="usuario" placeholder="Usuario" required autoFocus />
-            <input type="password" name="contrasena" placeholder="Contraseña" required />
-            <button type="submit">Iniciar Sesión</button>
+            <div className="login-field">
+              <label>Usuario<input type="text" name="usuario" placeholder="nombre.apellido" required autoFocus /></label>
+            </div>
+            <div className="login-field">
+              <label>Contraseña<input type="password" name="contrasena" placeholder="••••••••" required /></label>
+            </div>
+            <button type="submit">Iniciar sesión</button>
           </form>
           <div className="login-footer">
-            <p>Sistema de Control de Overtime - Kyndryl Chile</p>
+            <p>Kyndryl Chile · 2026</p>
             <p className="version">v2.0.0</p>
           </div>
         </div>
@@ -729,10 +738,13 @@ function App() {
     const clientesDpe = clientesInfo.filter(c => (usuario.clientesIds||[]).includes(c.id));
     return (
       <div className="container-login">
-        <div className="login-box" style={{ maxWidth:'480px' }}>
-          <h1>👋 Hola, {usuario.nombre.split(' ')[0]}</h1>
-          <h2>Elige el cliente con el que quieres trabajar</h2>
-          <div style={{ display:'flex', flexDirection:'column', gap:'10px', margin:'10px 0 20px' }}>
+        <div className="login-box" style={{ maxWidth:'440px' }}>
+          <div className="login-brand">
+            <span className="login-wordmark">kyndryl</span>
+          </div>
+          <h1>Hola, {usuario.nombre.split(' ')[0]}</h1>
+          <h2>Elige el cliente con el que quieres trabajar hoy</h2>
+          <div style={{ display:'flex', flexDirection:'column', gap:'10px', margin:'20px 0' }}>
             {clientesDpe.map(c => (
               <button key={c.id} type="button"
                 onClick={() => {
@@ -741,28 +753,31 @@ function App() {
                   setSeleccionandoCliente(false);
                   setVista('dashboard');
                 }}
-                style={{ padding:'16px 20px', background:'#fff', border:'2px solid #e5e7eb', borderRadius:'10px',
-                  cursor:'pointer', textAlign:'left', fontSize:'14px', fontWeight:'600', color:'#111827',
-                  display:'flex', alignItems:'center', gap:'12px', transition:'border-color .2s' }}
-                onMouseOver={e => e.currentTarget.style.borderColor='#FF462D'}
-                onMouseOut={e => e.currentTarget.style.borderColor='#e5e7eb'}
+                style={{ padding:'14px 16px', background:'rgba(255,255,255,0.72)', border:'1px solid rgba(18,52,78,0.13)',
+                  borderRadius:'16px', cursor:'pointer', textAlign:'left', fontSize:'14px', fontWeight:'700',
+                  color:'#061826', display:'flex', alignItems:'center', gap:'12px',
+                  transition:'all .18s', boxShadow:'0 10px 28px rgba(6,24,38,0.06)' }}
+                onMouseOver={e => { e.currentTarget.style.transform='translateY(-2px)'; e.currentTarget.style.boxShadow='0 18px 42px rgba(6,24,38,0.12)'; }}
+                onMouseOut={e => { e.currentTarget.style.transform=''; e.currentTarget.style.boxShadow='0 10px 28px rgba(6,24,38,0.06)'; }}
               >
-                <span style={{ width:'36px', height:'36px', borderRadius:'8px', background:'#FF462D', color:'#fff',
-                  display:'flex', alignItems:'center', justifyContent:'center', fontWeight:'800', fontSize:'14px', flexShrink:0 }}>
+                <span style={{ width:'38px', height:'38px', borderRadius:'10px',
+                  background:'linear-gradient(135deg,#092235,#003b71)', color:'#fff',
+                  display:'flex', alignItems:'center', justifyContent:'center', fontWeight:'800', fontSize:'13px', flexShrink:0 }}>
                   {c.nombre.substring(0,2).toUpperCase()}
                 </span>
                 <div>
-                  <div>{c.nombre}</div>
-                  <div style={{ fontSize:'12px', color:'#9ca3af', fontWeight:'400', marginTop:'2px' }}>#{c.id}</div>
+                  <div style={{ fontWeight:'800', letterSpacing:'-.01em' }}>{c.nombre}</div>
+                  <div style={{ fontSize:'11px', color:'#647887', fontWeight:'600', marginTop:'2px', fontFamily:"'IBM Plex Mono',monospace", letterSpacing:'.06em', textTransform:'uppercase' }}>#{c.id}</div>
                 </div>
-                <span style={{ marginLeft:'auto', fontSize:'20px' }}>→</span>
+                <span style={{ marginLeft:'auto', color:'#003b71', fontSize:'18px', fontWeight:'300' }}>→</span>
               </button>
             ))}
           </div>
-          <button onClick={manejarLogout}
-            style={{ background:'none', border:'none', color:'#9ca3af', fontSize:'13px', cursor:'pointer', textDecoration:'underline' }}>
-            Cerrar sesión
-          </button>
+          <div className="login-footer">
+            <button onClick={manejarLogout} style={{ background:'none', border:'none', color:'#647887', fontSize:'12px', cursor:'pointer', fontWeight:'700' }}>
+              Cerrar sesión
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -780,115 +795,127 @@ function App() {
     return !!permisos[usuario.rol]?.[vista];
   };
 
+
+  // Meta por vista: eyebrow + título para el topbar
+  const PAGE_META = {
+    dashboard:       { eyebrow: 'Dashboard',       title: 'Gestión de Overtime',      sub: 'Aprobaciones, horas y registros del equipo.' },
+    analytics:       { eyebrow: 'Analytics',        title: 'Análisis de HHEE',         sub: 'Tendencias, distribución y agrupación.' },
+    'ovt-proyectado':{ eyebrow: 'OVT',             title: 'OVT Proyectado',           sub: 'Proyecciones de horas extra del equipo.' },
+    claim:           { eyebrow: 'Control de Labor', title: 'Horas imputadas',          sub: 'Claims del equipo Kyndryl Chile.' },
+    usuarios:        { eyebrow: 'Administración',   title: 'Gestión de usuarios',      sub: 'Usuarios, grupos y clientes del sistema.' },
+    mantenedor:      { eyebrow: 'Administración',   title: 'Mantenedor',               sub: 'Gestión y aprobación de todos los registros.' },
+    auditoria:       { eyebrow: 'Administración',   title: 'Auditoría',                sub: 'Log de acciones del sistema.' },
+    'permisos-roles':{ eyebrow: 'Administración',   title: 'Permisos de roles',        sub: 'Configura qué ve cada perfil.' },
+    registros:       { eyebrow: 'Especialista',     title: 'Registrar cambio',         sub: 'Completa los datos del registro de overtime.' },
+    resumen:         { eyebrow: 'Especialista',     title: 'Mi resumen',               sub: 'Historial y horas aprobadas.' },
+    'excel-upload':  { eyebrow: 'Especialista',     title: 'Cargar Excel',             sub: 'Carga masiva de registros desde planilla.' },
+    'proyeccion-nueva':{ eyebrow:'ITSM',            title: 'Nueva proyección',         sub: 'Crea una nueva proyección de tickets ITSM.' },
+    'proyeccion-mis':  { eyebrow:'ITSM',            title: 'Mis proyecciones',         sub: 'Historial de proyecciones enviadas.' },
+    'proyeccion-excel':{ eyebrow:'ITSM',            title: 'Cargar Excel ITSM',        sub: 'Carga masiva desde planilla ITSM.' },
+    'test-groq':     { eyebrow: 'Sistema',          title: 'Test API IA',              sub: 'Verificar conectividad con GROQ.' },
+  };
+  const meta = PAGE_META[vista] || { eyebrow: '', title: '', sub: '' };
+  const nombreClienteActivo = clientesInfo.find(c => c.id === clienteActivo)?.nombre || '';
+
   return (
     <div className="app">
-      {/* HEADER */}
-      <header className="header" style={{ display:'grid', gridTemplateColumns:'1fr auto 1fr', alignItems:'center', gap:'12px' }}>
 
-        {/* IZQUIERDA — marca */}
-        <div className="header-left">
-          <h1>🕐 Sistema OVT v2</h1>
-        </div>
-
-        {/* CENTRO — pill de cliente activo */}
-        <div style={{ display:'flex', justifyContent:'center' }}>
-          {(usuario?.rol === 'dpe' || usuario?.rol === 'admin') && clienteActivo && clientesInfo.length > 0 && (
-            <div style={{ position:'relative' }}>
+      {/* ── SIDEBAR ── */}
+      <aside className="sidebar">
+        <div className="sidebar-brand">
+          <div className="sidebar-wordmark">kyndryl</div>
+          {/* Selector de cliente (DPE o admin con clienteActivo) */}
+          {(usuario?.rol === 'dpe' || usuario?.rol === 'admin') && clientesInfo.length > 0 && (
+            <div className="sidebar-client">
+              <div className="sidebar-client-dot"></div>
               <select
                 value={clienteActivo}
                 onChange={e => {
-                  const nuevoCliente = e.target.value;
-                  setClienteActivo(nuevoCliente);
-                  localStorage.setItem('clienteActivo', nuevoCliente);
+                  const nc = e.target.value;
+                  setClienteActivo(nc);
+                  localStorage.setItem('clienteActivo', nc);
                   setRegistros([]);
                   setVista('dashboard');
                 }}
-                style={{
-                  appearance:'none', WebkitAppearance:'none',
-                  padding:'7px 36px 7px 14px',
-                  borderRadius:'20px',
-                  border:'1.5px solid rgba(255,255,255,0.4)',
-                  background:'rgba(0,0,0,0.18)',
-                  color:'#fff',
-                  fontSize:'13px',
-                  fontWeight:'700',
-                  cursor:'pointer',
-                  letterSpacing:'0.1px'
-                }}
               >
                 {clientesInfo
-                  .filter(c => (usuario.rol === 'admin') ? true : (usuario.clientesIds||[]).includes(c.id))
-                  .map(c => (
-                    <option key={c.id} value={c.id} style={{ background:'#11131a', color:'#fff' }}>{c.nombre}</option>
-                  ))}
+                  .filter(c => usuario.rol === 'admin' ? true : (usuario.clientesIds||[]).includes(c.id))
+                  .map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
               </select>
-              <span style={{ position:'absolute', right:'12px', top:'50%', transform:'translateY(-50%)', color:'rgba(255,255,255,0.8)', pointerEvents:'none', fontSize:'11px' }}>▾</span>
             </div>
           )}
         </div>
 
-        {/* DERECHA — usuario + salir */}
-        <div className="header-right" style={{ justifyContent:'flex-end' }}>
-          <span className="user-badge">
-            {usuario.nombre} <br />
-            <small>({usuario.rol})</small>
-          </span>
-          <button className="btn-logout" onClick={manejarLogout}>Salir</button>
-        </div>
-      </header>
-
-      {/* NAVEGACIÓN */}
-      <nav className="nav">
+        {/* Nav por rol */}
         {usuario.rol === 'especialista' && (
-          <>
-            {puedeVer('registros') && <button className={vista === 'registros' ? 'nav-btn active' : 'nav-btn'} onClick={() => setVista('registros')}>📋 Registrar Cambio/Alerta</button>}
-            {puedeVer('resumen') && <button className={vista === 'resumen' ? 'nav-btn active' : 'nav-btn'} onClick={() => setVista('resumen')}>📊 Mi Resumen</button>}
-            {puedeVer('carga-excel') && <button className={vista === 'excel-upload' ? 'nav-btn active' : 'nav-btn'} onClick={() => setVista('excel-upload')}>📥 Cargar Excel</button>}
-          </>
+          <nav className="nav">
+            {puedeVer('registros') && <button className={vista==='registros'?'nav-btn active':'nav-btn'} onClick={()=>setVista('registros')}><i className="ti ti-edit" aria-hidden="true"></i>Registrar cambio</button>}
+            {puedeVer('resumen') && <button className={vista==='resumen'?'nav-btn active':'nav-btn'} onClick={()=>setVista('resumen')}><i className="ti ti-chart-bar" aria-hidden="true"></i>Mi resumen</button>}
+            {puedeVer('carga-excel') && <button className={vista==='excel-upload'?'nav-btn active':'nav-btn'} onClick={()=>setVista('excel-upload')}><i className="ti ti-upload" aria-hidden="true"></i>Cargar Excel</button>}
+          </nav>
         )}
 
         {usuario.rol === 'itsm' && (
-          <>
-            {puedeVer('proyeccion-nueva') && <button className={vista === 'proyeccion-nueva' ? 'nav-btn active' : 'nav-btn'} onClick={() => setVista('proyeccion-nueva')}>📋 Nueva Proyección</button>}
-            {puedeVer('proyeccion-mis') && <button className={vista === 'proyeccion-mis' ? 'nav-btn active' : 'nav-btn'} onClick={() => setVista('proyeccion-mis')}>📊 Mis Proyecciones</button>}
-            {puedeVer('proyeccion-excel') && <button className={vista === 'proyeccion-excel' ? 'nav-btn active' : 'nav-btn'} onClick={() => setVista('proyeccion-excel')}>📥 Cargar Excel</button>}
-          </>
+          <nav className="nav">
+            {puedeVer('proyeccion-nueva') && <button className={vista==='proyeccion-nueva'?'nav-btn active':'nav-btn'} onClick={()=>setVista('proyeccion-nueva')}><i className="ti ti-plus" aria-hidden="true"></i>Nueva proyección</button>}
+            {puedeVer('proyeccion-mis') && <button className={vista==='proyeccion-mis'?'nav-btn active':'nav-btn'} onClick={()=>setVista('proyeccion-mis')}><i className="ti ti-list" aria-hidden="true"></i>Mis proyecciones</button>}
+            {puedeVer('proyeccion-excel') && <button className={vista==='proyeccion-excel'?'nav-btn active':'nav-btn'} onClick={()=>setVista('proyeccion-excel')}><i className="ti ti-upload" aria-hidden="true"></i>Cargar Excel</button>}
+          </nav>
         )}
 
-        {usuario.rol === 'dpe' && (
-          <>
-            {puedeVer('dashboard') && <button className={vista === 'dashboard' ? 'nav-btn active' : 'nav-btn'} onClick={() => setVista('dashboard')}>📊 Dashboard</button>}
-            {puedeVer('analytics') && <button className={vista === 'analytics' ? 'nav-btn active' : 'nav-btn'} onClick={() => setVista('analytics')}>📈 Analytics</button>}
-            {puedeVer('ovt-proyectado') && <button className={vista === 'ovt-proyectado' ? 'nav-btn active' : 'nav-btn'} onClick={() => setVista('ovt-proyectado')}>📅 OVT Proyectado</button>}
-            {puedeVer('claim') && <button className={vista === 'claim' ? 'nav-btn active' : 'nav-btn'} onClick={() => setVista('claim')}>🕐 Control de Labor</button>}
-            {puedeVer('usuarios') && <button className={vista === 'usuarios' ? 'nav-btn active' : 'nav-btn'} onClick={() => setVista('usuarios')}>👥 Gestión de Usuarios</button>}
-          </>
-        )}
-
-        {usuario.rol === 'teamleader' && (
-          <>
-            <button className={vista === 'dashboard' ? 'nav-btn active' : 'nav-btn'} onClick={() => setVista('dashboard')}>📊 Dashboard</button>
-            {puedeVer('analytics') && <button className={vista === 'analytics' ? 'nav-btn active' : 'nav-btn'} onClick={() => setVista('analytics')}>📈 Analytics</button>}
-          </>
+        {(usuario.rol === 'dpe' || usuario.rol === 'teamleader') && (
+          <nav className="nav">
+            {puedeVer('dashboard') && <button className={vista==='dashboard'?'nav-btn active':'nav-btn'} onClick={()=>setVista('dashboard')}><i className="ti ti-layout-dashboard" aria-hidden="true"></i>Dashboard</button>}
+            {puedeVer('analytics') && <button className={vista==='analytics'?'nav-btn active':'nav-btn'} onClick={()=>setVista('analytics')}><i className="ti ti-chart-bar" aria-hidden="true"></i>Analytics</button>}
+            {usuario.rol==='dpe' && puedeVer('ovt-proyectado') && <button className={vista==='ovt-proyectado'?'nav-btn active':'nav-btn'} onClick={()=>setVista('ovt-proyectado')}><i className="ti ti-calendar" aria-hidden="true"></i>OVT Proyectado</button>}
+            {usuario.rol==='dpe' && puedeVer('claim') && <button className={vista==='claim'?'nav-btn active':'nav-btn'} onClick={()=>setVista('claim')}><i className="ti ti-clock" aria-hidden="true"></i>Control de Labor</button>}
+            {usuario.rol==='dpe' && puedeVer('usuarios') && <button className={vista==='usuarios'?'nav-btn active':'nav-btn'} onClick={()=>setVista('usuarios')}><i className="ti ti-users" aria-hidden="true"></i>Usuarios</button>}
+          </nav>
         )}
 
         {usuario.rol === 'admin' && (
           <>
-            {puedeVer('dashboard') && <button className={vista === 'dashboard' ? 'nav-btn active' : 'nav-btn'} onClick={() => setVista('dashboard')}>📊 Dashboard</button>}
-            {puedeVer('analytics') && <button className={vista === 'analytics' ? 'nav-btn active' : 'nav-btn'} onClick={() => setVista('analytics')}>📈 Analytics</button>}
-            {puedeVer('ovt-proyectado') && <button className={vista === 'ovt-proyectado' ? 'nav-btn active' : 'nav-btn'} onClick={() => setVista('ovt-proyectado')}>📅 OVT Proyectado</button>}
-            {puedeVer('claim') && <button className={vista === 'claim' ? 'nav-btn active' : 'nav-btn'} onClick={() => setVista('claim')}>🕐 Control de Labor</button>}
-            {puedeVer('usuarios') && <button className={vista === 'usuarios' ? 'nav-btn active' : 'nav-btn'} onClick={() => setVista('usuarios')}>👥 Gestión de Usuarios</button>}
-            {puedeVer('mantenedor') && <button className={vista === 'mantenedor' ? 'nav-btn active' : 'nav-btn'} onClick={() => setVista('mantenedor')}>⚙️ Mantenedor</button>}
-            {puedeVer('auditoria') && <button className={vista === 'auditoria' ? 'nav-btn active' : 'nav-btn'} onClick={() => setVista('auditoria')}>🔍 Auditoría</button>}
-            <button className={vista === 'permisos-roles' ? 'nav-btn active' : 'nav-btn'} onClick={() => setVista('permisos-roles')}>🔐 Permisos</button>
-            <button className={vista === 'test-groq' ? 'nav-btn active' : 'nav-btn'} onClick={() => setVista('test-groq')}>🧪 Test GROQ</button>
+            <div className="sidebar-section">Principal</div>
+            <nav className="nav">
+              {puedeVer('dashboard') && <button className={vista==='dashboard'?'nav-btn active':'nav-btn'} onClick={()=>setVista('dashboard')}><i className="ti ti-layout-dashboard" aria-hidden="true"></i>Dashboard</button>}
+              {puedeVer('analytics') && <button className={vista==='analytics'?'nav-btn active':'nav-btn'} onClick={()=>setVista('analytics')}><i className="ti ti-chart-bar" aria-hidden="true"></i>Analytics</button>}
+              {puedeVer('ovt-proyectado') && <button className={vista==='ovt-proyectado'?'nav-btn active':'nav-btn'} onClick={()=>setVista('ovt-proyectado')}><i className="ti ti-calendar" aria-hidden="true"></i>OVT Proyectado</button>}
+              {puedeVer('claim') && <button className={vista==='claim'?'nav-btn active':'nav-btn'} onClick={()=>setVista('claim')}><i className="ti ti-clock" aria-hidden="true"></i>Control de Labor</button>}
+            </nav>
+            <div className="sidebar-section">Administración</div>
+            <nav className="nav">
+              {puedeVer('usuarios') && <button className={vista==='usuarios'?'nav-btn active':'nav-btn'} onClick={()=>setVista('usuarios')}><i className="ti ti-users" aria-hidden="true"></i>Usuarios</button>}
+              {puedeVer('mantenedor') && <button className={vista==='mantenedor'?'nav-btn active':'nav-btn'} onClick={()=>setVista('mantenedor')}><i className="ti ti-settings" aria-hidden="true"></i>Mantenedor</button>}
+              {puedeVer('auditoria') && <button className={vista==='auditoria'?'nav-btn active':'nav-btn'} onClick={()=>setVista('auditoria')}><i className="ti ti-file-text" aria-hidden="true"></i>Auditoría</button>}
+              <button className={vista==='permisos-roles'?'nav-btn active':'nav-btn'} onClick={()=>setVista('permisos-roles')}><i className="ti ti-shield" aria-hidden="true"></i>Permisos</button>
+              <button className={vista==='test-groq'?'nav-btn active':'nav-btn'} onClick={()=>setVista('test-groq')}><i className="ti ti-robot" aria-hidden="true"></i>Test IA</button>
+            </nav>
           </>
         )}
-      </nav>
 
-      {/* CONTENIDO PRINCIPAL */}
+        {/* User card */}
+        <div className="user-card">
+          <strong>{usuario.nombre}</strong>
+          <span>{usuario.rol} · {usuario.empresa || 'Kyndryl'}</span>
+          <button className="btn-logout" onClick={manejarLogout}>Cerrar sesión</button>
+        </div>
+      </aside>
+
+      {/* ── MAIN ── */}
       <main className="main">
+        {/* Topbar de página */}
+        <div className="page-topbar">
+          <div>
+            {meta.eyebrow && <p className="page-eyebrow">{meta.eyebrow}</p>}
+            <h1 className="page-title">{meta.title}</h1>
+            {meta.sub && <p className="page-sub">{meta.sub}</p>}
+          </div>
+          {nombreClienteActivo && (
+            <span className="kyn-badge">KYNDRYL × {nombreClienteActivo.toUpperCase()}</span>
+          )}
+        </div>
+
+
         
         {/* SECCIÓN: REGISTRAR CAMBIO/ALERTA */}
         {vista === 'registros' && usuario.rol === 'especialista' && (
