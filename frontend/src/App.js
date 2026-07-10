@@ -1197,9 +1197,7 @@ function App() {
 
         {/* SECCIÓN: ANALYTICS */}
         {vista === 'analytics' && (usuario.rol === 'admin' || usuario.rol === 'dpe' || usuario.rol === 'teamleader') && (
-          <section className="seccion">
-            <Analytics registros={registros} usuarios={usuarioList} token={token} />
-          </section>
+          <Analytics registros={registros} usuarios={usuarioList} token={token} />
         )}
 
         {/* SECCIÓN: MANTENEDOR */}

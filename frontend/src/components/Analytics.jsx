@@ -584,212 +584,175 @@ Sé conciso, específico y ORIGINAL.`;
   };
 
   return (
-    <div style={{ padding: '20px', fontFamily: 'Arial, sans-serif' }}>
-      <h2>📊 Analytics - Análisis de HHEE</h2>
+    <div style={{ padding:0, fontFamily:"Manrope,ui-sans-serif,system-ui,sans-serif" }}>
 
-      {/* Filtros */}
-      <div style={{ display: 'flex', gap: '14px', flexWrap: 'wrap', alignItems: 'flex-end', marginBottom: '20px', background: '#f5f5f5', padding: '14px 16px', borderRadius: '8px' }}>
-        <div className="form-group" style={{ minWidth: '140px' }}>
-          <label style={{ fontSize: '12px', fontWeight: '600', color: '#555', display: 'block', marginBottom: '5px' }}>Mes</label>
-          <select value={filtroMes} onChange={(e) => setFiltroMes(parseInt(e.target.value))}>
-            {[...Array(12)].map((_, i) => (
-              <option key={i + 1} value={i + 1}>{new Date(2024, i).toLocaleString('es-CL', { month: 'long' })}</option>
-            ))}
-          </select>
-        </div>
-        <div className="form-group" style={{ minWidth: '110px' }}>
-          <label style={{ fontSize: '12px', fontWeight: '600', color: '#555', display: 'block', marginBottom: '5px' }}>Año</label>
-          <select value={filtroAnio} onChange={(e) => setFiltroAnio(parseInt(e.target.value))}>
-            <option value="2023">2023</option>
-            <option value="2024">2024</option>
-            <option value="2025">2025</option>
-            <option value="2026">2026</option>
-            <option value="2027">2027</option>
-          </select>
-        </div>
-        <div className="form-group" style={{ minWidth: '180px' }}>
-          <label style={{ fontSize: '12px', fontWeight: '600', color: '#555', display: 'block', marginBottom: '5px' }}>Empresa Contratista</label>
-          <select value={filtroEmpresa} onChange={(e) => setFiltroEmpresa(e.target.value)}>
-            <option value="todas">Todas</option>
-            <option value="Kyndryl">Kyndryl</option>
-            <option value="Incosec">Incosec</option>
-            <option value="Biznet">Biznet</option>
-            <option value="Otro">Otro</option>
-          </select>
-        </div>
-      </div>
-
-      {/* Métricas Principales */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '12px', marginBottom: '30px' }}>
-        <div style={{ background: '#f5f5f5', padding: '15px', borderRadius: '8px', textAlign: 'center' }}>
-          <p style={{ margin: 0, fontSize: '12px', color: '#666', fontWeight: 'bold' }}>Total HHEE</p>
-          <p style={{ margin: '8px 0 0', fontSize: '24px', fontWeight: 'bold', color: '#3266ad' }}>{datos.total.toFixed(0)}h</p>
-        </div>
-        <div style={{ background: '#f5f5f5', padding: '15px', borderRadius: '8px', textAlign: 'center' }}>
-          <p style={{ margin: 0, fontSize: '12px', color: '#666', fontWeight: 'bold' }}>Cambios</p>
-          <p style={{ margin: '8px 0 0', fontSize: '24px', fontWeight: 'bold', color: '#3266ad' }}>{datos.porTipo.cambios.toFixed(0)}h</p>
-        </div>
-        <div style={{ background: '#f5f5f5', padding: '15px', borderRadius: '8px', textAlign: 'center' }}>
-          <p style={{ margin: 0, fontSize: '12px', color: '#666', fontWeight: 'bold' }}>Alertas</p>
-          <p style={{ margin: '8px 0 0', fontSize: '24px', fontWeight: 'bold', color: '#e24b4a' }}>{datos.porTipo.alertas.toFixed(0)}h</p>
-        </div>
-        <div style={{ background: '#f5f5f5', padding: '15px', borderRadius: '8px', textAlign: 'center' }}>
-          <p style={{ margin: 0, fontSize: '12px', color: '#666', fontWeight: 'bold' }}>Incidentes</p>
-          <p style={{ margin: '8px 0 0', fontSize: '24px', fontWeight: 'bold', color: '#ba7517' }}>{datos.porTipo.incidentes.toFixed(0)}h</p>
-        </div>
-        <div style={{ background: '#f5f5f5', padding: '15px', borderRadius: '8px', textAlign: 'center' }}>
-          <p style={{ margin: 0, fontSize: '12px', color: '#666', fontWeight: 'bold' }}>Requerimientos</p>
-          <p style={{ margin: '8px 0 0', fontSize: '24px', fontWeight: 'bold', color: '#1d9e75' }}>{datos.porTipo.requerimientos.toFixed(0)}h</p>
-        </div>
-        <div style={{ background: '#f5f5f5', padding: '15px', borderRadius: '8px', textAlign: 'center' }}>
-          <p style={{ margin: 0, fontSize: '12px', color: '#666', fontWeight: 'bold' }}>Registros</p>
-          <p style={{ margin: '8px 0 0', fontSize: '24px', fontWeight: 'bold', color: '#1d9e75' }}>{datos.registrosFiltrados.length}</p>
-        </div>
-      </div>
-
-      {/* Tabs */}
-      <div style={{ marginBottom: '20px', borderBottom: '1px solid #ddd', display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+      {/* ── FILTROS ── */}
+      <div style={{ display:'flex', gap:'12px', flexWrap:'wrap', alignItems:'flex-end', marginBottom:'20px' }}>
         {[
-          { id: 'resumen', label: '📊 Resumen' },
-          { id: 'tendencias', label: '📈 Tendencias' },
-          { id: 'persona', label: '👥 Por Persona' },
-          { id: 'area', label: '🏢 Por Área' },
-          { id: 'ia-insights', label: '🤖 IA Insights' },
-          { id: 'ia-agrupacion', label: '🔍 Agrupación IA' }
-        ].map(tab => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            style={{
-              padding: '10px 15px',
-              border: 'none',
-              background: activeTab === tab.id ? '#3266ad' : 'transparent',
-              color: activeTab === tab.id ? 'white' : '#666',
-              cursor: 'pointer',
-              fontSize: '13px',
-              fontWeight: activeTab === tab.id ? 'bold' : 'normal',
-              borderBottom: activeTab === tab.id ? '3px solid #3266ad' : 'none'
-            }}
-          >
+          { label:'Mes', content:
+            <select value={filtroMes} onChange={e=>setFiltroMes(parseInt(e.target.value))}
+              style={{ border:'1px solid rgba(18,52,78,0.13)', borderRadius:'12px', padding:'9px 14px', background:'rgba(255,255,255,0.84)', color:'var(--ink-950)', fontSize:'13px', fontWeight:'600', minWidth:'130px' }}>
+              {[...Array(12)].map((_,i)=><option key={i+1} value={i+1}>{new Date(2024,i).toLocaleString('es-CL',{month:'long'})}</option>)}
+            </select>
+          },
+          { label:'Año', content:
+            <select value={filtroAnio} onChange={e=>setFiltroAnio(parseInt(e.target.value))}
+              style={{ border:'1px solid rgba(18,52,78,0.13)', borderRadius:'12px', padding:'9px 14px', background:'rgba(255,255,255,0.84)', color:'var(--ink-950)', fontSize:'13px', fontWeight:'600', minWidth:'100px' }}>
+              {['2023','2024','2025','2026','2027'].map(y=><option key={y} value={y}>{y}</option>)}
+            </select>
+          },
+          { label:'Empresa contratista', content:
+            <select value={filtroEmpresa} onChange={e=>setFiltroEmpresa(e.target.value)}
+              style={{ border:'1px solid rgba(18,52,78,0.13)', borderRadius:'12px', padding:'9px 14px', background:'rgba(255,255,255,0.84)', color:'var(--ink-950)', fontSize:'13px', fontWeight:'600', minWidth:'160px' }}>
+              <option value="todas">Todas</option>
+              <option value="Kyndryl">Kyndryl</option>
+              <option value="Incosec">Incosec</option>
+              <option value="Biznet">Biznet</option>
+              <option value="Otro">Otro</option>
+            </select>
+          }
+        ].map(f=>(
+          <div key={f.label}>
+            <div style={{ fontFamily:"'IBM Plex Mono',monospace", fontSize:'10px', fontWeight:'700', color:'var(--muted)', textTransform:'uppercase', letterSpacing:'.07em', marginBottom:'6px' }}>{f.label}</div>
+            {f.content}
+          </div>
+        ))}
+      </div>
+
+      {/* ── KPI MÉTRICAS ── */}
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(6,minmax(0,1fr))', gap:'1px', background:'var(--line)', marginBottom:'20px' }}>
+        {[
+          { label:'Total HHEE',      val:`${datos.total.toFixed(0)}h`,                           color:'var(--kyn-red)' },
+          { label:'Cambios',         val:`${datos.porTipo.cambios.toFixed(0)}h`,                  color:'var(--bank-blue)' },
+          { label:'Alertas',         val:`${datos.porTipo.alertas.toFixed(0)}h`,                  color:'var(--danger)' },
+          { label:'Incidentes',      val:`${datos.porTipo.incidentes.toFixed(0)}h`,               color:'var(--warning)' },
+          { label:'Requerimientos',  val:`${datos.porTipo.requerimientos.toFixed(0)}h`,           color:'var(--success)' },
+          { label:'Registros',       val:datos.registrosFiltrados.length,                         color:'var(--ink-800)' },
+        ].map(k=>(
+          <div key={k.label} style={{ background:'var(--glass)', backdropFilter:'blur(18px)', padding:'16px 14px' }}>
+            <div style={{ fontFamily:"'IBM Plex Mono',monospace", fontSize:'9px', fontWeight:'700', color:'var(--muted)', textTransform:'uppercase', letterSpacing:'.07em', marginBottom:'8px' }}>{k.label}</div>
+            <div style={{ fontSize:'1.8rem', fontWeight:'800', lineHeight:1, letterSpacing:'-.07em', color:k.color }}>{k.val}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* ── TABS ── */}
+      <div style={{ display:'inline-flex', flexWrap:'wrap', gap:'6px', padding:'5px', border:'1px solid rgba(18,52,78,0.09)', borderRadius:'16px', background:'rgba(255,255,255,0.55)', marginBottom:'20px' }}>
+        {[
+          { id:'resumen', label:'Resumen' },
+          { id:'tendencias', label:'Tendencias' },
+          { id:'persona', label:'Por Persona' },
+          { id:'area', label:'Por Área' },
+          { id:'ia-insights', label:'IA Insights' },
+          { id:'ia-agrupacion', label:'Agrupación IA' }
+        ].map(tab=>(
+          <button key={tab.id} onClick={()=>setActiveTab(tab.id)}
+            style={{ borderRadius:'11px', padding:'8px 14px', background: activeTab===tab.id ? 'var(--ink-900)' : 'transparent',
+              color: activeTab===tab.id ? '#fff' : 'var(--muted)', fontWeight:'900', fontSize:'12px', border:'none', transition:'all .16s', cursor:'pointer' }}>
             {tab.label}
           </button>
         ))}
       </div>
 
-      {/* Tab: Resumen */}
-      {activeTab === 'resumen' && (
-        <>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '20px' }}>
-          <div style={{ background: 'white', padding: '20px', borderRadius: '8px', border: '1px solid #eee' }}>
-            <h3>HHEE por Tipo</h3>
-            <div style={{ position: 'relative', height: '250px', overflow: 'hidden' }}>
-              <Doughnut data={chartPorTipo} options={chartOptionsDoughnut} />
+      {/* ── TAB: RESUMEN ── */}
+      {activeTab === 'resumen' && (<>
+        <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(280px,1fr))', gap:'16px', marginBottom:'16px' }}>
+          {[
+            { label:'Horas por tipo', chart:<Doughnut data={chartPorTipo} options={chartOptionsDoughnut}/> },
+            { label:'Horas por especialidad', chart:<Bar data={chartPorEspecialidad} options={chartOptionsSinLeyenda}/> },
+            { label:'Por empresa contratista', chart:<Doughnut data={chartPorEmpresa} options={chartOptionsDoughnut}/> },
+          ].map(c=>(
+            <div key={c.label} style={{ border:'1px solid rgba(255,255,255,0.72)', borderRadius:'22px', background:'var(--glass)', boxShadow:'var(--shadow-soft)', backdropFilter:'blur(18px)', padding:'20px' }}>
+              <div style={{ fontFamily:"'IBM Plex Mono',monospace", fontSize:'9px', fontWeight:'700', color:'var(--muted)', textTransform:'uppercase', letterSpacing:'.09em', marginBottom:'4px' }}>Distribución</div>
+              <h3 style={{ margin:'0 0 14px', fontSize:'1rem', fontWeight:'800', color:'var(--ink-950)', letterSpacing:'-.03em' }}>{c.label}</h3>
+              <div style={{ position:'relative', height:'220px', overflow:'hidden' }}>{c.chart}</div>
             </div>
-          </div>
-          <div style={{ background: 'white', padding: '20px', borderRadius: '8px', border: '1px solid #eee' }}>
-            <h3>HHEE por Especialidad</h3>
-            <div style={{ position: 'relative', height: '250px', overflow: 'hidden' }}>
-              <Bar data={chartPorEspecialidad} options={chartOptionsSinLeyenda} />
-            </div>
-          </div>
-          <div style={{ background: 'white', padding: '20px', borderRadius: '8px', border: '1px solid #eee' }}>
-            <h3>Distribución por Empresa Contratista</h3>
-            <div style={{ position: 'relative', height: '250px', overflow: 'hidden' }}>
-              <Doughnut data={chartPorEmpresa} options={chartOptionsDoughnut} />
-            </div>
-          </div>
+          ))}
         </div>
-
-        <div style={{ background: 'white', padding: '20px', borderRadius: '8px', border: '1px solid #eee', marginTop: '20px' }}>
-          <h3>Tendencia Anual de HHEE — {filtroAnio}</h3>
-          <p style={{ fontSize: '12px', color: '#999', margin: '0 0 12px' }}>
-            Horas extra acumuladas por mes durante todo el año (no se ve afectado por el filtro de Mes)
-          </p>
-          <div style={{ position: 'relative', height: '280px', overflow: 'hidden' }}>
-            <Line data={chartTendenciaAnual} options={chartOptions} />
-          </div>
+        <div style={{ border:'1px solid rgba(255,255,255,0.72)', borderRadius:'22px', background:'var(--glass)', boxShadow:'var(--shadow-soft)', backdropFilter:'blur(18px)', padding:'20px' }}>
+          <div style={{ fontFamily:"'IBM Plex Mono',monospace", fontSize:'9px', fontWeight:'700', color:'var(--muted)', textTransform:'uppercase', letterSpacing:'.09em', marginBottom:'4px' }}>Tendencia</div>
+          <h3 style={{ margin:'0 0 4px', fontSize:'1rem', fontWeight:'800', color:'var(--ink-950)', letterSpacing:'-.03em' }}>Tendencia anual de HHEE — {filtroAnio}</h3>
+          <p style={{ fontSize:'11px', color:'var(--muted)', fontWeight:'600', margin:'0 0 14px' }}>Horas acumuladas por mes · no afectado por el filtro de Mes</p>
+          <div style={{ position:'relative', height:'260px', overflow:'hidden' }}><Line data={chartTendenciaAnual} options={chartOptions}/></div>
         </div>
-        </>
-      )}
+      </>)}
 
-      {/* Tab: Tendencias */}
+      {/* ── TAB: TENDENCIAS ── */}
       {activeTab === 'tendencias' && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '20px' }}>
-          <div style={{ background: 'white', padding: '20px', borderRadius: '8px', border: '1px solid #eee' }}>
-            <h3>Evolución Semana a Semana</h3>
-            <div style={{ position: 'relative', height: '300px', overflow: 'hidden' }}>
-              <Line data={chartSemanal} options={chartOptions} />
+        <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(360px,1fr))', gap:'16px' }}>
+          {[
+            { label:'Evolución semana a semana', chart:<Line data={chartSemanal} options={chartOptions}/>, height:280 },
+            { label:'HHEE por día de semana', chart:<Bar data={chartPorDia} options={chartOptionsSinLeyenda}/>, height:280 },
+            { label:'Concentración por hora del día', sub:'Basado en hora de inicio de cada registro', chart:<Bar data={chartPorHora} options={chartOptionsSinLeyenda}/>, height:260, full:true },
+          ].map(c=>(
+            <div key={c.label} style={{ border:'1px solid rgba(255,255,255,0.72)', borderRadius:'22px', background:'var(--glass)', boxShadow:'var(--shadow-soft)', backdropFilter:'blur(18px)', padding:'20px', ...(c.full?{gridColumn:'1/-1'}:{}) }}>
+              <div style={{ fontFamily:"'IBM Plex Mono',monospace", fontSize:'9px', fontWeight:'700', color:'var(--muted)', textTransform:'uppercase', letterSpacing:'.09em', marginBottom:'4px' }}>Tendencia</div>
+              <h3 style={{ margin:'0 0 4px', fontSize:'1rem', fontWeight:'800', color:'var(--ink-950)', letterSpacing:'-.03em' }}>{c.label}</h3>
+              {c.sub && <p style={{ fontSize:'11px', color:'var(--muted)', fontWeight:'600', margin:'0 0 12px' }}>{c.sub}</p>}
+              <div style={{ position:'relative', height:`${c.height}px`, overflow:'hidden', marginTop: c.sub?0:12 }}>{c.chart}</div>
             </div>
-          </div>
-          <div style={{ background: 'white', padding: '20px', borderRadius: '8px', border: '1px solid #eee' }}>
-            <h3>HHEE por Día de Semana</h3>
-            <div style={{ position: 'relative', height: '300px', overflow: 'hidden' }}>
-              <Bar data={chartPorDia} options={chartOptionsSinLeyenda} />
-            </div>
-          </div>
-          <div style={{ background: 'white', padding: '20px', borderRadius: '8px', border: '1px solid #eee', gridColumn: '1 / -1' }}>
-            <h3>Concentración de HHEE por Hora del Día</h3>
-            <p style={{ fontSize: '12px', color: '#999', margin: '0 0 12px' }}>Basado en la hora de inicio de cada registro</p>
-            <div style={{ position: 'relative', height: '280px', overflow: 'hidden' }}>
-              <Bar data={chartPorHora} options={chartOptionsSinLeyenda} />
-            </div>
-          </div>
+          ))}
         </div>
       )}
 
-      {/* Tab: Por Persona */}
+      {/* ── TAB: POR PERSONA ── */}
       {activeTab === 'persona' && (
-        <div style={{ background: 'white', padding: '20px', borderRadius: '8px', border: '1px solid #eee' }}>
-          <h3>Top Especialistas - HHEE</h3>
-          <div style={{ position: 'relative', height: '400px', overflow: 'hidden' }}>
-            <Bar data={chartTopEspecialistas} options={{ ...chartOptionsSinLeyenda, indexAxis: 'y' }} />
+        <div style={{ border:'1px solid rgba(255,255,255,0.72)', borderRadius:'22px', background:'var(--glass)', boxShadow:'var(--shadow-soft)', backdropFilter:'blur(18px)', padding:'20px' }}>
+          <div style={{ fontFamily:"'IBM Plex Mono',monospace", fontSize:'9px', fontWeight:'700', color:'var(--muted)', textTransform:'uppercase', letterSpacing:'.09em', marginBottom:'4px' }}>Especialistas</div>
+          <h3 style={{ margin:'0 0 16px', fontSize:'1rem', fontWeight:'800', color:'var(--ink-950)', letterSpacing:'-.03em' }}>Top especialistas · horas imputadas</h3>
+          <div style={{ position:'relative', height:'400px', overflow:'hidden' }}>
+            <Bar data={chartTopEspecialistas} options={{ ...chartOptionsSinLeyenda, indexAxis:'y' }}/>
           </div>
         </div>
       )}
 
-      {/* Tab: Por Área */}
+      {/* ── TAB: POR ÁREA ── */}
       {activeTab === 'area' && (
-        <div style={{ background: 'white', padding: '20px', borderRadius: '8px', border: '1px solid #eee' }}>
-          <h3>Desglose por Especialidad</h3>
-          <table style={{ width: '100%', marginTop: '15px', borderCollapse: 'collapse' }}>
-            <thead>
-              <tr style={{ borderBottom: '2px solid #ddd' }}>
-                <th style={{ padding: '10px', textAlign: 'left', fontWeight: 'bold' }}>Especialidad</th>
-                <th style={{ padding: '10px', textAlign: 'right', fontWeight: 'bold' }}>Horas</th>
-                <th style={{ padding: '10px', textAlign: 'right', fontWeight: 'bold' }}>% del Total</th>
-              </tr>
-            </thead>
+        <div style={{ border:'1px solid rgba(255,255,255,0.72)', borderRadius:'22px', background:'var(--glass)', boxShadow:'var(--shadow-soft)', backdropFilter:'blur(18px)', padding:'20px' }}>
+          <div style={{ fontFamily:"'IBM Plex Mono',monospace", fontSize:'9px', fontWeight:'700', color:'var(--muted)', textTransform:'uppercase', letterSpacing:'.09em', marginBottom:'4px' }}>Distribución</div>
+          <h3 style={{ margin:'0 0 16px', fontSize:'1rem', fontWeight:'800', color:'var(--ink-950)', letterSpacing:'-.03em' }}>Desglose por especialidad</h3>
+          <table className="tabla">
+            <thead><tr>
+              <th>Especialidad</th>
+              <th style={{textAlign:'right'}}>Horas</th>
+              <th style={{textAlign:'right'}}>% del total</th>
+            </tr></thead>
             <tbody>
-              {Object.entries(datos.porEspecialidad)
-                .sort((a, b) => b[1] - a[1])
-                .map(([especialidad, horas]) => (
-                  <tr key={especialidad} style={{ borderBottom: '1px solid #eee' }}>
-                    <td style={{ padding: '10px' }}>{especialidad}</td>
-                    <td style={{ padding: '10px', textAlign: 'right', fontWeight: 'bold' }}>{horas.toFixed(1)}h</td>
-                    <td style={{ padding: '10px', textAlign: 'right' }}>
-                      {((horas / datos.total) * 100).toFixed(1)}%
-                    </td>
-                  </tr>
-                ))}
+              {Object.entries(datos.porEspecialidad).sort((a,b)=>b[1]-a[1]).map(([esp,h])=>(
+                <tr key={esp}>
+                  <td style={{fontWeight:'700'}}>{esp}</td>
+                  <td style={{textAlign:'right',fontFamily:"'IBM Plex Mono',monospace",fontWeight:'700',color:'var(--kyn-red)'}}>{h.toFixed(1)}h</td>
+                  <td style={{textAlign:'right'}}>
+                    <div style={{display:'flex',alignItems:'center',gap:'8px',justifyContent:'flex-end'}}>
+                      <div style={{width:'60px',height:'5px',background:'rgba(18,52,78,0.1)',borderRadius:'2px',overflow:'hidden'}}>
+                        <div style={{width:`${datos.total>0?Math.round(h/datos.total*100):0}%`,height:'100%',background:'var(--bank-blue)',borderRadius:'2px'}}></div>
+                      </div>
+                      <span style={{fontFamily:"'IBM Plex Mono',monospace",fontSize:'11px',fontWeight:'700',color:'var(--muted)',minWidth:'34px',textAlign:'right'}}>
+                        {datos.total > 0 ? Math.round(h/datos.total*100) : 0}%
+                      </span>
+                    </div>
+                  </td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>
       )}
 
-      {/* Tab: IA Insights */}
+      {/* ── TAB: IA INSIGHTS ── */}
       {activeTab === 'ia-insights' && (
-        <div style={{ background: 'white', padding: '20px', borderRadius: '8px', border: '1px solid #eee' }}>
-          <h3>🤖 Análisis Inteligente</h3>
+        <div style={{ border:'1px solid rgba(255,255,255,0.72)', borderRadius:'22px', background:'var(--glass)', boxShadow:'var(--shadow-soft)', backdropFilter:'blur(18px)', padding:'20px' }}>
+          <h3 style={{margin:'0 0 14px',fontSize:'1rem',fontWeight:'800',color:'var(--ink-950)',letterSpacing:'-.03em'}}>🤖 Análisis Inteligente</h3>
           
           {/* Info de descartados */}
           {discardedInsights.length > 0 && (
             <div style={{
               background: '#e3f2fd',
               padding: '12px',
-              borderRadius: '6px',
+              borderRadius:'10px',
               marginBottom: '15px',
               fontSize: '12px',
-              color: '#1565c0',
+              color:'var(--bank-blue)',
               border: '1px solid #90caf9',
               display: 'flex',
               justifyContent: 'space-between',
@@ -803,10 +766,10 @@ Sé conciso, específico y ORIGINAL.`;
                   background: '#1565c0',
                   color: 'white',
                   border: 'none',
-                  borderRadius: '4px',
+                  borderRadius:'8px',
                   cursor: 'pointer',
                   fontSize: '11px',
-                  fontWeight: 'bold'
+                  fontWeight:'700'
                 }}
               >
                 🔄 Limpiar Historial
@@ -815,14 +778,14 @@ Sé conciso, específico y ORIGINAL.`;
           )}
           
           {loading && (
-            <p style={{ color: '#666', fontStyle: 'italic' }}>⏳ Analizando datos con IA...</p>
+            <p style={{ color:'var(--muted)', fontStyle: 'italic' }}>⏳ Analizando datos con IA...</p>
           )}
           {error && (
             <p style={{ color: '#e24b4a', fontStyle: 'italic' }}>❌ {error}</p>
           )}
           {insights && (
             <div>
-              <div style={{ whiteSpace: 'pre-wrap', fontFamily: 'monospace', fontSize: '13px', lineHeight: '1.6', color: '#333', background: '#f9f9f9', padding: '15px', borderRadius: '6px', marginBottom: '15px' }}>
+              <div style={{ whiteSpace: 'pre-wrap', fontFamily: 'monospace', fontSize: '13px', lineHeight: '1.6', color:'var(--ink-950)', background:'rgba(238,245,248,0.6)', padding: '15px', borderRadius:'10px', marginBottom: '15px' }}>
                 {insights}
               </div>
               <div style={{ display: 'flex', gap: '10px' }}>
@@ -834,10 +797,10 @@ Sé conciso, específico y ORIGINAL.`;
                     background: '#FF6B6B',
                     color: 'white',
                     border: 'none',
-                    borderRadius: '4px',
+                    borderRadius:'8px',
                     cursor: 'pointer',
-                    fontSize: '14px',
-                    fontWeight: 'bold',
+                    fontSize:'13px',
+                    fontWeight:'700',
                     transition: 'all 0.3s'
                   }}
                   onMouseOver={(e) => e.target.style.background = '#E63946'}
@@ -853,10 +816,10 @@ Sé conciso, específico y ORIGINAL.`;
                     background: '#4CAF50',
                     color: 'white',
                     border: 'none',
-                    borderRadius: '4px',
+                    borderRadius:'8px',
                     cursor: 'pointer',
-                    fontSize: '14px',
-                    fontWeight: 'bold',
+                    fontSize:'13px',
+                    fontWeight:'700',
                     transition: 'all 0.3s'
                   }}
                   onMouseOver={(e) => e.target.style.background = '#45a049'}
@@ -875,10 +838,10 @@ Sé conciso, específico y ORIGINAL.`;
                 background: '#3266ad',
                 color: 'white',
                 border: 'none',
-                borderRadius: '4px',
+                borderRadius:'8px',
                 cursor: 'pointer',
-                fontSize: '14px',
-                fontWeight: 'bold'
+                fontSize:'13px',
+                fontWeight:'700'
               }}
             >
               🚀 Generar Análisis IA
@@ -887,16 +850,16 @@ Sé conciso, específico y ORIGINAL.`;
         </div>
       )}
 
-      {/* Tab: Agrupación IA */}
+      {/* ── TAB: AGRUPACIÓN IA ── */}
       {activeTab === 'ia-agrupacion' && (
-        <div style={{ background: 'white', padding: '20px', borderRadius: '8px', border: '1px solid #eee' }}>
-          <h3 style={{ marginTop: 0, color: '#1f2937' }}>🔍 Agrupación por Tipo de Actividad (IA)</h3>
-          <p style={{ fontSize: '13px', color: '#6b7280', marginBottom: '20px' }}>
+        <div style={{ border:'1px solid rgba(255,255,255,0.72)', borderRadius:'22px', background:'var(--glass)', boxShadow:'var(--shadow-soft)', backdropFilter:'blur(18px)', padding:'20px' }}>
+          <h3 style={{ marginTop: 0, color:'var(--ink-950)' }}>🔍 Agrupación por Tipo de Actividad (IA)</h3>
+          <p style={{ fontSize: '13px', color:'var(--muted)', marginBottom: '20px' }}>
             La IA lee todas las descripciones de los registros aprobados, las agrupa por categorías de actividad, detecta cuáles se repiten más y cuáles generan más tiempo.
           </p>
 
           {/* Controles */}
-          <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-end', flexWrap: 'wrap', background: '#f9fafb', padding: '14px', borderRadius: '8px', marginBottom: '20px' }}>
+          <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-end', flexWrap: 'wrap', background:'rgba(238,245,248,0.7)', padding: '14px', borderRadius:'14px', marginBottom: '20px' }}>
             <div className="form-group" style={{ minWidth: '170px' }}>
               <label style={{ fontSize: '12px', fontWeight: '600', color: '#555', display: 'block', marginBottom: '5px' }}>Período a analizar</label>
               <select value={rangoAgrupacion} onChange={(e) => { setRangoAgrupacion(e.target.value); setAgrupacion(null); }}>
@@ -910,7 +873,7 @@ Sé conciso, específico y ORIGINAL.`;
               disabled={loadingAgrupacion}
               style={{
                 padding: '10px 20px', background: loadingAgrupacion ? '#9ca3af' : '#1f2937',
-                color: 'white', border: 'none', borderRadius: '8px',
+                color: 'white', border: 'none', borderRadius:'14px',
                 cursor: loadingAgrupacion ? 'not-allowed' : 'pointer',
                 fontWeight: '700', fontSize: '13px'
               }}
@@ -920,7 +883,7 @@ Sé conciso, específico y ORIGINAL.`;
             {agrupacion && (
               <button
                 onClick={() => setAgrupacion(null)}
-                style={{ padding: '10px 14px', background: '#f3f4f6', color: '#374151', border: '1px solid #d1d5db', borderRadius: '8px', cursor: 'pointer', fontSize: '13px' }}
+                style={{ padding: '10px 14px', background: '#f3f4f6', color:'#12344e', border: '1px solid #d1d5db', borderRadius:'14px', cursor: 'pointer', fontSize: '13px' }}
               >
                 🔄 Nueva Consulta
               </button>
@@ -928,13 +891,13 @@ Sé conciso, específico y ORIGINAL.`;
           </div>
 
           {errorAgrupacion && (
-            <div style={{ background: '#fee2e2', border: '1px solid #fca5a5', borderRadius: '8px', padding: '14px', color: '#991b1b', fontSize: '13px', marginBottom: '16px' }}>
+            <div style={{ background: '#fee2e2', border: '1px solid #fca5a5', borderRadius:'14px', padding: '14px', color: '#991b1b', fontSize: '13px', marginBottom: '16px' }}>
               ❌ {errorAgrupacion}
             </div>
           )}
 
           {loadingAgrupacion && (
-            <div style={{ textAlign: 'center', padding: '40px', color: '#6b7280' }}>
+            <div style={{ textAlign: 'center', padding: '40px', color:'var(--muted)' }}>
               <div style={{ fontSize: '32px', marginBottom: '12px' }}>🤖</div>
               <p style={{ fontWeight: '600' }}>La IA está leyendo y agrupando las descripciones...</p>
               <p style={{ fontSize: '12px' }}>Esto puede tomar unos segundos según la cantidad de registros.</p>
@@ -944,8 +907,8 @@ Sé conciso, específico y ORIGINAL.`;
           {agrupacion && (
             <>
               {/* Resumen ejecutivo */}
-              <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '10px', padding: '18px', marginBottom: '24px' }}>
-                <div style={{ fontWeight: '700', color: '#1e40af', marginBottom: '8px' }}>📋 Resumen Ejecutivo</div>
+              <div style={{ background:'rgba(0,59,113,0.07)', border: '1px solid #bfdbfe', borderRadius: '10px', padding: '18px', marginBottom: '24px' }}>
+                <div style={{ fontWeight: '700', color:'var(--bank-blue)', marginBottom: '8px' }}>📋 Resumen Ejecutivo</div>
                 <p style={{ margin: 0, fontSize: '13.5px', color: '#1e3a8a', lineHeight: '1.6' }}>{agrupacion.resumen_ejecutivo}</p>
                 <div style={{ display: 'flex', gap: '20px', marginTop: '14px', fontSize: '12px', flexWrap: 'wrap' }}>
                   <span>🏋️ <strong>Mayor carga:</strong> {agrupacion.actividad_mas_costosa}</span>
@@ -964,36 +927,36 @@ Sé conciso, específico y ORIGINAL.`;
                     <div key={idx} style={{ background: 'white', border: `2px solid ${color}20`, borderRadius: '10px', overflow: 'hidden' }}>
                       <div style={{ background: color, padding: '14px 16px', color: 'white' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <strong style={{ fontSize: '14px' }}>{grupo.nombre}</strong>
+                          <strong style={{ fontSize:'13px' }}>{grupo.nombre}</strong>
                           <span style={{ fontSize: '11px', opacity: 0.9 }}>{tendenciaIcon} {grupo.tendencia}</span>
                         </div>
                         <div style={{ fontSize: '11.5px', opacity: 0.85, marginTop: '4px' }}>{grupo.descripcion}</div>
                       </div>
                       <div style={{ padding: '14px 16px' }}>
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px', marginBottom: '12px', textAlign: 'center' }}>
-                          <div style={{ background: `${color}10`, borderRadius: '6px', padding: '8px' }}>
+                          <div style={{ background: `${color}10`, borderRadius:'10px', padding: '8px' }}>
                             <div style={{ fontSize: '18px', fontWeight: '800', color }}>{grupo.horas?.toFixed(1)}h</div>
-                            <div style={{ fontSize: '10px', color: '#6b7280' }}>Horas</div>
+                            <div style={{ fontSize: '10px', color:'var(--muted)' }}>Horas</div>
                           </div>
-                          <div style={{ background: `${color}10`, borderRadius: '6px', padding: '8px' }}>
+                          <div style={{ background: `${color}10`, borderRadius:'10px', padding: '8px' }}>
                             <div style={{ fontSize: '18px', fontWeight: '800', color }}>{grupo.registros}</div>
-                            <div style={{ fontSize: '10px', color: '#6b7280' }}>Registros</div>
+                            <div style={{ fontSize: '10px', color:'var(--muted)' }}>Registros</div>
                           </div>
-                          <div style={{ background: `${color}10`, borderRadius: '6px', padding: '8px' }}>
+                          <div style={{ background: `${color}10`, borderRadius:'10px', padding: '8px' }}>
                             <div style={{ fontSize: '18px', fontWeight: '800', color }}>{grupo.porcentaje?.toFixed(1)}%</div>
-                            <div style={{ fontSize: '10px', color: '#6b7280' }}>Del total</div>
+                            <div style={{ fontSize: '10px', color:'var(--muted)' }}>Del total</div>
                           </div>
                         </div>
                         {grupo.actividades_frecuentes?.length > 0 && (
                           <div style={{ marginBottom: '10px' }}>
-                            <div style={{ fontSize: '11px', fontWeight: '700', color: '#374151', marginBottom: '5px' }}>Actividades más frecuentes:</div>
+                            <div style={{ fontSize: '11px', fontWeight: '700', color:'#12344e', marginBottom: '5px' }}>Actividades más frecuentes:</div>
                             {grupo.actividades_frecuentes.map((act, i) => (
-                              <div key={i} style={{ fontSize: '11.5px', color: '#6b7280', padding: '2px 0' }}>· {act}</div>
+                              <div key={i} style={{ fontSize: '11.5px', color:'var(--muted)', padding: '2px 0' }}>· {act}</div>
                             ))}
                           </div>
                         )}
                         {grupo.recomendacion && (
-                          <div style={{ background: '#f9fafb', borderLeft: `3px solid ${color}`, padding: '8px 10px', borderRadius: '0 6px 6px 0', fontSize: '11.5px', color: '#374151' }}>
+                          <div style={{ background:'rgba(238,245,248,0.7)', borderLeft: `3px solid ${color}`, padding: '8px 10px', borderRadius: '0 6px 6px 0', fontSize: '11.5px', color:'#12344e' }}>
                             💡 {grupo.recomendacion}
                           </div>
                         )}
@@ -1006,9 +969,9 @@ Sé conciso, específico y ORIGINAL.`;
           )}
 
           {!agrupacion && !loadingAgrupacion && !errorAgrupacion && (
-            <div style={{ textAlign: 'center', padding: '50px', color: '#9ca3af' }}>
+            <div style={{ textAlign: 'center', padding: '50px', color:'#8a96a3' }}>
               <div style={{ fontSize: '48px', marginBottom: '14px' }}>🔍</div>
-              <p style={{ fontSize: '14px', fontWeight: '600' }}>Selecciona el período y haz clic en "Analizar Descripciones"</p>
+              <p style={{ fontSize:'13px', fontWeight: '600' }}>Selecciona el período y haz clic en "Analizar Descripciones"</p>
               <p style={{ fontSize: '12px' }}>La IA agrupará automáticamente tus actividades en categorías y te dirá cuáles consumen más tiempo y se repiten más.</p>
             </div>
           )}
@@ -1016,11 +979,9 @@ Sé conciso, específico y ORIGINAL.`;
       )}
 
       {/* Footer */}
-      <div style={{ marginTop: '30px', padding: '15px', background: '#f9f9f9', borderRadius: '8px', textAlign: 'center', fontSize: '12px', color: '#999' }}>
+      <div style={{ marginTop: '30px', padding: '15px', background:'rgba(238,245,248,0.6)', borderRadius:'14px', textAlign: 'center', fontSize: '12px', color:'#8a96a3' }}>
         📊 Datos actualizados al momento • Período: {new Date(2024, filtroMes - 1).toLocaleString('es-CL', { month: 'long' })} {filtroAnio}{filtroEmpresa !== 'todas' ? ` • Empresa: ${filtroEmpresa}` : ''}
       </div>
     </div>
   );
-};
-
-export default Analytics;
+}
