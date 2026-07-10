@@ -972,7 +972,7 @@ function App() {
         {/* SECCIÓN: REGISTRAR CAMBIO/ALERTA */}
         {vista === 'registros' && usuario.rol === 'especialista' && (
           <section className="seccion">
-            <h2>📋 {editandoId ? '✏️ Editar Cambio/Alerta' : 'Registrar Cambio o Alerta'}</h2>
+            <p className="panel-label">Especialista</p>
             
             <form onSubmit={manejarRegistro} className="formulario-mejorado">
               <div className="form-group">
@@ -1180,7 +1180,7 @@ function App() {
         {/* SECCIÓN: EXCEL UPLOAD */}
         {vista === 'excel-upload' && usuario.rol === 'especialista' && (
           <section className="seccion">
-            <h2>📥 Cargar Registros desde Excel</h2>
+            <p className="panel-label">Especialista</p>
             <ExcelUpload 
               token={token} 
               apiUrl={API_URL}
@@ -1204,106 +1204,48 @@ function App() {
 
         {/* SECCIÓN: MANTENEDOR */}
         {vista === 'mantenedor' && (usuario.rol === 'coordinador' || usuario.rol === 'admin') && (
-          <section className="seccion">
-            <h2>⚙️ Mantenedor - Gestionar Registros</h2>
-            
-            {registros.length === 0 ? (
-              <p className="sin-datos">No hay registros</p>
-            ) : (
+          <div className="seccion">
+            <p className="panel-label">Administración</p>
+            <div className="panel-toolbar">
+              <h2 style={{marginBottom:0}}>Todos los registros</h2>
+              {seleccionados.length > 0 && (
+                <div style={{display:'flex',alignItems:'center',gap:'10px'}}>
+                  <span style={{fontFamily:"'IBM Plex Mono',monospace",fontSize:'11px',color:'var(--muted)'}}>
+                    {seleccionados.length} seleccionados
+                  </span>
+                  <button className="btn-rechazar" onClick={manejarEliminarSeleccionados}>
+                    Eliminar ({seleccionados.length})
+                  </button>
+                </div>
+              )}
+            </div>
+            {registros.length === 0 ? <p className="sin-datos">No hay registros</p> : (
               <div className="tabla-responsive">
-                {seleccionados.length > 0 && (
-                  <div style={{
-                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                    background: '#fff3cd', border: '1px solid #FF9800', borderRadius: '8px',
-                    padding: '12px 16px', marginBottom: '15px'
-                  }}>
-                    <span style={{fontSize: '13px', fontWeight: '600', color: '#92400e'}}>
-                      {seleccionados.length} registro(s) seleccionado(s)
-                    </span>
-                    <button
-                      onClick={manejarEliminarSeleccionados}
-                      style={{
-                        padding: '8px 16px', background: '#f44336', color: 'white',
-                        border: 'none', borderRadius: '6px', cursor: 'pointer',
-                        fontSize: '13px', fontWeight: '600'
-                      }}
-                    >
-                      🗑️ Eliminar seleccionados ({seleccionados.length})
-                    </button>
-                  </div>
-                )}
-                <table className="tabla tabla-acciones">
-                  <thead>
-                    <tr>
-                      <th>
-                        <input
-                          type="checkbox"
-                          checked={registros.length > 0 && registros.every(r => seleccionados.includes(r.id))}
-                          onChange={() => toggleSeleccionarTodos(registros.map(r => r.id))}
-                        />
-                      </th>
-                      <th>N° Ticket</th>
-                      <th>Tipo</th>
-                      <th>Especialista</th>
-                      <th>Descripción</th>
-                      <th>Horas</th>
-                      <th>Estado</th>
-                      <th>Acciones</th>
-                    </tr>
-                  </thead>
+                <table className="tabla">
+                  <thead><tr>
+                    <th><input type="checkbox"
+                      checked={registros.length>0 && registros.every(r=>seleccionados.includes(r.id))}
+                      onChange={()=>toggleSeleccionarTodos(registros.map(r=>r.id))}
+                    /></th>
+                    <th>Ticket</th><th>Tipo</th><th>Especialista</th><th>Descripción</th><th>Horas</th><th>Estado</th><th>Acciones</th>
+                  </tr></thead>
                   <tbody>
-                    {registros.map(r => (
-                      <tr key={r.id} style={seleccionados.includes(r.id) ? {background: '#fff8e1'} : {}}>
-                        <td>
-                          <input
-                            type="checkbox"
-                            checked={seleccionados.includes(r.id)}
-                            onChange={() => toggleSeleccion(r.id)}
-                          />
-                        </td>
-                        <td>{r.numeroTicket || '—'}</td>
-                        <td><strong>{r.tipo}</strong></td>
-                        <td>{r.createdByNombre || r.especialista}</td>
-                        <td style={{maxWidth: '250px', whiteSpace: 'normal', wordBreak: 'break-word'}}>{r.descripcion}</td>
-                        <td className="numero">{r.horas}h</td>
-                        <td>
-                          <span className={`badge badge-${r.estado}`}>
-                            {r.estado === 'pendiente' ? 'Pendiente de Aprobación' : r.estado === 'exitoso' ? 'Aprobado' : 'Rechazado'}
-                          </span>
-                        </td>
+                    {registros.map(r=>(
+                      <tr key={r.id} style={seleccionados.includes(r.id)?{background:'rgba(86,217,217,0.06)'}:{}}>
+                        <td><input type="checkbox" checked={seleccionados.includes(r.id)} onChange={()=>toggleSeleccion(r.id)}/></td>
+                        <td style={{fontFamily:"'IBM Plex Mono',monospace",fontSize:'11px',color:'var(--muted)'}}>{r.numeroTicket||'—'}</td>
+                        <td style={{fontWeight:'700'}}>{r.tipo}</td>
+                        <td>{r.createdByNombre||r.especialista}</td>
+                        <td style={{maxWidth:'220px',whiteSpace:'normal',wordBreak:'break-word',fontSize:'12px'}}>{r.descripcion?.substring(0,60)}</td>
+                        <td style={{fontFamily:"'IBM Plex Mono',monospace",fontWeight:'700'}}>{r.horas}h</td>
+                        <td><span className={`badge badge-${r.estado}`}>{r.estado==='pendiente'?'Pendiente':r.estado==='exitoso'?'Aprobado':'Rechazado'}</span></td>
                         <td className="acciones">
-                          <button 
-                            className="btn-editar"
-                            onClick={() => cargarParaEditar(r)}
-                            title="Editar registro"
-                          >
-                            ✏️ Editar
-                          </button>
-                          {r.estado === 'pendiente' && (
-                            <>
-                              <button 
-                                className="btn-aprobar"
-                                onClick={() => manejarAprobacion(r.id, 'exitoso')}
-                                title="Aprobar registro"
-                              >
-                                ✅ Aprobar
-                              </button>
-                              <button 
-                                className="btn-rechazar"
-                                onClick={() => manejarAprobacion(r.id, 'fallido')}
-                                title="Rechazar registro"
-                              >
-                                ❌ Rechazar
-                              </button>
-                            </>
-                          )}
-                          <button 
-                            className="btn-eliminar"
-                            onClick={() => manejarEliminar(r.id)}
-                            title="Eliminar registro"
-                          >
-                            🗑️ Eliminar
-                          </button>
+                          <button className="btn-editar" onClick={()=>cargarParaEditar(r)}>Editar</button>
+                          {r.estado==='pendiente' && <>
+                            <button className="btn-aprobar" onClick={()=>manejarAprobacion(r.id,'exitoso')}>Aprobar</button>
+                            <button className="btn-rechazar" onClick={()=>manejarAprobacion(r.id,'fallido')}>Rechazar</button>
+                          </>}
+                          <button className="btn-eliminar" onClick={()=>manejarEliminar(r.id)}>Eliminar</button>
                         </td>
                       </tr>
                     ))}
@@ -1311,355 +1253,205 @@ function App() {
                 </table>
               </div>
             )}
-          </section>
+          </div>
         )}
 
         {/* SECCIÓN: MI RESUMEN (Especialista) */}
         {vista === 'resumen' && usuario.rol === 'especialista' && (
-          <section className="seccion">
-            <h2>📊 Mi Resumen</h2>
-            
-            {/* Tarjetas de resumen */}
-            <div className="dashboard-grid">
-              <div className="card card-blue">
-                <h3>📋 Cantidad de registros ingresados</h3>
-                <p className="numero">{misRegistrosFiltrados.length}</p>
-              </div>
-              <div className="card card-green">
-                <h3>✅ Horas Aprobadas en el mes</h3>
-                <p className="numero">{misRegistrosFiltrados.filter(r => r.estado === 'exitoso').reduce((sum, r) => sum + (r.horas || 0), 0).toFixed(2)}h</p>
-              </div>
-              <div className="card card-yellow">
-                <h3>⏳ Registros Pendientes de aprobación</h3>
-                <p className="numero">{misRegistrosFiltrados.filter(r => r.estado === 'pendiente').length}</p>
-              </div>
-              <div className="card" style={{ background: 'linear-gradient(135deg, #d97706 0%, #92400e 100%)' }}>
-                <h3>⏱️ Horas Pendientes de aprobación</h3>
-                <p className="numero">{misRegistrosFiltrados.filter(r => r.estado === 'pendiente').reduce((sum, r) => sum + (r.horas || 0), 0).toFixed(2)}h</p>
-              </div>
-            </div>
-
-            {/* Filtros */}
-            <div className="filtros-dashboard">
-              <div className="form-group">
-                <label>Mes</label>
-                <select
-                  value={filtros.mes}
-                  onChange={(e) => setFiltros({ ...filtros, mes: parseInt(e.target.value) })}
-                >
-                  {[...Array(12)].map((_, i) => (
-                    <option key={i + 1} value={i + 1}>
-                      {new Date(2024, i).toLocaleString('es-CL', { month: 'long' })}
-                    </option>
-                  ))}
+          <div>
+            {/* Filtros compactos */}
+            <div style={{display:'flex',gap:'10px',marginBottom:'20px',flexWrap:'wrap',alignItems:'flex-end'}}>
+              <div>
+                <div style={{fontFamily:"'IBM Plex Mono',monospace",fontSize:'10px',fontWeight:'700',color:'var(--muted)',textTransform:'uppercase',letterSpacing:'.07em',marginBottom:'6px'}}>Mes</div>
+                <select value={filtros.mes} onChange={e=>setFiltros({...filtros,mes:parseInt(e.target.value)})}
+                  style={{border:'1px solid var(--line)',borderRadius:'12px',padding:'9px 14px',background:'rgba(255,255,255,0.84)',color:'var(--ink-950)',fontSize:'13px',fontWeight:'600',minWidth:'130px'}}>
+                  {[...Array(12)].map((_,i)=><option key={i+1} value={i+1}>{new Date(2024,i).toLocaleString('es-CL',{month:'long'})}</option>)}
                 </select>
               </div>
-
-              <div className="form-group">
-                <label>Año</label>
-                <select
-                  value={filtros.anio}
-                  onChange={(e) => setFiltros({ ...filtros, anio: parseInt(e.target.value) })}
-                >
-                  <option value="2023">2023</option>
-                  <option value="2024">2024</option>
-                  <option value="2025">2025</option>
-                  <option value="2026">2026</option>
-                  <option value="2027">2027</option>
+              <div>
+                <div style={{fontFamily:"'IBM Plex Mono',monospace",fontSize:'10px',fontWeight:'700',color:'var(--muted)',textTransform:'uppercase',letterSpacing:'.07em',marginBottom:'6px'}}>Año</div>
+                <select value={filtros.anio} onChange={e=>setFiltros({...filtros,anio:parseInt(e.target.value)})}
+                  style={{border:'1px solid var(--line)',borderRadius:'12px',padding:'9px 14px',background:'rgba(255,255,255,0.84)',color:'var(--ink-950)',fontSize:'13px',fontWeight:'600',minWidth:'100px'}}>
+                  {['2023','2024','2025','2026','2027'].map(y=><option key={y} value={y}>{y}</option>)}
                 </select>
               </div>
-
-              <div className="form-group">
-                <label>Estado</label>
-                <select
-                  value={filtros.estado || ''}
-                  onChange={(e) => setFiltros({ ...filtros, estado: e.target.value || null })}
-                >
+              <div>
+                <div style={{fontFamily:"'IBM Plex Mono',monospace",fontSize:'10px',fontWeight:'700',color:'var(--muted)',textTransform:'uppercase',letterSpacing:'.07em',marginBottom:'6px'}}>Estado</div>
+                <select value={filtros.estado||''} onChange={e=>setFiltros({...filtros,estado:e.target.value||null})}
+                  style={{border:'1px solid var(--line)',borderRadius:'12px',padding:'9px 14px',background:'rgba(255,255,255,0.84)',color:'var(--ink-950)',fontSize:'13px',fontWeight:'600',minWidth:'140px'}}>
                   <option value="">Todos</option>
-                  <option value="pendiente">Pendiente de Aprobación</option>
+                  <option value="pendiente">Pendiente</option>
                   <option value="exitoso">Aprobado</option>
                   <option value="fallido">Rechazado</option>
                 </select>
               </div>
             </div>
-
-            {/* Tabla de registros */}
-            <h3>Mis Registros</h3>
-            {misRegistrosFiltrados.length === 0 ? (
-              <p className="sin-datos">No hay registros para este período</p>
-            ) : (
-              <table className="tabla">
-                <thead>
-                  <tr>
-                    <th>N° Ticket</th>
-                    <th>Tipo</th>
-                    <th>Descripción</th>
-                    <th>Cliente</th>
-                    <th>Inicio (Fecha - Hora)</th>
-                    <th>Fin (Fecha - Hora)</th>
-                    <th>Horas</th>
-                    <th>Estado</th>
-                    <th>Genera OVT</th>
-                    <th>Acciones</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {misRegistrosFiltrados.map(r => (
-                    <tr key={r.id}>
-                      <td>{r.numeroTicket || '—'}</td>
-                      <td><strong>{r.tipo}</strong></td>
-                      <td style={{maxWidth: '220px', whiteSpace: 'normal', wordBreak: 'break-word'}}>{r.descripcion}</td>
-                      <td>{r.cliente}</td>
-                      <td style={{fontSize: '13px'}}>{parseDate(r.fechaInicio)} <strong>{toTimeString(toDate(r.fechaInicio))}</strong></td>
-                      <td style={{fontSize: '13px'}}>{parseDate(r.fechaFin)} <strong>{toTimeString(toDate(r.fechaFin))}</strong></td>
-                      <td className="numero">{r.horas}h</td>
-                      <td>
-                        <span className={`badge badge-${r.estado}`}>
-                          {r.estado === 'pendiente' ? 'Pendiente' : r.estado === 'exitoso' ? 'Aprobado' : 'Rechazado'}
-                        </span>
-                      </td>
-                      <td>{r.genera_ovt === 'si' ? '✓' : '✗'}</td>
-                      <td style={{textAlign: 'center', verticalAlign: 'middle'}}>
-                        <div className="acciones">
-                        {r.estado === 'pendiente' ? (
-                          <button 
-                            className="btn-editar"
-                            disabled
-                            title="No puedes editar mientras está pendiente de aprobación"
-                            style={{opacity: 0.5, cursor: 'not-allowed'}}
-                          >
-                            ⏳ Pendiente
-                          </button>
-                        ) : r.estado === 'exitoso' ? (
-                          <button 
-                            className="btn-editar"
-                            disabled
-                            title="No puedes editar registros aprobados"
-                            style={{opacity: 0.5, cursor: 'not-allowed'}}
-                          >
-                            ✅ Aprobado
-                          </button>
-                        ) : (
-                          <button 
-                            className="btn-editar"
-                            onClick={() => cargarParaEditar(r)}
-                            title="Editar registro rechazado"
-                          >
-                            ✏️ Editar
-                          </button>
-                        )}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </section>
+            {/* KPIs */}
+            <div className="queue-tabs" style={{gridTemplateColumns:'repeat(4,minmax(0,1fr))',marginBottom:'20px'}}>
+              <div className="queue-tab">
+                <span className="queue-tab-label">Registros</span>
+                <div className="queue-tab-num">{misRegistrosFiltrados.length}</div>
+                <div className="queue-tab-sub">ingresados en el período</div>
+              </div>
+              <div className="queue-tab">
+                <span className="queue-tab-label">Horas aprobadas</span>
+                <div className="queue-tab-num">{misRegistrosFiltrados.filter(r=>r.estado==='exitoso').reduce((s,r)=>s+(r.horas||0),0).toFixed(1)}<span style={{fontSize:'1.2rem'}}>h</span></div>
+                <div className="queue-tab-sub">en el período</div>
+              </div>
+              <div className="queue-tab">
+                <span className="queue-tab-label">Pendientes</span>
+                <div className="queue-tab-num">{misRegistrosFiltrados.filter(r=>r.estado==='pendiente').length}</div>
+                <div className="queue-tab-sub">esperando aprobación</div>
+              </div>
+              <div className="queue-tab">
+                <span className="queue-tab-label">Horas pendientes</span>
+                <div className="queue-tab-num">{misRegistrosFiltrados.filter(r=>r.estado==='pendiente').reduce((s,r)=>s+(r.horas||0),0).toFixed(1)}<span style={{fontSize:'1.2rem'}}>h</span></div>
+                <div className="queue-tab-sub">en espera</div>
+              </div>
+            </div>
+            {/* Tabla */}
+            <div className="seccion">
+              <p className="panel-label">Historial</p>
+              <h2>Mis registros</h2>
+              {misRegistrosFiltrados.length===0 ? <p className="sin-datos">No hay registros para este período</p> : (
+                <div className="tabla-responsive">
+                  <table className="tabla">
+                    <thead><tr>
+                      <th>Ticket</th><th>Tipo</th><th>Descripción</th><th>Cliente</th>
+                      <th>Inicio</th><th>Fin</th><th>Horas</th><th>Estado</th><th>OVT</th><th>Acción</th>
+                    </tr></thead>
+                    <tbody>
+                      {misRegistrosFiltrados.map(r=>(
+                        <tr key={r.id}>
+                          <td style={{fontFamily:"'IBM Plex Mono',monospace",fontSize:'11px',color:'var(--muted)'}}>{r.numeroTicket||'—'}</td>
+                          <td style={{fontWeight:'700'}}>{r.tipo}</td>
+                          <td style={{maxWidth:'200px',whiteSpace:'normal',wordBreak:'break-word',fontSize:'12px'}}>{r.descripcion?.substring(0,60)}</td>
+                          <td style={{color:'var(--muted)'}}>{r.cliente}</td>
+                          <td style={{fontSize:'12px',whiteSpace:'nowrap'}}>{parseDate(r.fechaInicio)} {toTimeString(toDate(r.fechaInicio))}</td>
+                          <td style={{fontSize:'12px',whiteSpace:'nowrap'}}>{parseDate(r.fechaFin)} {toTimeString(toDate(r.fechaFin))}</td>
+                          <td style={{fontFamily:"'IBM Plex Mono',monospace",fontWeight:'700'}}>{r.horas}h</td>
+                          <td><span className={`badge badge-${r.estado}`}>{r.estado==='pendiente'?'Pendiente':r.estado==='exitoso'?'Aprobado':'Rechazado'}</span></td>
+                          <td><span style={{fontSize:'11px',padding:'2px 8px',borderRadius:'999px',fontWeight:'800',
+                            background:r.genera_ovt==='si'?'rgba(32,166,106,0.12)':'rgba(18,52,78,0.08)',
+                            color:r.genera_ovt==='si'?'#116642':'var(--muted)'}}>
+                            {r.genera_ovt==='si'?'Sí':'No'}
+                          </span></td>
+                          <td>
+                            {r.estado==='pendiente'||r.estado==='exitoso'
+                              ? <span style={{fontSize:'11px',color:'var(--muted)',fontWeight:'600'}}>{r.estado==='pendiente'?'Esperando':'Aprobado'}</span>
+                              : <button className="btn-editar" onClick={()=>cargarParaEditar(r)}>Editar</button>
+                            }
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </div>
         )}
 
-        {/* SECCIÓN: DASHBOARD (Admin) */}
+        {/* SECCIÓN: DASHBOARD */}
         {vista === 'dashboard' && (usuario.rol === 'admin' || usuario.rol === 'dpe' || usuario.rol === 'teamleader') && (
-          <section className="seccion">
-            <h2>📊 Dashboard - Gestión de Registros</h2>
-            
-            <div className="filtros-dashboard">
-              <div className="form-group">
-                <label>Mes</label>
-                <select
-                  value={filtros.mes}
-                  onChange={(e) => setFiltros({ ...filtros, mes: parseInt(e.target.value) })}
-                >
-                  {[...Array(12)].map((_, i) => (
-                    <option key={i + 1} value={i + 1}>
-                      {new Date(2024, i).toLocaleString('es-CL', { month: 'long' })}
-                    </option>
+          <div>
+            {/* Filtros de período */}
+            <div style={{ display:'flex', gap:'10px', marginBottom:'20px', flexWrap:'wrap', alignItems:'flex-end' }}>
+              <div>
+                <div style={{ fontFamily:"'IBM Plex Mono',monospace", fontSize:'10px', fontWeight:'700', color:'var(--muted)', textTransform:'uppercase', letterSpacing:'.07em', marginBottom:'6px' }}>Mes</div>
+                <select value={filtros.mes} onChange={e=>setFiltros({...filtros,mes:parseInt(e.target.value)})}
+                  style={{ border:'1px solid var(--line)', borderRadius:'12px', padding:'9px 14px', background:'rgba(255,255,255,0.84)', color:'var(--ink-950)', fontSize:'13px', fontWeight:'600', minWidth:'130px' }}>
+                  {[...Array(12)].map((_,i)=>(
+                    <option key={i+1} value={i+1}>{new Date(2024,i).toLocaleString('es-CL',{month:'long'})}</option>
                   ))}
                 </select>
               </div>
-              <div className="form-group">
-                <label>Año</label>
-                <select
-                  value={filtros.anio}
-                  onChange={(e) => setFiltros({ ...filtros, anio: parseInt(e.target.value) })}
-                >
-                  <option value="2023">2023</option>
-                  <option value="2024">2024</option>
-                  <option value="2025">2025</option>
-                  <option value="2026">2026</option>
-                  <option value="2027">2027</option>
+              <div>
+                <div style={{ fontFamily:"'IBM Plex Mono',monospace", fontSize:'10px', fontWeight:'700', color:'var(--muted)', textTransform:'uppercase', letterSpacing:'.07em', marginBottom:'6px' }}>Año</div>
+                <select value={filtros.anio} onChange={e=>setFiltros({...filtros,anio:parseInt(e.target.value)})}
+                  style={{ border:'1px solid var(--line)', borderRadius:'12px', padding:'9px 14px', background:'rgba(255,255,255,0.84)', color:'var(--ink-950)', fontSize:'13px', fontWeight:'600', minWidth:'100px' }}>
+                  {['2023','2024','2025','2026','2027'].map(y=><option key={y} value={y}>{y}</option>)}
                 </select>
               </div>
             </div>
 
-            {/* Tarjetas resumen */}
-            <div className="dashboard-grid">
-              <div className="card card-blue">
-                <h3>⏳ Pendientes de Aprobación</h3>
-                <p className="numero">{pendientes}</p>
-                <p style={{fontSize: '11px', color: '#fff', marginTop: '5px'}}>de {registrosFiltrados.length} registros</p>
+            {/* Queue Tabs — KPIs */}
+            <div className="queue-tabs" style={{ gridTemplateColumns:'repeat(4,minmax(0,1fr))', marginBottom:'20px' }}>
+              <div className="queue-tab active" style={{ '--qt-color':'var(--kyn-red)' }}>
+                <span className="queue-tab-label">Pendientes</span>
+                <div className="queue-tab-num" style={{ color:'var(--signal)' }}>{pendientes}</div>
+                <div className="queue-tab-sub">de {registrosFiltrados.length} registros</div>
               </div>
-              <div className="card card-green">
-                <h3>✅ Registros Aprobados</h3>
-                <p className="numero">{aprobados}</p>
+              <div className="queue-tab">
+                <span className="queue-tab-label">Aprobados</span>
+                <div className="queue-tab-num">{aprobados}</div>
+                <div className="queue-tab-sub">registros este período</div>
               </div>
-              <div className="card" style={{ background: 'linear-gradient(135deg, #047857 0%, #064e3b 100%)' }}>
-                <h3>📈 Total Horas Aprobadas en el mes</h3>
-                <p className="numero">{totalHorasAprobadas.toFixed(2)}h</p>
+              <div className="queue-tab">
+                <span className="queue-tab-label">Horas aprobadas</span>
+                <div className="queue-tab-num">{totalHorasAprobadas.toFixed(1)}<span style={{fontSize:'1.2rem'}}>h</span></div>
+                <div className="queue-tab-sub">en el período seleccionado</div>
               </div>
-              <div className="card card-red">
-                <h3>❌ Registros Rechazados</h3>
-                <p className="numero">{rechazados}</p>
+              <div className="queue-tab">
+                <span className="queue-tab-label">Rechazados</span>
+                <div className="queue-tab-num">{rechazados}</div>
+                <div className="queue-tab-sub">registros rechazados</div>
               </div>
             </div>
 
-            {/* Tabla: Registros Pendientes */}
-            <h3>⏳ Registros Pendientes de Aprobación</h3>
-            {registrosFiltrados.filter(r => r.estado === 'pendiente').length === 0 ? (
-              <p className="sin-datos">No hay registros pendientes</p>
-            ) : (
-              <>
+            {/* Tabla pendientes */}
+            <div className="seccion" style={{ marginBottom:'16px' }}>
+              <div className="panel-toolbar">
+                <div>
+                  <p className="panel-label">Aprobaciones</p>
+                  <h2 style={{ marginBottom:0 }}>Registros pendientes</h2>
+                </div>
                 {seleccionadosPendientes.length > 0 && (
-                  <div style={{
-                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                    background: '#fff3cd', border: '1px solid #FF9800', borderRadius: '8px',
-                    padding: '12px 16px', marginBottom: '15px'
-                  }}>
-                    <span style={{fontSize: '13px', fontWeight: '600', color: '#92400e'}}>
-                      {seleccionadosPendientes.length} registro(s) seleccionado(s)
-                    </span>
-                    <div style={{display: 'flex', gap: '8px'}}>
-                      <button
-                        onClick={() => manejarAprobacionMasiva('exitoso')}
-                        style={{
-                          padding: '8px 16px', background: '#4CAF50', color: 'white',
-                          border: 'none', borderRadius: '6px', cursor: 'pointer',
-                          fontSize: '13px', fontWeight: '600'
-                        }}
-                      >
-                        ✅ Aprobar seleccionados ({seleccionadosPendientes.length})
-                      </button>
-                      <button
-                        onClick={() => manejarAprobacionMasiva('fallido')}
-                        style={{
-                          padding: '8px 16px', background: '#f44336', color: 'white',
-                          border: 'none', borderRadius: '6px', cursor: 'pointer',
-                          fontSize: '13px', fontWeight: '600'
-                        }}
-                      >
-                        ❌ Rechazar seleccionados ({seleccionadosPendientes.length})
-                      </button>
-                    </div>
+                  <div style={{ display:'flex', gap:'8px' }}>
+                    <button className="btn-aprobar" onClick={()=>manejarAprobacionMasiva('exitoso')}>
+                      Aprobar {seleccionadosPendientes.length} seleccionados
+                    </button>
+                    <button className="btn-rechazar" onClick={()=>manejarAprobacionMasiva('fallido')}>
+                      Rechazar {seleccionadosPendientes.length}
+                    </button>
                   </div>
                 )}
-                <table className="tabla">
-                  <thead>
-                    <tr>
-                      <th>
-                        <input
-                          type="checkbox"
-                          checked={
-                            registrosFiltrados.filter(r => r.estado === 'pendiente').length > 0 &&
-                            registrosFiltrados.filter(r => r.estado === 'pendiente').every(r => seleccionadosPendientes.includes(r.id))
-                          }
-                          onChange={() => toggleSeleccionarTodosPendientes(registrosFiltrados.filter(r => r.estado === 'pendiente').map(r => r.id))}
-                        />
-                      </th>
-                      <th>N° Ticket</th>
-                      <th>Especialista</th>
-                      <th>Tipo</th>
-                      <th>Descripción</th>
-                      <th>Inicio (Fecha - Hora)</th>
-                      <th>Fin (Fecha - Hora)</th>
-                      <th>Horas</th>
-                      <th>Especialidad</th>
-                      <th>Genera OVT</th>
-                      <th>Acciones</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {registrosFiltrados.filter(r => r.estado === 'pendiente').map(r => (
-                      <tr key={r.id} style={seleccionadosPendientes.includes(r.id) ? {background: '#fff8e1'} : {}}>
-                        <td>
-                          <input
-                            type="checkbox"
-                            checked={seleccionadosPendientes.includes(r.id)}
-                            onChange={() => toggleSeleccionPendiente(r.id)}
-                          />
-                        </td>
-                        <td>{r.numeroTicket || '—'}</td>
-                        <td><strong>{r.createdByNombre || r.especialista}</strong></td>
-                        <td>{r.tipo}</td>
-                        <td style={{maxWidth: '220px', whiteSpace: 'normal', wordBreak: 'break-word'}}>{r.descripcion}</td>
-                        <td style={{fontSize: '13px'}}>{parseDate(r.fechaInicio)} <strong>{toTimeString(toDate(r.fechaInicio))}</strong></td>
-                        <td style={{fontSize: '13px'}}>{parseDate(r.fechaFin)} <strong>{toTimeString(toDate(r.fechaFin))}</strong></td>
-                        <td className="numero">{r.horas}h</td>
-                        <td>{r.especialidad}</td>
-                        <td>
-                          <span style={{
-                            display: 'inline-block',
-                            padding: '4px 12px',
-                            borderRadius: '20px',
-                            fontSize: '12px',
-                            fontWeight: '700',
-                            background: r.genera_ovt === 'si' ? '#d1fae5' : '#fee2e2',
-                            color: r.genera_ovt === 'si' ? '#065f46' : '#991b1b'
-                          }}>
-                            {r.genera_ovt === 'si' ? '✓ SÍ' : '✗ NO'}
-                          </span>
-                        </td>
-                        <td className="acciones">
-                          <button 
-                            className="btn-aprobar"
-                            onClick={() => manejarAprobacion(r.id, 'exitoso')}
-                            title="Aprobar registro"
-                          >
-                            ✅ Aprobar
-                          </button>
-                          <button 
-                            className="btn-rechazar"
-                            onClick={() => manejarAprobacion(r.id, 'fallido')}
-                            title="Rechazar registro"
-                          >
-                            ❌ Rechazar
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </>
-            )}
-
-            {/* Gráficos */}
-            <div style={{display: 'flex', gap: '20px', marginTop: '30px', flexWrap: 'wrap', justifyContent: 'space-around'}}>
-              {/* Gráfico 1: Especialidad */}
-              {datosEspecialidad.length > 0 && (
-                <div style={{flex: 1, minWidth: '300px', background: '#f9f9f9', padding: '20px', borderRadius: '8px', border: '1px solid #ddd'}}>
-                  <h4 style={{marginTop: 0, marginBottom: '15px', color: '#333'}}>📊 Horas por Especialidad</h4>
-                  <table style={{width: '100%', fontSize: '14px', borderCollapse: 'collapse'}}>
+              </div>
+              {registrosFiltrados.filter(r=>r.estado==='pendiente').length===0 ? (
+                <p className="sin-datos">No hay registros pendientes en este período</p>
+              ) : (
+                <div className="tabla-responsive">
+                  <table className="tabla">
+                    <thead><tr>
+                      <th><input type="checkbox"
+                        checked={registrosFiltrados.filter(r=>r.estado==='pendiente').length>0 && registrosFiltrados.filter(r=>r.estado==='pendiente').every(r=>seleccionadosPendientes.includes(r.id))}
+                        onChange={()=>toggleSeleccionarTodosPendientes(registrosFiltrados.filter(r=>r.estado==='pendiente').map(r=>r.id))}
+                      /></th>
+                      <th>Ticket</th><th>Especialista</th><th>Tipo</th><th>Descripción</th>
+                      <th>Inicio</th><th>Fin</th><th>Horas</th><th>OVT</th><th>Acciones</th>
+                    </tr></thead>
                     <tbody>
-                      {datosEspecialidad.map((d, idx) => (
-                        <tr key={d.name} style={{borderBottom: idx < datosEspecialidad.length - 1 ? '1px solid #eee' : 'none', paddingBottom: '8px'}}>
-                          <td style={{padding: '8px 0'}}><strong>{d.name}</strong></td>
-                          <td style={{textAlign: 'right', padding: '8px 0', fontWeight: 'bold', color: '#2196F3'}}>{d.value.toFixed(2)}h</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-              
-              {/* Gráfico 2: Top 10 Especialistas */}
-              {datosEspecialista.length > 0 && (
-                <div style={{flex: 1, minWidth: '300px', background: '#f9f9f9', padding: '20px', borderRadius: '8px', border: '1px solid #ddd'}}>
-                  <h4 style={{marginTop: 0, marginBottom: '15px', color: '#333'}}>👥 Top Especialistas</h4>
-                  <table style={{width: '100%', fontSize: '14px', borderCollapse: 'collapse'}}>
-                    <tbody>
-                      {datosEspecialista.map((d, idx) => (
-                        <tr key={d.name} style={{borderBottom: idx < datosEspecialista.length - 1 ? '1px solid #eee' : 'none', paddingBottom: '8px'}}>
-                          <td style={{padding: '8px 0'}}><strong>{d.name?.substring(0, 25)}</strong></td>
-                          <td style={{textAlign: 'right', padding: '8px 0', fontWeight: 'bold', color: '#4CAF50'}}>{d.value.toFixed(2)}h</td>
+                      {registrosFiltrados.filter(r=>r.estado==='pendiente').map(r=>(
+                        <tr key={r.id} style={seleccionadosPendientes.includes(r.id)?{background:'rgba(86,217,217,0.06)'}:{}}>
+                          <td><input type="checkbox" checked={seleccionadosPendientes.includes(r.id)} onChange={()=>toggleSeleccionPendiente(r.id)}/></td>
+                          <td style={{fontFamily:"'IBM Plex Mono',monospace",fontSize:'11px',color:'var(--muted)'}}>{r.numeroTicket||'—'}</td>
+                          <td style={{fontWeight:'700'}}>{r.createdByNombre||r.especialista}</td>
+                          <td>{r.tipo}</td>
+                          <td style={{maxWidth:'180px',whiteSpace:'normal',wordBreak:'break-word',fontSize:'12px'}}>{r.descripcion?.substring(0,60)}</td>
+                          <td style={{fontSize:'12px',whiteSpace:'nowrap'}}>{parseDate(r.fechaInicio)} {toTimeString(toDate(r.fechaInicio))}</td>
+                          <td style={{fontSize:'12px',whiteSpace:'nowrap'}}>{parseDate(r.fechaFin)} {toTimeString(toDate(r.fechaFin))}</td>
+                          <td style={{fontFamily:"'IBM Plex Mono',monospace",fontWeight:'700'}}>{r.horas}h</td>
+                          <td>
+                            <span style={{fontSize:'11px',padding:'2px 8px',borderRadius:'999px',fontWeight:'800',
+                              background:r.genera_ovt==='si'?'rgba(32,166,106,0.12)':'rgba(18,52,78,0.08)',
+                              color:r.genera_ovt==='si'?'#116642':'var(--muted)'}}>
+                              {r.genera_ovt==='si'?'Sí':'No'}
+                            </span>
+                          </td>
+                          <td className="acciones">
+                            <button className="btn-aprobar" onClick={()=>manejarAprobacion(r.id,'exitoso')}>Aprobar</button>
+                            <button className="btn-rechazar" onClick={()=>manejarAprobacion(r.id,'fallido')}>Rechazar</button>
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -1668,48 +1460,68 @@ function App() {
               )}
             </div>
 
-            <h3>📋 Historial de Aprobaciones</h3>
-            {registrosFiltrados.filter(r => r.estado !== 'pendiente').length === 0 ? (
-              <p className="sin-datos">No hay registros procesados</p>
-            ) : (
-              <table className="tabla">
-                <thead>
-                  <tr>
-                    <th>N° Ticket</th>
-                    <th>Tipo</th>
-                    <th>Descripción</th>
-                    <th>Especialista</th>
-                    <th>Cliente</th>
-                    <th>Inicio (Fecha - Hora)</th>
-                    <th>Fin (Fecha - Hora)</th>
-                    <th>Horas</th>
-                    <th>Especialidad</th>
-                    <th>Estado</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {registrosFiltrados.filter(r => r.estado !== 'pendiente').map(r => (
-                    <tr key={r.id}>
-                      <td>{r.numeroTicket || '—'}</td>
-                      <td><strong>{r.tipo}</strong></td>
-                      <td style={{maxWidth: '220px', whiteSpace: 'normal', wordBreak: 'break-word'}}>{r.descripcion}</td>
-                      <td>{r.createdByNombre || r.especialista}</td>
-                      <td>{r.cliente}</td>
-                      <td style={{fontSize: '13px'}}>{parseDate(r.fechaInicio)} <strong>{toTimeString(toDate(r.fechaInicio))}</strong></td>
-                      <td style={{fontSize: '13px'}}>{parseDate(r.fechaFin)} <strong>{toTimeString(toDate(r.fechaFin))}</strong></td>
-                      <td className="numero">{r.horas}h</td>
-                      <td>{r.especialidad}</td>
-                      <td>
-                        <span className={`badge badge-${r.estado}`}>
-                          {r.estado === 'exitoso' ? '✅ Aprobado' : '❌ Rechazado'}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            {/* Tablas complementarias */}
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'16px', marginBottom:'16px' }}>
+              {datosEspecialidad.length > 0 && (
+                <div className="seccion" style={{ marginBottom:0 }}>
+                  <p className="panel-label">Distribución</p>
+                  <h2>Horas por especialidad</h2>
+                  <table className="tabla">
+                    <thead><tr><th>Especialidad</th><th style={{textAlign:'right'}}>Horas</th></tr></thead>
+                    <tbody>
+                      {datosEspecialidad.map(d=>(
+                        <tr key={d.name}><td>{d.name}</td><td style={{textAlign:'right',fontFamily:"'IBM Plex Mono',monospace",fontWeight:'700',color:'var(--kyn-red)'}}>{d.value.toFixed(1)}h</td></tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+              {datosEspecialista.length > 0 && (
+                <div className="seccion" style={{ marginBottom:0 }}>
+                  <p className="panel-label">Top especialistas</p>
+                  <h2>Por horas aprobadas</h2>
+                  <table className="tabla">
+                    <thead><tr><th>Especialista</th><th style={{textAlign:'right'}}>Horas</th></tr></thead>
+                    <tbody>
+                      {datosEspecialista.map(d=>(
+                        <tr key={d.name}><td style={{fontWeight:'600'}}>{d.name?.substring(0,28)}</td><td style={{textAlign:'right',fontFamily:"'IBM Plex Mono',monospace",fontWeight:'700'}}>{d.value.toFixed(1)}h</td></tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
+            {/* Historial aprobaciones */}
+            {registrosFiltrados.filter(r=>r.estado!=='pendiente').length > 0 && (
+              <div className="seccion">
+                <p className="panel-label">Historial</p>
+                <h2>Aprobaciones y rechazos</h2>
+                <div className="tabla-responsive">
+                  <table className="tabla">
+                    <thead><tr>
+                      <th>Ticket</th><th>Tipo</th><th>Especialista</th><th>Cliente</th>
+                      <th>Inicio</th><th>Fin</th><th>Horas</th><th>Estado</th>
+                    </tr></thead>
+                    <tbody>
+                      {registrosFiltrados.filter(r=>r.estado!=='pendiente').map(r=>(
+                        <tr key={r.id}>
+                          <td style={{fontFamily:"'IBM Plex Mono',monospace",fontSize:'11px',color:'var(--muted)'}}>{r.numeroTicket||'—'}</td>
+                          <td style={{fontWeight:'600'}}>{r.tipo}</td>
+                          <td>{r.createdByNombre||r.especialista}</td>
+                          <td style={{color:'var(--muted)'}}>{r.cliente}</td>
+                          <td style={{fontSize:'12px'}}>{parseDate(r.fechaInicio)} {toTimeString(toDate(r.fechaInicio))}</td>
+                          <td style={{fontSize:'12px'}}>{parseDate(r.fechaFin)} {toTimeString(toDate(r.fechaFin))}</td>
+                          <td style={{fontFamily:"'IBM Plex Mono',monospace",fontWeight:'700'}}>{r.horas}h</td>
+                          <td><span className={`badge badge-${r.estado}`}>{r.estado==='exitoso'?'Aprobado':'Rechazado'}</span></td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
             )}
-          </section>
+          </div>
         )}
 
         {/* SECCIÓN: GESTIÓN DE USUARIOS (Admin) */}
@@ -1719,45 +1531,42 @@ function App() {
 
         {/* SECCIÓN: AUDITORÍA */}
         {vista === 'auditoria' && usuario.rol === 'admin' && (
-          <section className="seccion">
-            <h2>🔍 Auditoría</h2>
-            
-            {auditoria.length === 0 ? (
-              <p className="sin-datos">Sin registros</p>
-            ) : (
-              <table className="tabla">
-                <thead>
-                  <tr>
-                    <th>Acción</th>
-                    <th>Usuario</th>
-                    <th>Fecha/Hora</th>
-                    <th>Detalles</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {auditoria.map(log => (
-                    <tr key={log.id}>
-                      <td><strong>{log.accion}</strong></td>
-                      <td>{log.usuarioNombre || '-'}</td>
-                      <td>{parseDate(log.timestamp) !== 'Sin fecha' ? new Date(log.timestamp?.toDate?.() || (log.timestamp?._seconds ? log.timestamp._seconds * 1000 : log.timestamp)).toLocaleString('es-CL') : '-'}</td>
-                      <td>{log.camposModificados ? JSON.stringify(log.camposModificados).substring(0, 50) : '-'}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+          <div className="seccion">
+            <p className="panel-label">Sistema</p>
+            <h2>Log de auditoría</h2>
+            {auditoria.length === 0 ? <p className="sin-datos">Sin registros de auditoría</p> : (
+              <div className="tabla-responsive">
+                <table className="tabla">
+                  <thead><tr>
+                    <th>Acción</th><th>Usuario</th><th>Fecha / Hora</th><th>Detalles</th>
+                  </tr></thead>
+                  <tbody>
+                    {auditoria.map(log=>(
+                      <tr key={log.id}>
+                        <td style={{fontFamily:"'IBM Plex Mono',monospace",fontSize:'11px',fontWeight:'700',color:'var(--bank-blue)',textTransform:'uppercase',letterSpacing:'.04em'}}>{log.accion}</td>
+                        <td style={{fontWeight:'700'}}>{log.usuarioNombre||'—'}</td>
+                        <td style={{fontFamily:"'IBM Plex Mono',monospace",fontSize:'11px',color:'var(--muted)'}}>
+                          {log.timestamp ? new Date(log.timestamp?.toDate?.() || (log.timestamp?._seconds?log.timestamp._seconds*1000:log.timestamp)).toLocaleString('es-CL') : '—'}
+                        </td>
+                        <td style={{fontSize:'12px',color:'var(--muted)'}}>{log.camposModificados?JSON.stringify(log.camposModificados).substring(0,60):'—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             )}
-          </section>
+          </div>
         )}
 
         {/* MODAL MEJORADO - EDICIÓN COMPLETA */}
         {modalEdicion && modalEdicion.abierto && (
-          <div style={{position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', background: 'white', padding: '30px', borderRadius: '12px', zIndex: 9999, width: '95%', maxWidth: '600px', boxShadow: '0 10px 40px rgba(0,0,0,0.3)', maxHeight: '90vh', overflowY: 'auto'}}>
+          <div style={{position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', background: 'var(--glass-strong)', padding: '28px', borderRadius: '22px', zIndex: 9999, width: '95%', maxWidth: '600px', boxShadow: '0 10px 40px rgba(0,0,0,0.3)', maxHeight: '90vh', overflowY: 'auto'}}>
             <h2 style={{marginTop: 0, marginBottom: '20px'}}>
               ✏️ Editar Registro {modalEdicion?.registro?.estado === 'fallido' ? 'Rechazado' : ''}
             </h2>
             
             {/* INFO NO EDITABLE */}
-            <div style={{background: '#f5f5f5', padding: '12px', borderRadius: '8px', marginBottom: '20px', fontSize: '13px'}}>
+            <div style={{background: 'var(--paper-100)', padding: '12px', borderRadius: '14px', border:'1px solid var(--line)', marginBottom: '20px', fontSize: '13px'}}>
               <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px'}}>
                 <div>
                   <span style={{color: '#666', display: 'block', marginBottom: '4px', fontWeight: '500'}}>N° de Ticket</span>
@@ -1772,10 +1581,10 @@ function App() {
                   {(() => {
                     const e = modalEdicion?.registro?.estado;
                     const estilo = e === 'fallido'
-                      ? { background: '#FFE0B2', color: '#E65100' }
+                      ? { background: 'rgba(240,161,26,0.12)', color: 'var(--kyn-red)' }
                       : e === 'exitoso'
-                        ? { background: '#d1fae5', color: '#065f46' }
-                        : { background: '#fef3c7', color: '#92400e' };
+                        ? { background: 'rgba(32,166,106,0.12)', color: '#065f46' }
+                        : { background: 'rgba(240,161,26,0.1)', color: 'var(--ink-800)' };
                     const texto = e === 'fallido' ? 'Rechazado' : e === 'exitoso' ? 'Aprobado' : 'Pendiente';
                     return (
                       <span style={{ ...estilo, padding: '2px 8px', borderRadius: '4px', fontSize: '12px', fontWeight: '500', display: 'inline-block' }}>
@@ -1961,7 +1770,7 @@ function App() {
                   type="number" 
                   value={formularioModal.horas || 0} 
                   disabled
-                  style={{width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ddd', background: '#f5f5f5', color: '#999', fontSize: '14px'}} 
+                  style={{width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ddd', background: 'var(--paper-100)', color: '#999', fontSize: '14px'}} 
                 />
                 <span style={{fontSize: '12px', color: '#999', marginTop: '4px', display: 'block'}}>Cambiar fecha/hora para recalcular</span>
               </div>
@@ -1995,14 +1804,14 @@ function App() {
               <div style={{display: 'flex', gap: '10px', marginTop: '20px'}}>
                 <button 
                   type="submit" 
-                  style={{flex: 1, padding: '12px', background: '#2196F3', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '600', fontSize: '14px'}}
+                  style={{flex: 1, padding: '12px', background: '#2196F3', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '600', fontSize: '14px'}}
                 >
                   {formularioModal.estadoOriginal === 'fallido' ? '✅ Guardar y Enviar a Aprobación' : '✅ Guardar Cambios'}
                 </button>
                 <button 
                   type="button" 
                   onClick={() => setModalEdicion({abierto: false, registro: null})}
-                  style={{flex: 1, padding: '12px', background: '#999', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '600', fontSize: '14px'}}
+                  style={{flex: 1, padding: '12px', background: '#999', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '600', fontSize: '14px'}}
                 >
                   ✗ Cancelar
                 </button>
