@@ -79,6 +79,7 @@ function App() {
   const [usuario, setUsuario] = useState(JSON.parse(localStorage.getItem('usuario') || '{}'));
   const [clienteActivo, setClienteActivo] = useState(localStorage.getItem('clienteActivo') || '');
   const [seleccionandoCliente, setSeleccionandoCliente] = useState(false);
+  const [dropdownClienteAbierto, setDropdownClienteAbierto] = useState(false);
   const [clientesInfo, setClientesInfo] = useState([]);
   const [permisos, setPermisos] = useState(null); // permisos por rol cargados de Firestore
   const [registros, setRegistros] = useState([]);
@@ -219,6 +220,14 @@ function App() {
       console.error('Error cargando usuarios:', err.message);
     }
   }, [token, usuario.rol]);
+
+  // Cerrar dropdown de cliente al hacer click fuera del sidebar
+  useEffect(() => {
+    if (!dropdownClienteAbierto) return;
+    const handler = () => setDropdownClienteAbierto(false);
+    document.addEventListener('click', handler, true);
+    return () => document.removeEventListener('click', handler, true);
+  }, [dropdownClienteAbierto]);
 
   // Efecto inicial
   useEffect(() => {
@@ -824,26 +833,69 @@ function App() {
       <aside className="sidebar">
         <div className="sidebar-brand">
           <div className="sidebar-wordmark">kyndryl</div>
-          {/* Selector de cliente (DPE o admin con clienteActivo) */}
-          {(usuario?.rol === 'dpe' || usuario?.rol === 'admin') && clientesInfo.length > 0 && (
-            <div className="sidebar-client">
-              <div className="sidebar-client-dot"></div>
-              <select
-                value={clienteActivo}
-                onChange={e => {
-                  const nc = e.target.value;
-                  setClienteActivo(nc);
-                  localStorage.setItem('clienteActivo', nc);
-                  setRegistros([]);
-                  setVista('dashboard');
-                }}
-              >
-                {clientesInfo
-                  .filter(c => usuario.rol === 'admin' ? true : (usuario.clientesIds||[]).includes(c.id))
-                  .map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
-              </select>
-            </div>
-          )}
+          {/* Selector de cliente — dropdown personalizado */}
+          {(usuario?.rol === 'dpe' || usuario?.rol === 'admin') && clientesInfo.length > 0 && (() => {
+            const clientesDisponibles = clientesInfo.filter(c => usuario.rol === 'admin' ? true : (usuario.clientesIds||[]).includes(c.id));
+            const clienteNombre = clientesDisponibles.find(c => c.id === clienteActivo)?.nombre || clienteActivo;
+            const tieneVarios = clientesDisponibles.length > 1;
+            return (
+              <div style={{ position:'relative' }}>
+                <button
+                  onClick={() => tieneVarios && setDropdownClienteAbierto(prev => !prev)}
+                  style={{
+                    display:'flex', alignItems:'center', gap:'8px', width:'100%',
+                    border:'1px solid rgba(86,217,217,0.28)', borderRadius:'10px',
+                    padding:'8px 11px', background:'rgba(86,217,217,0.07)',
+                    color:'rgba(255,255,255,0.95)', fontSize:'12px', fontWeight:'700',
+                    cursor: tieneVarios ? 'pointer' : 'default', textAlign:'left',
+                    transition:'background .15s'
+                  }}
+                  onMouseOver={e => tieneVarios && (e.currentTarget.style.background='rgba(86,217,217,0.14)')}
+                  onMouseOut={e => (e.currentTarget.style.background='rgba(86,217,217,0.07)')}
+                >
+                  <span style={{ width:'6px', height:'6px', borderRadius:'50%', background:'#ff462d', flexShrink:0 }}></span>
+                  <span style={{ flex:1, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{clienteNombre}</span>
+                  {tieneVarios && <span style={{ color:'rgba(86,217,217,0.7)', fontSize:'10px', flexShrink:0 }}>{dropdownClienteAbierto ? '▲' : '▼'}</span>}
+                </button>
+
+                {/* Dropdown panel */}
+                {dropdownClienteAbierto && tieneVarios && (
+                  <div style={{
+                    position:'absolute', top:'calc(100% + 6px)', left:0, right:0, zIndex:200,
+                    background:'linear-gradient(160deg,#0b2940,#07131f)',
+                    border:'1px solid rgba(86,217,217,0.2)', borderRadius:'12px',
+                    overflow:'hidden', boxShadow:'0 16px 40px rgba(6,24,38,0.4)'
+                  }}>
+                    {clientesDisponibles.map(c => (
+                      <button key={c.id}
+                        onClick={() => {
+                          setClienteActivo(c.id);
+                          localStorage.setItem('clienteActivo', c.id);
+                          setRegistros([]);
+                          setVista('dashboard');
+                          setDropdownClienteAbierto(false);
+                        }}
+                        style={{
+                          display:'flex', alignItems:'center', gap:'8px', width:'100%',
+                          padding:'10px 12px', background: c.id === clienteActivo ? 'rgba(86,217,217,0.12)' : 'transparent',
+                          border:'none', borderBottom:'1px solid rgba(255,255,255,0.06)',
+                          color: c.id === clienteActivo ? '#56d9d9' : 'rgba(255,255,255,0.85)',
+                          fontSize:'12px', fontWeight:'700', textAlign:'left', cursor:'pointer',
+                          transition:'background .12s'
+                        }}
+                        onMouseOver={e => { if(c.id !== clienteActivo) e.currentTarget.style.background='rgba(255,255,255,0.08)'; }}
+                        onMouseOut={e => { if(c.id !== clienteActivo) e.currentTarget.style.background='transparent'; }}
+                      >
+                        <span style={{ width:'5px', height:'5px', borderRadius:'50%', background: c.id === clienteActivo ? '#56d9d9' : 'rgba(255,255,255,0.3)', flexShrink:0 }}></span>
+                        <span style={{ overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{c.nombre}</span>
+                        {c.id === clienteActivo && <span style={{ marginLeft:'auto', fontSize:'11px' }}>✓</span>}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
         </div>
 
         {/* Nav por rol */}
