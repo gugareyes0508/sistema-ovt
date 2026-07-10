@@ -229,6 +229,19 @@ function App() {
     return () => document.removeEventListener('click', handler, true);
   }, [dropdownClienteAbierto]);
 
+  // ── RECARGAR DATOS al cambiar clienteActivo ──────────────────────────────
+  // useEffect dedicado para que el cambio de cliente siempre dispare la recarga
+  const clienteActivoPrev = React.useRef(clienteActivo);
+  useEffect(() => {
+    if (!token || !clienteActivo) return;
+    if (clienteActivoPrev.current === clienteActivo) return;
+    clienteActivoPrev.current = clienteActivo;
+    // Recargar registros con el nuevo cliente
+    cargarRegistros();
+    cargarDashboard();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clienteActivo, token]);
+
   // Efecto inicial
   useEffect(() => {
     cargarRegistros();
@@ -868,7 +881,8 @@ function App() {
                   }}>
                     {clientesDisponibles.map(c => (
                       <button key={c.id}
-                        onClick={() => {
+                        onClick={e => {
+                          e.stopPropagation();
                           setClienteActivo(c.id);
                           localStorage.setItem('clienteActivo', c.id);
                           setRegistros([]);

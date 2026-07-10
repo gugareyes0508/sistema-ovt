@@ -380,7 +380,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 
 main, .main {
   min-width: 0;
-  padding: 28px 32px;
+  padding: 24px 28px;
   overflow: auto;
 }
 
@@ -391,7 +391,6 @@ main, .main {
   align-items: flex-start;
   gap: 20px;
   margin-bottom: 24px;
-  max-width: 1400px;
 }
 .page-eyebrow {
   margin: 0 0 7px;
@@ -444,7 +443,6 @@ main, .main {
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 12px;
   margin-bottom: 20px;
-  max-width: 1400px;
 }
 
 .queue-tab {
@@ -516,7 +514,6 @@ main, .main {
   backdrop-filter: blur(18px);
   padding: 24px;
   margin-bottom: 20px;
-  max-width: 1400px;
   animation: riseIn .4s ease both;
 }
 @keyframes riseIn { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }
