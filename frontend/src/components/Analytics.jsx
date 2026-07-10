@@ -985,3 +985,4 @@ Sé conciso, específico y ORIGINAL.`;
     </div>
   );
 }
+export default Analytics;
