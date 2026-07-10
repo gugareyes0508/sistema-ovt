@@ -56,36 +56,37 @@ const parseFecha = (v) => {
 };
 
 // ─── sub-componentes de gráfico ───────────────────────────────────────────
-const MiniBar = ({ label, value, max, color='#2a78d6', right='' }) => (
-  <div style={{ display:'flex', alignItems:'center', gap:'8px', marginBottom:'7px' }}>
-    <div style={{ fontSize:'11px', color:'#6b7280', width:'140px', flexShrink:0, textAlign:'right', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{label}</div>
-    <div style={{ flex:1, background:'#e5e7eb', borderRadius:'3px', height:'7px', overflow:'hidden' }}>
+const MiniBar = ({ label, value, max, color='var(--bank-blue)', right='' }) => (
+  <div style={{ display:'flex', alignItems:'center', gap:'8px', marginBottom:'8px' }}>
+    <div style={{ fontSize:'11px', fontFamily:"'IBM Plex Mono',monospace", color:'var(--muted)', width:'140px', flexShrink:0, textAlign:'right', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{label}</div>
+    <div style={{ flex:1, background:'var(--paper-200)', borderRadius:'3px', height:'6px', overflow:'hidden' }}>
       <div style={{ width:`${Math.round(value/max*100)}%`, height:'100%', background:color, borderRadius:'3px' }} />
     </div>
-    <div style={{ fontSize:'11px', color:'#9ca3af', width:'52px', flexShrink:0, textAlign:'right' }}>{right}</div>
+    <div style={{ fontSize:'11px', fontFamily:"'IBM Plex Mono',monospace", color:'var(--muted)', width:'52px', flexShrink:0, textAlign:'right' }}>{right}</div>
   </div>
 );
 
 const InsightBox = ({ text }) => (
-  <div style={{ background:'#eff6ff', border:'1px solid #bfdbfe', borderRadius:'8px', padding:'10px 12px', fontSize:'12px', color:'#1e40af', marginTop:'12px', display:'flex', gap:'8px' }}>
-    <span>💡</span><span>{text}</span>
+  <div style={{ background:'rgba(0,59,113,0.06)', border:'1px solid rgba(0,59,113,0.14)', borderRadius:'14px', padding:'10px 14px', fontSize:'12px', color:'var(--bank-blue)', marginTop:'12px', display:'flex', gap:'8px', fontWeight:'600' }}>
+    <span style={{ flexShrink:0 }}>💡</span><span>{text}</span>
   </div>
 );
 
 const ChartCard = ({ title, height=220, children }) => (
-  <div style={{ background:'#fff', border:'1px solid #e5e7eb', borderRadius:'10px', padding:'16px 18px' }}>
-    <h4 style={{ margin:'0 0 12px', fontSize:'13px', color:'#374151', fontWeight:'600' }}>{title}</h4>
+  <div style={{ border:'1px solid rgba(255,255,255,0.72)', borderRadius:'22px', background:'var(--glass)', boxShadow:'var(--shadow-soft)', backdropFilter:'blur(18px)', padding:'18px 20px' }}>
+    <div style={{ fontFamily:"'IBM Plex Mono',monospace", fontSize:'9px', fontWeight:'700', color:'var(--muted)', textTransform:'uppercase', letterSpacing:'.09em', marginBottom:'4px' }}>Gráfico</div>
+    <h4 style={{ margin:'0 0 14px', fontSize:'1rem', fontWeight:'800', color:'var(--ink-950)', letterSpacing:'-.03em' }}>{title}</h4>
     <div style={{ position:'relative', height:`${height}px`, overflow:'hidden' }}>{children}</div>
   </div>
 );
 
 const grid2 = { display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(320px, 1fr))', gap:'16px', marginBottom:'16px' };
 const grid3 = { display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(200px, 1fr))', gap:'12px', marginBottom:'16px' };
-const gridColor = 'rgba(128,128,128,0.12)';
-const textMuted = '#888';
+const gridColor = 'rgba(18,52,78,0.07)';
+const textMuted = 'var(--muted)';
 const chartBase = { responsive:true, maintainAspectRatio:false, plugins:{ legend:{display:false} },
-  scales:{ x:{ ticks:{font:{size:9},color:textMuted,maxRotation:45,autoSkip:false}, grid:{display:false} },
-            y:{ ticks:{font:{size:9},color:textMuted}, grid:{color:gridColor}, beginAtZero:true } } };
+  scales:{ x:{ ticks:{font:{size:9},color:'#647887',maxRotation:45,autoSkip:false}, grid:{display:false} },
+            y:{ ticks:{font:{size:9},color:'#647887'}, grid:{color:'rgba(18,52,78,0.07)'}, beginAtZero:true } } };
 
 // ─── componente principal ─────────────────────────────────────────────────
 // ─── Sub-componente: Tab Por Grupo ───────────────────────────────────────────
@@ -179,7 +180,7 @@ const GrupoTab = ({ grupoOrdenado, gruposPorPersona, filtradas, totalH, gruposFS
         {/* Barras por costo + clic detalle */}
         <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: '10px', padding: '16px 18px' }}>
           <h4 style={{ margin: '0 0 4px', fontSize: '13px', fontWeight: '600' }}>Grupos — ordenados por costo</h4>
-          <p style={{ fontSize: '11px', color: '#9ca3af', margin: '0 0 12px' }}>Haz clic en una barra para ver detalle de personas</p>
+          <p style={{ fontSize: '11px', color: 'var(--muted)', margin: '0 0 12px' }}>Haz clic en una barra para ver detalle de personas</p>
           {gruposPorCosto.map(([nombre, v], i) => {
             const color = nombre === 'Sin grupo asignado' ? COLOR_SIN_GRUPO : COLORES_GRUPO[i % COLORES_GRUPO.length];
             return (
@@ -187,15 +188,15 @@ const GrupoTab = ({ grupoOrdenado, gruposPorPersona, filtradas, totalH, gruposFS
                 onClick={() => setDetalleGrupo(detalleGrupo === nombre ? null : nombre)}
                 style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', padding: '5px 6px', borderRadius: '8px', cursor: 'pointer',
                   background: detalleGrupo === nombre ? '#eff6ff' : 'transparent', transition: 'background .1s' }}
-                onMouseOver={e => { if (detalleGrupo !== nombre) e.currentTarget.style.background = '#f9fafb'; }}
+                onMouseOver={e => { if (detalleGrupo !== nombre) e.currentTarget.style.background = 'var(--paper-100)'; }}
                 onMouseOut={e => { if (detalleGrupo !== nombre) e.currentTarget.style.background = 'transparent'; }}
               >
-                <div style={{ fontSize: '11px', color: '#6b7280', width: '130px', flexShrink: 0, textAlign: 'right', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{nombre}</div>
-                <div style={{ flex: 1, background: '#e5e7eb', borderRadius: '3px', height: '10px', overflow: 'hidden' }}>
+                <div style={{ fontSize: '11px', color: 'var(--muted)', width: '130px', flexShrink: 0, textAlign: 'right', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{nombre}</div>
+                <div style={{ flex: 1, background: 'var(--line)', borderRadius: '3px', height: '10px', overflow: 'hidden' }}>
                   <div style={{ width: `${Math.round(v.costo / maxCosto * 100)}%`, height: '100%', background: color, borderRadius: '3px' }} />
                 </div>
-                <div style={{ fontSize: '11px', color: '#9ca3af', width: '52px', flexShrink: 0, textAlign: 'right' }}>{fmtK(v.costo)}</div>
-                <span style={{ fontSize: '12px', color: detalleGrupo === nombre ? '#2563eb' : '#9ca3af' }}>
+                <div style={{ fontSize: '11px', color: 'var(--muted)', width: '52px', flexShrink: 0, textAlign: 'right' }}>{fmtK(v.costo)}</div>
+                <span style={{ fontSize: '12px', color: detalleGrupo === nombre ? '#2563eb' : 'var(--muted)' }}>
                   {detalleGrupo === nombre ? '▲' : '▼'}
                 </span>
               </div>
@@ -213,7 +214,7 @@ const GrupoTab = ({ grupoOrdenado, gruposPorPersona, filtradas, totalH, gruposFS
                 <button key={nombre} onClick={() => setGrupoSel(i)}
                   style={{ fontSize: '10px', padding: '3px 9px', borderRadius: '12px', border: 'none', cursor: 'pointer',
                     background: grupoSel === i ? color : '#f3f4f6',
-                    color: grupoSel === i ? '#fff' : '#6b7280',
+                    color: grupoSel === i ? '#fff' : 'var(--muted)',
                     fontWeight: grupoSel === i ? '700' : '400' }}>
                   {nombre.length > 14 ? nombre.slice(0, 14) + '…' : nombre}
                 </button>
@@ -224,10 +225,10 @@ const GrupoTab = ({ grupoOrdenado, gruposPorPersona, filtradas, totalH, gruposFS
             <canvas ref={chartRef} />
           </div>
           <div style={{ display: 'flex', gap: '16px', marginTop: '8px' }}>
-            <span style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '11px', color: '#6b7280' }}>
+            <span style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '11px', color: 'var(--muted)' }}>
               <span style={{ width: '12px', height: '10px', background: colorActual + 'AA', display: 'inline-block', borderRadius: '2px' }}></span>Horas (eje izq.)
             </span>
-            <span style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '11px', color: '#6b7280' }}>
+            <span style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '11px', color: 'var(--muted)' }}>
               <span style={{ width: '16px', height: '2px', background: '#e24b4a', display: 'inline-block', borderRadius: '1px' }}></span>Costo USD (eje der.)
             </span>
           </div>
@@ -246,12 +247,12 @@ const GrupoTab = ({ grupoOrdenado, gruposPorPersona, filtradas, totalH, gruposFS
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
               <div>
                 <h4 style={{ margin: 0, fontSize: '14px', fontWeight: '700', color }}>{detalleGrupo}</h4>
-                <p style={{ margin: '3px 0 0', fontSize: '11px', color: '#9ca3af' }}>
+                <p style={{ margin: '3px 0 0', fontSize: '11px', color: 'var(--muted)' }}>
                   {personas.length} personas · {fmt(totalGH)}h · {fmtK(totalGC)} · Rate prom: ${totalGH > 0 ? fmt(totalGC / totalGH) : '—'}/h
                 </p>
               </div>
               <button onClick={() => setDetalleGrupo(null)}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '16px', color: '#9ca3af', padding: '4px' }}>✕</button>
+                style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '16px', color: 'var(--muted)', padding: '4px' }}>✕</button>
             </div>
             <table className="tabla" style={{ minWidth: 0 }}>
               <thead>
@@ -281,10 +282,10 @@ const GrupoTab = ({ grupoOrdenado, gruposPorPersona, filtradas, totalH, gruposFS
                     </td>
                     <td style={{ textAlign: 'center' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '4px', justifyContent: 'center' }}>
-                        <div style={{ width: '50px', height: '5px', background: '#e5e7eb', borderRadius: '2px', overflow: 'hidden' }}>
+                        <div style={{ width: '50px', height: '5px', background: 'var(--line)', borderRadius: '2px', overflow: 'hidden' }}>
                           <div style={{ width: `${totalGH > 0 ? Math.round(v.horas / totalGH * 100) : 0}%`, height: '100%', background: color, borderRadius: '2px' }} />
                         </div>
-                        <span style={{ fontSize: '10px', color: '#9ca3af' }}>{totalGH > 0 ? Math.round(v.horas / totalGH * 100) : 0}%</span>
+                        <span style={{ fontSize: '10px', color: 'var(--muted)' }}>{totalGH > 0 ? Math.round(v.horas / totalGH * 100) : 0}%</span>
                       </div>
                     </td>
                   </tr>
@@ -299,7 +300,7 @@ const GrupoTab = ({ grupoOrdenado, gruposPorPersona, filtradas, totalH, gruposFS
       {sinGrupoConHoras.length > 0 && (
         <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: '10px', padding: '16px 18px' }}>
           <h4 style={{ margin: '0 0 4px', fontSize: '13px', fontWeight: '600' }}>⚠️ Personas sin grupo — pendientes de asignar</h4>
-          <p style={{ fontSize: '11px', color: '#9ca3af', margin: '0 0 10px' }}>Ve a Gestión de Usuarios para asignar grupo a estos especialistas.</p>
+          <p style={{ fontSize: '11px', color: 'var(--muted)', margin: '0 0 10px' }}>Ve a Gestión de Usuarios para asignar grupo a estos especialistas.</p>
           <table className="tabla" style={{ minWidth: 0 }}>
             <thead><tr><th>Nombre en Excel</th><th>Horas</th><th>Estado</th></tr></thead>
             <tbody>
@@ -584,108 +585,103 @@ const ClaimDashboard = ({ token, apiUrl, clienteActivo = '' }) => {
   const lineOpts = { ...chartBase, scales:{ ...chartBase.scales, y:{...chartBase.scales.y, ticks:{...chartBase.scales.y.ticks, callback:v=>'$'+Math.round(v/1000)+'K'}} } };
 
   // KPI box helper
-  const KPI = ({ icon, label, value, sub, color='#111827' }) => (
-    <div style={{ background:'#f9fafb', border:'1px solid #e5e7eb', borderRadius:'10px', padding:'14px 16px' }}>
-      <div style={{ fontSize:'11px', color:'#6b7280', marginBottom:'4px' }}>{icon} {label}</div>
-      <div style={{ fontSize:'20px', fontWeight:'700', color, marginBottom:'3px' }}>{value}</div>
-      {sub && <div style={{ fontSize:'11px', color:'#9ca3af' }}>{sub}</div>}
+  const KPI = ({ icon, label, value, sub, color='var(--ink-950)' }) => (
+    <div style={{ background:'var(--glass)', border:'1px solid rgba(255,255,255,0.72)', borderRadius:'18px', padding:'16px', backdropFilter:'blur(18px)', boxShadow:'var(--shadow-soft)' }}>
+      <div style={{ fontFamily:"'IBM Plex Mono',monospace", fontSize:'9px', fontWeight:'700', color:'var(--muted)', textTransform:'uppercase', letterSpacing:'.07em', marginBottom:'8px' }}>{label}</div>
+      <div style={{ fontSize:'1.8rem', fontWeight:'800', color, lineHeight:1, letterSpacing:'-.07em', marginBottom:'4px' }}>{value}</div>
+      {sub && <div style={{ fontSize:'11px', fontWeight:'600', color:'var(--muted)' }}>{sub}</div>}
     </div>
   );
 
   // ── render ──────────────────────────────────────────────────────────────
   return (
-    <section className="seccion">
-      {/* HEADER */}
-      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', flexWrap:'wrap', gap:'12px', marginBottom:'20px' }}>
-        <div>
-          <h2 style={{ marginBottom:'4px' }}>🕐 Control de Labor (Claim)</h2>
-          <p style={{ fontSize:'13px', color:'#6b7280', margin:0 }}>Horas imputadas por el equipo Kyndryl Chile · datos en Firestore · carga semanal progresiva</p>
-        </div>
-        {ultimaCarga && (
-          <div style={{ fontSize:'12px', color:'#9ca3af', textAlign:'right' }}>
-            Última carga: {ultimaCarga}<br/>
-            <button onClick={limpiarDatos} style={{ fontSize:'11px', color:'#ef4444', background:'none', border:'none', cursor:'pointer', padding:0, marginTop:'4px' }}>
-              🗑️ Limpiar todos los datos
-            </button>
-          </div>
-        )}
-      </div>
-
+    <div>
       {/* UPLOAD */}
-      <div style={{ border:'1.5px dashed #d1d5db', borderRadius:'8px', padding:'14px 20px', display:'flex', alignItems:'center', gap:'14px', marginBottom:'24px', background:'#fafafa', cursor:'pointer' }}
+      <div style={{ border:'1px solid rgba(255,255,255,0.72)', borderRadius:'22px', background:'var(--glass)', boxShadow:'var(--shadow-soft)', backdropFilter:'blur(18px)', padding:'18px 22px', marginBottom:'18px', display:'flex', alignItems:'center', gap:'16px', cursor:'pointer' }}
         onClick={() => fileRef.current?.click()}>
-        <span style={{ fontSize:'26px' }}>📊</span>
+        <div style={{ width:'42px', height:'42px', borderRadius:'14px', background:'linear-gradient(135deg,var(--ink-900),var(--bank-blue))', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+          <span style={{ fontSize:'18px' }}>📊</span>
+        </div>
         <div style={{ flex:1 }}>
-          <div style={{ fontWeight:'600', fontSize:'14px', marginBottom:'2px' }}>
-            {cargando ? '⏳ Procesando archivo...' : 'Cargar Export.xlsx semanal'}
+          <div style={{ fontWeight:'800', fontSize:'13px', color:'var(--ink-950)', marginBottom:'2px', letterSpacing:'-.01em' }}>
+            {cargando ? 'Procesando archivo...' : 'Cargar Export.xlsx semanal'}
           </div>
-          <div style={{ fontSize:'12px', color:'#9ca3af' }}>
+          <div style={{ fontSize:'12px', fontWeight:'600', color:'var(--muted)' }}>
             Acumulativo · hoja "Export" requerida · las semanas nuevas se guardan en Firestore
           </div>
         </div>
+        {ultimaCarga && (
+          <div style={{ fontSize:'11px', fontFamily:"'IBM Plex Mono',monospace", color:'var(--muted)', textAlign:'right', flexShrink:0 }}>
+            Última carga: {ultimaCarga}<br/>
+            <button onClick={e=>{e.stopPropagation();limpiarDatos();}}
+              style={{ fontSize:'10px', color:'var(--danger)', background:'none', border:'none', cursor:'pointer', padding:0, marginTop:'4px', fontWeight:'700' }}>
+              Limpiar datos
+            </button>
+          </div>
+        )}
         <button disabled={cargando} onClick={(e) => { e.stopPropagation(); fileRef.current?.click(); }}
-          style={{ padding:'8px 16px', background: cargando ? '#d1d5db' : '#FF462D', color:'#fff', border:'none', borderRadius:'8px', fontWeight:'700', fontSize:'13px', cursor: cargando ? 'not-allowed':'pointer', whiteSpace:'nowrap' }}>
-          {cargando ? '⏳ Cargando...' : '⬆️ Seleccionar archivo'}
+          style={{ padding:'10px 18px', background: cargando ? 'var(--muted)' : 'linear-gradient(135deg,var(--ink-900),var(--bank-blue))', color:'#fff', border:'none', borderRadius:'999px', fontWeight:'900', fontSize:'12px', cursor: cargando ? 'not-allowed':'pointer', whiteSpace:'nowrap', boxShadow:'0 12px 28px rgba(0,59,113,0.24)', flexShrink:0 }}>
+          {cargando ? 'Cargando...' : 'Seleccionar archivo'}
         </button>
         <input ref={fileRef} type="file" accept=".xlsx,.xls" style={{ display:'none' }}
           onChange={(e) => { if (e.target.files[0]) procesarExcel(e.target.files[0]); e.target.value=''; }} />
       </div>
 
       {loadingDatos ? (
-        <p style={{ textAlign:'center', color:'#9ca3af', padding:'40px' }}>⏳ Cargando datos de Firestore...</p>
+        <p style={{ textAlign:'center', color:'var(--muted)', padding:'40px', fontWeight:'600' }}>Cargando datos de Firestore...</p>
       ) : semanas.length === 0 ? (
-        <div style={{ textAlign:'center', padding:'60px 20px', color:'#9ca3af' }}>
+        <div style={{ textAlign:'center', padding:'60px 20px', color:'var(--muted)' }}>
           <div style={{ fontSize:'48px', marginBottom:'14px' }}>📂</div>
-          <p style={{ fontWeight:'600' }}>Sin datos cargados</p>
-          <p style={{ fontSize:'13px' }}>Sube el archivo Export.xlsx para comenzar</p>
+          <p style={{ fontWeight:'800', color:'var(--ink-800)', letterSpacing:'-.02em' }}>Sin datos cargados</p>
+          <p style={{ fontSize:'13px', fontWeight:'600' }}>Sube el archivo Export.xlsx para comenzar</p>
         </div>
       ) : (
         <>
           {/* FILTROS */}
-          <div style={{ display:'flex', gap:'14px', alignItems:'flex-end', flexWrap:'wrap', background:'#f9fafb', border:'1px solid #e5e7eb', borderRadius:'8px', padding:'14px 18px', marginBottom:'22px' }}>
-            <div className="form-group" style={{ minWidth:'130px' }}>
-              <label style={{ fontSize:'12px', fontWeight:'600', color:'#6b7280', display:'block', marginBottom:'5px' }}>Mes</label>
-              <select value={filtroMes} onChange={e => setFiltroMes(parseInt(e.target.value))}>
+          <div style={{ display:'flex', gap:'12px', alignItems:'flex-end', flexWrap:'wrap', marginBottom:'18px' }}>
+            <div>
+              <div style={{ fontFamily:"'IBM Plex Mono',monospace", fontSize:'9px', fontWeight:'700', color:'var(--muted)', textTransform:'uppercase', letterSpacing:'.07em', marginBottom:'6px' }}>Mes</div>
+              <select value={filtroMes} onChange={e => setFiltroMes(parseInt(e.target.value))}
+                style={{ border:'1px solid var(--line)', borderRadius:'12px', padding:'9px 14px', background:'rgba(255,255,255,0.84)', color:'var(--ink-950)', fontSize:'13px', fontWeight:'600', minWidth:'130px' }}>
                 {MESES.slice(1).map((m,i) => <option key={i+1} value={i+1}>{m}</option>)}
               </select>
             </div>
-            <div className="form-group" style={{ minWidth:'100px' }}>
-              <label style={{ fontSize:'12px', fontWeight:'600', color:'#6b7280', display:'block', marginBottom:'5px' }}>Año</label>
-              <select value={filtroAnio} onChange={e => setFiltroAnio(parseInt(e.target.value))}>
+            <div>
+              <div style={{ fontFamily:"'IBM Plex Mono',monospace", fontSize:'9px', fontWeight:'700', color:'var(--muted)', textTransform:'uppercase', letterSpacing:'.07em', marginBottom:'6px' }}>Año</div>
+              <select value={filtroAnio} onChange={e => setFiltroAnio(parseInt(e.target.value))}
+                style={{ border:'1px solid var(--line)', borderRadius:'12px', padding:'9px 14px', background:'rgba(255,255,255,0.84)', color:'var(--ink-950)', fontSize:'13px', fontWeight:'600', minWidth:'100px' }}>
                 {aniosDisponibles.map(a => <option key={a} value={a}>{a}</option>)}
               </select>
             </div>
-            <div style={{ fontSize:'13px', color:'#6b7280', paddingLeft:'12px', borderLeft:'1px solid #e5e7eb', alignSelf:'center' }}>
-              {filtradas.length > 0
-                ? <><strong>{filtradas.length}</strong> semanas · {MESES[filtroMes]} {filtroAnio}</>
-                : <span style={{ color:'#ef4444' }}>Sin datos para este período</span>}
-            </div>
+            {filtradas.length > 0 && (
+              <div style={{ fontFamily:"'IBM Plex Mono',monospace", fontSize:'11px', fontWeight:'700', color:'var(--muted)', alignSelf:'center', paddingLeft:'12px', borderLeft:'1px solid var(--line)' }}>
+                {filtradas.length} semanas · {MESES[filtroMes]} {filtroAnio}
+              </div>
+            )}
           </div>
 
           {/* KPIs globales del período */}
-          <div style={{ ...grid3, gridTemplateColumns:'repeat(auto-fit, minmax(180px, 1fr))', marginBottom:'24px' }}>
-            <KPI icon="🕐" label="Horas imputadas" value={fmt(totalH)+'h'} sub={`OT: ${fmt(totalOT)}h · SB: ${fmt(totalSB)}h`} color="#2563eb" />
-            <KPI icon="💵" label="Costo total USD" value={fmtK(totalCosto)} sub={`Prom: ${fmtK(filtradas.length ? totalCosto/filtradas.length : 0)}/sem`} color="#059669" />
-            <KPI icon="⚠️" label="Semanas con OT/SB" value={semsConOT} sub={`de ${filtradas.length} semanas`} color="#d97706" />
-            <KPI icon="📊" label="Promedio semanal" value={fmt(promSem)+'h'} sub="horas imputadas/sem" />
-            <KPI icon="💹" label="Rate promedio equipo"
-              value={'$' + (totalH > 0 ? fmt(totalCosto/totalH) : '—') + '/h'}
-              sub="costo por hora imputada" color="#7c3aed" />
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(5,minmax(0,1fr))', gap:'1px', background:'var(--line)', marginBottom:'20px' }}>
+            <KPI label="Horas imputadas" value={fmt(totalH)+'h'} sub={`OT: ${fmt(totalOT)}h · SB: ${fmt(totalSB)}h`} color="var(--bank-blue)" />
+            <KPI label="Costo total USD" value={fmtK(totalCosto)} sub={`Prom: ${fmtK(filtradas.length ? totalCosto/filtradas.length : 0)}/sem`} color="var(--success)" />
+            <KPI label="Semanas con OT/SB" value={semsConOT} sub={`de ${filtradas.length} semanas`} color="var(--warning)" />
+            <KPI label="Promedio semanal" value={fmt(promSem)+'h'} sub="horas imputadas/sem" />
+            <KPI label="Rate promedio equipo" value={'$' + (totalH > 0 ? fmt(totalCosto/totalH) : '—') + '/h'} sub="costo por hora imputada" color="var(--kyn-red)" />
           </div>
 
           {/* TABS DE ANALÍTICA */}
-          <div style={{ borderBottom:'2px solid #e5e7eb', display:'flex', gap:'4px', marginBottom:'20px', overflowX:'auto' }}>
+          <div style={{ display:'inline-flex', flexWrap:'wrap', gap:'6px', padding:'5px', border:'1px solid rgba(18,52,78,0.09)', borderRadius:'16px', background:'rgba(255,255,255,0.55)', marginBottom:'20px', overflowX:'auto' }}>
             {TABS_ANALITICA.map(t => (
               <button key={t.id} onClick={() => setTabAnalitica(t.id)}
-                style={{ padding:'10px 16px', background:'none', border:'none', borderBottom: tabAnalitca===t.id ? '3px solid #FF462D':'3px solid transparent',
-                  color: tabAnalitca===t.id ? '#FF462D':'#6b7280', fontWeight:'600', fontSize:'13px', cursor:'pointer', whiteSpace:'nowrap', marginBottom:'-2px' }}>
+                style={{ borderRadius:'11px', padding:'8px 14px', background: tabAnalitca===t.id ? 'var(--ink-900)' : 'transparent',
+                  color: tabAnalitca===t.id ? '#fff' : 'var(--muted)', fontWeight:'900', fontSize:'12px', border:'none', transition:'all .16s', cursor:'pointer', whiteSpace:'nowrap' }}>
                 {t.label}
               </button>
             ))}
           </div>
 
           {filtradas.length === 0 ? (
-            <p style={{ textAlign:'center', padding:'40px', color:'#9ca3af' }}>Sin datos para {MESES[filtroMes]} {filtroAnio}</p>
+            <p style={{ textAlign:'center', padding:'40px', color:'var(--muted)' }}>Sin datos para {MESES[filtroMes]} {filtroAnio}</p>
           ) : (
             <>
               {/* ── TAB RESUMEN ── */}
@@ -700,34 +696,34 @@ const ClaimDashboard = ({ token, apiUrl, clienteActivo = '' }) => {
                     </ChartCard>
                   </div>
                   <div style={grid2}>
-                    <div style={{ background:'#fff', border:'1px solid #e5e7eb', borderRadius:'10px', padding:'16px 18px' }}>
-                      <h4 style={{ margin:'0 0 12px', fontSize:'13px', color:'#374151', fontWeight:'600' }}>Distribución por Offering</h4>
+                    <div style={{ background:'rgba(255,255,255,0.84)', border:'1px solid #e5e7eb', borderRadius:'10px', padding:'16px 18px' }}>
+                      <h4 style={{ margin:'0 0 12px', fontSize:'13px', color:'var(--ink-800)', fontWeight:'600' }}>Distribución por Offering</h4>
                       <div style={{ display:'flex', alignItems:'center', gap:'16px' }}>
                         <div style={{ position:'relative', width:'110px', height:'110px', flexShrink:0 }}>
                           <Doughnut data={chartDonutOff} options={donutOpts} />
                         </div>
                         <div>
                           {offOrdenado.map(([k,v],i) => (
-                            <div key={k} style={{ display:'flex', alignItems:'center', gap:'7px', fontSize:'11px', color:'#6b7280', marginBottom:'6px' }}>
+                            <div key={k} style={{ display:'flex', alignItems:'center', gap:'7px', fontSize:'11px', color:'var(--muted)', marginBottom:'6px' }}>
                               <div style={{ width:'10px', height:'10px', borderRadius:'2px', background:COLORES_OFF[i]||'#888', flexShrink:0 }}></div>
-                              <div><div style={{ fontWeight:'600', color:'#374151' }}>{k.substring(0,35)}</div>
+                              <div><div style={{ fontWeight:'600', color:'var(--ink-800)' }}>{k.substring(0,35)}</div>
                               <div>{fmt(v.horas)}h · {fmtK(v.costo)} · {totalH>0?fmt(v.horas/totalH*100):'0'}%</div></div>
                             </div>
                           ))}
                         </div>
                       </div>
                     </div>
-                    <div style={{ background:'#fff', border:'1px solid #e5e7eb', borderRadius:'10px', padding:'16px 18px' }}>
-                      <h4 style={{ margin:'0 0 12px', fontSize:'13px', color:'#374151', fontWeight:'600' }}>Distribución por tipo de WBS</h4>
+                    <div style={{ background:'rgba(255,255,255,0.84)', border:'1px solid #e5e7eb', borderRadius:'10px', padding:'16px 18px' }}>
+                      <h4 style={{ margin:'0 0 12px', fontSize:'13px', color:'var(--ink-800)', fontWeight:'600' }}>Distribución por tipo de WBS</h4>
                       <div style={{ display:'flex', alignItems:'center', gap:'16px' }}>
                         <div style={{ position:'relative', width:'110px', height:'110px', flexShrink:0 }}>
                           <Doughnut data={chartDonutWbs} options={donutOpts} />
                         </div>
                         <div>
                           {wbsOrdenado.slice(0,5).map(([k,v],i) => (
-                            <div key={k} style={{ display:'flex', alignItems:'center', gap:'7px', fontSize:'11px', color:'#6b7280', marginBottom:'6px' }}>
+                            <div key={k} style={{ display:'flex', alignItems:'center', gap:'7px', fontSize:'11px', color:'var(--muted)', marginBottom:'6px' }}>
                               <div style={{ width:'10px', height:'10px', borderRadius:'2px', background:['#2a78d6','#1baf7a','#eda100','#4a3aa7','#e24b4a'][i], flexShrink:0 }}></div>
-                              <div><div style={{ fontWeight:'600', color:'#374151' }}>{k.substring(0,30)}</div>
+                              <div><div style={{ fontWeight:'600', color:'var(--ink-800)' }}>{k.substring(0,30)}</div>
                               <div>{fmt(v.horas)}h · {fmtK(v.costo)}</div></div>
                             </div>
                           ))}
@@ -741,12 +737,12 @@ const ClaimDashboard = ({ token, apiUrl, clienteActivo = '' }) => {
               {/* ── TAB WBS ── */}
               {tabAnalitca === 'wbs' && (
                 <div>
-                  <div style={{ background:'#fff', border:'1px solid #e5e7eb', borderRadius:'10px', padding:'16px 18px', marginBottom:'16px' }}>
-                    <h4 style={{ margin:'0 0 14px', fontSize:'13px', color:'#374151', fontWeight:'600' }}>Horas por WBS</h4>
+                  <div style={{ background:'rgba(255,255,255,0.84)', border:'1px solid #e5e7eb', borderRadius:'10px', padding:'16px 18px', marginBottom:'16px' }}>
+                    <h4 style={{ margin:'0 0 14px', fontSize:'13px', color:'var(--ink-800)', fontWeight:'600' }}>Horas por WBS</h4>
                     {wbsOrdenado.map(([k,v]) => <MiniBar key={k} label={k.substring(0,25)} value={v.horas} max={wbsOrdenado[0][1].horas} right={fmt(v.horas)+'h'} />)}
                   </div>
-                  <div style={{ background:'#fff', border:'1px solid #e5e7eb', borderRadius:'10px', padding:'16px 18px' }}>
-                    <h4 style={{ margin:'0 0 12px', fontSize:'13px', color:'#374151', fontWeight:'600' }}>Detalle WBS — horas, costo y rate/h</h4>
+                  <div style={{ background:'rgba(255,255,255,0.84)', border:'1px solid #e5e7eb', borderRadius:'10px', padding:'16px 18px' }}>
+                    <h4 style={{ margin:'0 0 12px', fontSize:'13px', color:'var(--ink-800)', fontWeight:'600' }}>Detalle WBS — horas, costo y rate/h</h4>
                     <table className="tabla" style={{ minWidth:0 }}>
                       <thead><tr><th>WBS</th><th>Horas</th><th>Costo USD</th><th>Rate/h</th></tr></thead>
                       <tbody>
@@ -755,7 +751,7 @@ const ClaimDashboard = ({ token, apiUrl, clienteActivo = '' }) => {
                             <td style={{ fontSize:'12px' }}>{k}</td>
                             <td>{fmt(v.horas)}h</td>
                             <td>{fmtK(v.costo)}</td>
-                            <td style={{ color:'#d97706', fontWeight:'600' }}>${v.horas>0?fmt(v.costo/v.horas):0}/h</td>
+                            <td style={{ color:'var(--warning)', fontWeight:'600' }}>${v.horas>0?fmt(v.costo/v.horas):0}/h</td>
                           </tr>
                         ))}
                       </tbody>
@@ -768,12 +764,12 @@ const ClaimDashboard = ({ token, apiUrl, clienteActivo = '' }) => {
               {/* ── TAB PERSONAS ── */}
               {tabAnalitca === 'personas' && (
                 <div style={grid2}>
-                  <div style={{ background:'#fff', border:'1px solid #e5e7eb', borderRadius:'10px', padding:'16px 18px' }}>
-                    <h4 style={{ margin:'0 0 14px', fontSize:'13px', color:'#374151', fontWeight:'600' }}>Top 10 · horas imputadas</h4>
+                  <div style={{ background:'rgba(255,255,255,0.84)', border:'1px solid #e5e7eb', borderRadius:'10px', padding:'16px 18px' }}>
+                    <h4 style={{ margin:'0 0 14px', fontSize:'13px', color:'var(--ink-800)', fontWeight:'600' }}>Top 10 · horas imputadas</h4>
                     {perOrdenado.map(([k,v]) => <MiniBar key={k} label={k} value={v.horas} max={maxPerH} right={fmt(v.horas)+'h'} />)}
                   </div>
-                  <div style={{ background:'#fff', border:'1px solid #e5e7eb', borderRadius:'10px', padding:'16px 18px' }}>
-                    <h4 style={{ margin:'0 0 12px', fontSize:'13px', color:'#374151', fontWeight:'600' }}>Rate USD/h por persona</h4>
+                  <div style={{ background:'rgba(255,255,255,0.84)', border:'1px solid #e5e7eb', borderRadius:'10px', padding:'16px 18px' }}>
+                    <h4 style={{ margin:'0 0 12px', fontSize:'13px', color:'var(--ink-800)', fontWeight:'600' }}>Rate USD/h por persona</h4>
                     <table className="tabla" style={{ minWidth:0 }}>
                       <thead><tr><th>Persona</th><th>Horas</th><th>Rate/h</th><th>Total USD</th></tr></thead>
                       <tbody>
@@ -781,7 +777,7 @@ const ClaimDashboard = ({ token, apiUrl, clienteActivo = '' }) => {
                           <tr key={k}>
                             <td style={{ fontSize:'11px' }}>{k}</td>
                             <td>{fmt(v.horas)}h</td>
-                            <td style={{ color:'#d97706', fontWeight:'600' }}>${v.horas>0?fmt(v.costo/v.horas):0}/h</td>
+                            <td style={{ color:'var(--warning)', fontWeight:'600' }}>${v.horas>0?fmt(v.costo/v.horas):0}/h</td>
                             <td>{fmtK(v.costo)}</td>
                           </tr>
                         ))}
@@ -795,19 +791,19 @@ const ClaimDashboard = ({ token, apiUrl, clienteActivo = '' }) => {
               {tabAnalitca === 'nivel' && (
                 <div>
                   <div style={grid2}>
-                    <div style={{ background:'#fff', border:'1px solid #e5e7eb', borderRadius:'10px', padding:'16px 18px' }}>
-                      <h4 style={{ margin:'0 0 14px', fontSize:'13px', color:'#374151', fontWeight:'600' }}>Horas por nivel de seniority</h4>
+                    <div style={{ background:'rgba(255,255,255,0.84)', border:'1px solid #e5e7eb', borderRadius:'10px', padding:'16px 18px' }}>
+                      <h4 style={{ margin:'0 0 14px', fontSize:'13px', color:'var(--ink-800)', fontWeight:'600' }}>Horas por nivel de seniority</h4>
                       {nivOrdenado.map(([k,v]) => <MiniBar key={k} label={k} value={v.horas} max={maxNivH} right={fmt(v.horas)+'h'} />)}
                     </div>
-                    <div style={{ background:'#fff', border:'1px solid #e5e7eb', borderRadius:'10px', padding:'16px 18px' }}>
-                      <h4 style={{ margin:'0 0 14px', fontSize:'13px', color:'#374151', fontWeight:'600' }}>Costo USD por nivel</h4>
+                    <div style={{ background:'rgba(255,255,255,0.84)', border:'1px solid #e5e7eb', borderRadius:'10px', padding:'16px 18px' }}>
+                      <h4 style={{ margin:'0 0 14px', fontSize:'13px', color:'var(--ink-800)', fontWeight:'600' }}>Costo USD por nivel</h4>
                       {[...nivOrdenado].sort((a,b) => b[1].costo-a[1].costo).map(([k,v]) => (
                         <MiniBar key={k} label={k} value={v.costo} max={nivOrdenado.reduce((m,[,x])=>Math.max(m,x.costo),1)} color="#1baf7a" right={fmtK(v.costo)} />
                       ))}
                     </div>
                   </div>
-                  <div style={{ background:'#fff', border:'1px solid #e5e7eb', borderRadius:'10px', padding:'16px 18px' }}>
-                    <h4 style={{ margin:'0 0 12px', fontSize:'13px', color:'#374151', fontWeight:'600' }}>Tabla comparativa por nivel</h4>
+                  <div style={{ background:'rgba(255,255,255,0.84)', border:'1px solid #e5e7eb', borderRadius:'10px', padding:'16px 18px' }}>
+                    <h4 style={{ margin:'0 0 12px', fontSize:'13px', color:'var(--ink-800)', fontWeight:'600' }}>Tabla comparativa por nivel</h4>
                     <table className="tabla" style={{ minWidth:0 }}>
                       <thead><tr><th>Nivel</th><th>Horas</th><th>Costo USD</th><th>Rate prom/h</th></tr></thead>
                       <tbody>
@@ -816,7 +812,7 @@ const ClaimDashboard = ({ token, apiUrl, clienteActivo = '' }) => {
                             <td style={{ fontWeight:'600' }}>{k}</td>
                             <td>{fmt(v.horas)}h</td>
                             <td>{fmtK(v.costo)}</td>
-                            <td style={{ color:'#d97706', fontWeight:'600' }}>${v.horas>0?fmt(v.costo/v.horas):0}/h</td>
+                            <td style={{ color:'var(--warning)', fontWeight:'600' }}>${v.horas>0?fmt(v.costo/v.horas):0}/h</td>
                           </tr>
                         ))}
                       </tbody>
@@ -868,7 +864,7 @@ const ClaimDashboard = ({ token, apiUrl, clienteActivo = '' }) => {
           )}
         </>
       )}
-    </section>
+    </div>
   );
 };
 
