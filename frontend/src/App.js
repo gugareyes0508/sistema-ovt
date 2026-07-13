@@ -206,12 +206,12 @@ function App() {
     }
   }, [token, usuario.rol]);
 
-  // Cargar lista de usuarios (para admin)
+  // Cargar lista de usuarios (para admin/dpe, filtrada por cliente activo)
   const cargarUsuarios = useCallback(async () => {
-    if (!token || usuario.rol !== 'admin') return;
+    if (!token || (usuario.rol !== 'admin' && usuario.rol !== 'dpe')) return;
     try {
       const response = await axios.get(`${API_URL}/api/admin/listar-usuarios`, {
-        headers: { Authorization: `Bearer ${token}` }
+        headers: buildHeaders(token, clienteActivo)
       });
       if (response.data.usuarios) {
         setUsuarioList(response.data.usuarios);
@@ -219,7 +219,7 @@ function App() {
     } catch (err) {
       console.error('Error cargando usuarios:', err.message);
     }
-  }, [token, usuario.rol]);
+  }, [token, usuario.rol, clienteActivo]);
 
   // ── Dropdown de cliente: cerrar al click fuera usando ref ──────────────
   const dropdownRef = React.useRef(null);
@@ -234,21 +234,25 @@ function App() {
     return () => document.removeEventListener('mousedown', handler);
   }, [dropdownClienteAbierto]);
 
-  // ── Función de cambio de cliente — llama la API directamente con el nuevo ID ──
+  // ── Función de cambio de cliente — limpia TODO y recarga con nuevo ID ──
   const cambiarCliente = React.useCallback(async (nuevoClienteId) => {
+    // 1. Limpiar todos los datos del cliente anterior
+    setRegistros([]);
+    setUsuarioList([]);
+    setAuditoria([]);
+    // 2. Actualizar estado y localStorage
     setClienteActivo(nuevoClienteId);
     localStorage.setItem('clienteActivo', nuevoClienteId);
-    setRegistros([]);
-    setVista('dashboard');
     setDropdownClienteAbierto(false);
-    // Llamada directa pasando el nuevo ID para no depender del estado que aún no actualizó
+    setVista('dashboard');
+    // 3. Recargar con el nuevo ID directamente (no esperar actualización de state)
     try {
       const headers = buildHeaders(token, nuevoClienteId);
-      const [resReg] = await Promise.all([
-        axios.get(`${API_URL}/api/registros`, { headers }),
-        axios.get(`${API_URL}/api/dashboard/resumen`, { headers }).catch(() => null),
-      ]);
+      const resReg = await axios.get(`${API_URL}/api/registros`, { headers });
       setRegistros(resReg.data || []);
+      // Recargar usuarios también con nuevo cliente
+      const resUsr = await axios.get(`${API_URL}/api/admin/listar-usuarios`, { headers });
+      if (resUsr.data?.usuarios) setUsuarioList(resUsr.data.usuarios);
     } catch (err) {
       console.error('Error al cambiar cliente:', err.message);
     }
@@ -1217,7 +1221,7 @@ function App() {
 
         {/* SECCIÓN: ANALYTICS */}
         {vista === 'analytics' && (usuario.rol === 'admin' || usuario.rol === 'dpe' || usuario.rol === 'teamleader') && (
-          <Analytics registros={registros} usuarios={usuarioList} token={token} />
+          <Analytics key={`analytics-${clienteActivo}`} registros={registros} usuarios={usuarioList} token={token} />
         )}
 
         {/* SECCIÓN: MANTENEDOR */}
