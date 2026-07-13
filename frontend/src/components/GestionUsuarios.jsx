@@ -314,7 +314,7 @@ const GestionUsuarios = ({ token, apiUrl, rolUsuario = 'admin' }) => {
       {/* ── MODAL USUARIO ── */}
       {modalUser.abierto && (
         <div style={{ position:'fixed', inset:0, background:'rgba(6,24,38,0.5)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:9999, padding:'20px' }}>
-          <div style={{ background:'var(--glass-strong)', backdropFilter:'blur(22px)', borderRadius:'22px', padding:'28px', border:'1px solid rgba(255,255,255,0.72)', boxShadow:'var(--shadow-lift)', width:'100%', maxWidth:'560px', maxHeight:'90vh', overflowY:'auto', boxShadow:'var(--shadow-lift)' }}>
+          <div style={{ background:'var(--glass-strong)', backdropFilter:'blur(22px)', borderRadius:'22px', padding:'28px', border:'1px solid rgba(255,255,255,0.72)', width:'100%', maxWidth:'560px', maxHeight:'90vh', overflowY:'auto', boxShadow:'var(--shadow-lift)' }}>
             <h3 style={{ marginTop:0, marginBottom:'20px' }}>
               {modalUser.modo === 'crear' ? '➕ Nuevo Usuario' : `✏️ Editar — ${modalUser.datos.nombre}`}
             </h3>
@@ -401,7 +401,7 @@ const GestionUsuarios = ({ token, apiUrl, rolUsuario = 'admin' }) => {
       {/* ── MODAL CLIENTE ── */}
       {modalCliente.abierto && (
         <div style={{ position:'fixed', inset:0, background:'rgba(6,24,38,0.5)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:9999 }}>
-          <div style={{ background:'var(--glass-strong)', backdropFilter:'blur(22px)', borderRadius:'22px', padding:'28px', border:'1px solid rgba(255,255,255,0.72)', boxShadow:'var(--shadow-lift)', width:'100%', maxWidth:'400px', boxShadow:'var(--shadow-lift)' }}>
+          <div style={{ background:'var(--glass-strong)', backdropFilter:'blur(22px)', borderRadius:'22px', padding:'28px', border:'1px solid rgba(255,255,255,0.72)', width:'100%', maxWidth:'400px', boxShadow:'var(--shadow-lift)' }}>
             <h3 style={{ marginTop:0, marginBottom:'20px' }}>🏦 Nuevo Cliente</h3>
             <div style={{ marginBottom:'12px' }}>
               <label style={{ display:'block', fontSize:'12px', fontWeight:'600', color:'var(--muted)', marginBottom:'5px' }}>ID único (slug) *</label>
@@ -425,7 +425,7 @@ const GestionUsuarios = ({ token, apiUrl, rolUsuario = 'admin' }) => {
       {/* ── MODAL EDITAR GRUPO ── */}
       {modalEditGrupo.abierto && (
         <div style={{ position:'fixed', inset:0, background:'rgba(6,24,38,0.5)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:9999 }}>
-          <div style={{ background:'var(--glass-strong)', backdropFilter:'blur(22px)', borderRadius:'22px', padding:'28px', border:'1px solid rgba(255,255,255,0.72)', boxShadow:'var(--shadow-lift)', width:'100%', maxWidth:'400px', boxShadow:'var(--shadow-lift)' }}>
+          <div style={{ background:'var(--glass-strong)', backdropFilter:'blur(22px)', borderRadius:'22px', padding:'28px', border:'1px solid rgba(255,255,255,0.72)', width:'100%', maxWidth:'400px', boxShadow:'var(--shadow-lift)' }}>
             <h3 style={{ marginTop:0, marginBottom:'6px' }}>✏️ Editar Grupo</h3>
             <p style={{ fontSize:'12px', color:'var(--muted)', marginBottom:'20px' }}>
               Cliente: <strong>{nombreCliente(modalEditGrupo.grupo?.clienteId)}</strong>
@@ -449,7 +449,7 @@ const GestionUsuarios = ({ token, apiUrl, rolUsuario = 'admin' }) => {
       )}
       {modalGrupo.abierto && (
         <div style={{ position:'fixed', inset:0, background:'rgba(6,24,38,0.5)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:9999 }}>
-          <div style={{ background:'var(--glass-strong)', backdropFilter:'blur(22px)', borderRadius:'22px', padding:'28px', border:'1px solid rgba(255,255,255,0.72)', boxShadow:'var(--shadow-lift)', width:'100%', maxWidth:'400px', boxShadow:'var(--shadow-lift)' }}>
+          <div style={{ background:'var(--glass-strong)', backdropFilter:'blur(22px)', borderRadius:'22px', padding:'28px', border:'1px solid rgba(255,255,255,0.72)', width:'100%', maxWidth:'400px', boxShadow:'var(--shadow-lift)' }}>
             <h3 style={{ marginTop:0, marginBottom:'6px' }}>📂 Nuevo Grupo de Servicio</h3>
             <p style={{ fontSize:'12px', color:'var(--muted)', marginBottom:'20px' }}>Cliente: <strong>{nombreCliente(modalGrupo.clienteId)}</strong></p>
             <div style={{ marginBottom:'12px' }}>
