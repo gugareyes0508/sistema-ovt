@@ -1544,7 +1544,7 @@ function App() {
 
         {/* SECCIÓN: GESTIÓN DE USUARIOS (Admin) */}
         {vista === 'usuarios' && (usuario.rol === 'admin' || usuario.rol === 'dpe') && (
-          <GestionUsuarios token={token} apiUrl={API_URL} rolUsuario={usuario.rol} />
+          <GestionUsuarios key={`usuarios-${clienteActivo}`} token={token} apiUrl={API_URL} rolUsuario={usuario.rol} />
         )}
 
         {/* SECCIÓN: AUDITORÍA */}
@@ -1864,12 +1864,12 @@ function App() {
 
         {/* OVT Proyectado (Admin) */}
         {vista === 'ovt-proyectado' && (usuario.rol === 'admin' || usuario.rol === 'dpe') && (
-          <OvtProyectado token={token} apiUrl={API_URL} clienteActivo={clienteActivo} />
+          <OvtProyectado key={`ovt-${clienteActivo}`} token={token} apiUrl={API_URL} clienteActivo={clienteActivo} />
         )}
 
         {/* Control de Labor (Claim) */}
         {vista === 'claim' && (usuario.rol === 'admin' || usuario.rol === 'dpe') && (
-          <ClaimDashboard token={token} apiUrl={API_URL} clienteActivo={clienteActivo} />
+          <ClaimDashboard key={`claim-${clienteActivo}`} token={token} apiUrl={API_URL} clienteActivo={clienteActivo} />
         )}
 
         {/* Permisos de Roles — solo admin */}
