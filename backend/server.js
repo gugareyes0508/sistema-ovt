@@ -1108,10 +1108,17 @@ app.post('/api/claims/upload', verificarToken, async (req, res) => {
     // Determinar clienteId: DPE usa x-cliente-activo, admin usa 'bcochile' por defecto
     const clienteActivoId = req.headers['x-cliente-activo'] || 'bcochile';
 
-    // Verificar cuáles fechas ya existen
+    // Verificar cuáles fechas ya existen PARA ESTE CLIENTE (antes comparaba contra
+    // toda la colección, así que semanas de otros clientes con la misma fecha
+    // calendario se marcaban como "ya cargadas" y se descartaban sin guardarse)
     const existSnap = await db.collection('claims_semanas').get();
     const existentes = new Set();
-    existSnap.forEach(doc => existentes.add(doc.data().fecha));
+    existSnap.forEach(doc => {
+      const data = doc.data();
+      if ((data.clienteId || 'bcochile') === clienteActivoId) {
+        existentes.add(data.fecha);
+      }
+    });
 
     const nuevas = semanas.filter(s => !existentes.has(s.fecha));
     if (nuevas.length === 0) {
@@ -1120,7 +1127,10 @@ app.post('/api/claims/upload', verificarToken, async (req, res) => {
 
     const batch = db.batch();
     nuevas.forEach(sem => {
-      const ref = db.collection('claims_semanas').doc(sem.fecha);
+      // ID compuesto por cliente + fecha: evita que dos clientes con la misma
+      // semana calendario (ej. ambos cierran el 2026-03-20) compartan el mismo
+      // documento y se pisen los datos entre sí.
+      const ref = db.collection('claims_semanas').doc(`${clienteActivoId}_${sem.fecha}`);
       batch.set(ref, {
         ...sem,
         clienteId: clienteActivoId,
