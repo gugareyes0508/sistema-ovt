@@ -274,24 +274,33 @@ app.get('/api/admin/listar-usuarios', verificarToken, async (req, res) => {
     const esDpe = req.usuario.rol === 'dpe';
     if (!esAdmin && !esDpe) return res.status(403).json({ error: 'No tienes permisos' });
 
+    // Cliente activo desde header — si viene, filtrar solo por ese cliente
+    const clienteActivoId = req.headers['x-cliente-activo'] || '';
+
     const snapshot = await db.collection('usuarios').get();
     const usuariosList = [];
     snapshot.forEach(doc => {
       const d = doc.data();
-      // DPE solo ve usuarios de sus clientes
-      if (esDpe) {
+      const clientesUsuario = d.clientesIds || ['bcochile'];
+
+      // Si viene cliente activo, mostrar solo usuarios de ese cliente
+      if (clienteActivoId) {
+        if (!clientesUsuario.includes(clienteActivoId)) return;
+      } else if (esDpe) {
+        // Sin cliente activo: DPE ve todos sus clientes
         const clientesDpe = req.usuario.clientesIds || [];
-        const clientesUsuario = d.clientesIds || ['bcochile'];
         const tieneAcceso = clientesDpe.some(c => clientesUsuario.includes(c));
         if (!tieneAcceso) return;
       }
+      // Admin sin cliente activo: ve todos
+
       usuariosList.push({
         usuario: doc.id,
         nombre: d.nombre,
         rol: d.rol,
         departamento: d.departamento || '',
         empresa: d.empresa || 'Kyndryl',
-        clientesIds: d.clientesIds || ['bcochile'],
+        clientesIds: clientesUsuario,
         grupoServicioId: d.grupoServicioId || '',
         haceOVT: d.haceOVT !== false
       });
