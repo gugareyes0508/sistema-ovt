@@ -78,7 +78,7 @@ const GestionUsuarios = ({ token, apiUrl, rolUsuario = 'admin' }) => {
 
   useEffect(() => { cargar(); }, [cargar]);
 
-  const gruposPorCliente = (cId) => grupos.filter(g => g.clienteId === cId);
+  const gruposDeCliente = (cId) => grupos.filter(g => g.clienteId === cId);
   const nombreCliente = (id) => clientes.find(c => c.id === id)?.nombre || id;
   const nombreGrupo = (id) => grupos.find(g => g.id === id)?.nombre || '—';
 
@@ -98,15 +98,20 @@ const GestionUsuarios = ({ token, apiUrl, rolUsuario = 'admin' }) => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
     setModalUser({
       abierto: true, modo: 'crear',
-      datos: { usuario:'', nombre:'', rol:'especialista', empresa:'Kyndryl', contrasena:'', departamento:'', clientesIds:[], grupoServicioId:'', haceOVT:true }
+      datos: { usuario:'', nombre:'', rol:'especialista', empresa:'Kyndryl', contrasena:'', departamento:'', clientesIds:[], gruposPorCliente:{}, haceOVT:true }
     });
   };
 
   const abrirModalEditar = (u) => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
+    // Migración: si el usuario aún trae solo el grupoServicioId viejo (single),
+    // se mapea al primer cliente para no perder el dato al editar.
+    const gruposPorClienteInicial = u.gruposPorCliente && Object.keys(u.gruposPorCliente).length > 0
+      ? u.gruposPorCliente
+      : (u.grupoServicioId ? { [(u.clientesIds||['bcochile'])[0]]: u.grupoServicioId } : {});
     setModalUser({
       abierto: true, modo: 'editar',
-      datos: { ...u, contrasena:'' }
+      datos: { ...u, contrasena:'', gruposPorCliente: gruposPorClienteInicial }
     });
   };
 
@@ -123,7 +128,7 @@ const GestionUsuarios = ({ token, apiUrl, rolUsuario = 'admin' }) => {
       } else {
         const payload = { usuario: datos.usuario, nombre: datos.nombre, rol: datos.rol,
           empresa: datos.empresa, departamento: datos.departamento,
-          clientesIds: datos.clientesIds, grupoServicioId: datos.grupoServicioId, haceOVT: datos.haceOVT };
+          clientesIds: datos.clientesIds, gruposPorCliente: datos.gruposPorCliente || {}, haceOVT: datos.haceOVT };
         await axios.post(`${apiUrl}/api/admin/editar-usuario`, payload, { headers });
         if (datos.contrasena) {
           await axios.post(`${apiUrl}/api/admin/resetear-contrasena`, { usuario: datos.usuario, contraseñaNueva: datos.contrasena }, { headers });
@@ -215,7 +220,7 @@ const GestionUsuarios = ({ token, apiUrl, rolUsuario = 'admin' }) => {
               </button>
             </div>
             <div style={{ display:'flex', flexWrap:'wrap', gap:'6px' }}>
-              {gruposPorCliente(c.id).map(g => (
+              {gruposDeCliente(c.id).map(g => (
                 <div key={g.id} style={{ display:'flex', alignItems:'center', gap:'4px', background:'#e0f2fe', borderRadius:'8px', padding:'2px 4px 2px 8px' }}>
                   <span style={{ fontSize:'11px', color:'var(--bank-blue)' }}>{g.nombre}</span>
                   <button onClick={() => abrirEditarGrupo(g)} title="Editar grupo"
@@ -224,7 +229,7 @@ const GestionUsuarios = ({ token, apiUrl, rolUsuario = 'admin' }) => {
                     style={{ background:'none', border:'none', cursor:'pointer', fontSize:'11px', padding:'0 2px', color:'var(--danger)', lineHeight:1 }}>✕</button>
                 </div>
               ))}
-              {gruposPorCliente(c.id).length === 0 && <span style={{ fontSize:'11px', color:'var(--muted)' }}>Sin grupos</span>}
+              {gruposDeCliente(c.id).length === 0 && <span style={{ fontSize:'11px', color:'var(--muted)' }}>Sin grupos</span>}
             </div>
             <div style={{ fontSize:'11px', color:'var(--muted)', marginTop:'8px' }}>
               {usuarios.filter(u=>(u.clientesIds||[]).includes(c.id)).length} usuarios
@@ -299,7 +304,20 @@ const GestionUsuarios = ({ token, apiUrl, rolUsuario = 'admin' }) => {
                     </span>
                   ))}
                 </td>
-                <td style={{ fontSize:'12px', color:'var(--muted)' }}>{u.grupoServicioId ? nombreGrupo(u.grupoServicioId) : '—'}</td>
+                <td style={{ fontSize:'12px', color:'var(--muted)' }}>
+                  {(() => {
+                    const clientesUsuario = u.clientesIds || ['bcochile'];
+                    const mapa = u.gruposPorCliente || (u.grupoServicioId ? { [clientesUsuario[0]]: u.grupoServicioId } : {});
+                    const entradas = clientesUsuario.filter(cId => mapa[cId]);
+                    if (entradas.length === 0) return '—';
+                    if (clientesUsuario.length === 1) return nombreGrupo(mapa[entradas[0]]);
+                    return entradas.map(cId => (
+                      <div key={cId} style={{ whiteSpace:'nowrap' }}>
+                        <span style={{ color:'var(--ink-800)', fontWeight:'600' }}>{nombreCliente(cId)}:</span> {nombreGrupo(mapa[cId])}
+                      </div>
+                    ));
+                  })()}
+                </td>
                 <td style={{ fontSize:'12px' }}>{u.empresa||'Kyndryl'}</td>
                 <td>
                   <button onClick={() => toggleHaceOVT(u)}
@@ -361,7 +379,12 @@ const GestionUsuarios = ({ token, apiUrl, rolUsuario = 'admin' }) => {
                       borderRadius:'14px', cursor:'pointer', background: sel?'#eff6ff':'rgba(255,255,255,0.84)', fontSize:'13px' }}>
                       <input type="checkbox" checked={sel} onChange={() => {
                         const ids = modalUser.datos.clientesIds||[];
-                        setModalUser(p=>({...p,datos:{...p.datos,clientesIds: sel ? ids.filter(x=>x!==c.id) : [...ids,c.id]}}));
+                        setModalUser(p=>{
+                          const nuevosIds = sel ? ids.filter(x=>x!==c.id) : [...ids,c.id];
+                          const nuevosGrupos = { ...(p.datos.gruposPorCliente||{}) };
+                          if (sel) delete nuevosGrupos[c.id]; // al quitar el cliente, se limpia su grupo asignado
+                          return {...p,datos:{...p.datos,clientesIds: nuevosIds, gruposPorCliente: nuevosGrupos}};
+                        });
                       }} />
                       {c.nombre}
                     </label>
@@ -370,18 +393,24 @@ const GestionUsuarios = ({ token, apiUrl, rolUsuario = 'admin' }) => {
               </div>
             </div>
 
-            {/* Grupo de servicio */}
+            {/* Grupo de servicio — uno por cada cliente asignado, así un usuario
+                con acceso a más de un cliente puede tener grupos distintos */}
             {(modalUser.datos.clientesIds||[]).length > 0 && (
               <div style={{ marginBottom:'12px' }}>
-                <label style={{ display:'block', fontSize:'12px', fontWeight:'600', color:'var(--muted)', marginBottom:'5px' }}>Grupo de Servicio</label>
-                <select value={modalUser.datos.grupoServicioId||''}
-                  onChange={e=>setModalUser(p=>({...p,datos:{...p.datos,grupoServicioId:e.target.value}}))}
-                  style={{ width:'100%', padding:'9px 12px', border:'1px solid #d1d5db', borderRadius:'14px', fontSize:'13px' }}>
-                  <option value="">Sin grupo</option>
-                  {(modalUser.datos.clientesIds||[]).flatMap(cId =>
-                    gruposPorCliente(cId).map(g=><option key={g.id} value={g.id}>{nombreCliente(cId)} → {g.nombre}</option>)
-                  )}
-                </select>
+                <label style={{ display:'block', fontSize:'12px', fontWeight:'600', color:'var(--muted)', marginBottom:'5px' }}>Grupo de Servicio (por cliente)</label>
+                <div style={{ display:'flex', flexDirection:'column', gap:'8px' }}>
+                  {(modalUser.datos.clientesIds||[]).map(cId => (
+                    <div key={cId} style={{ display:'flex', alignItems:'center', gap:'10px' }}>
+                      <span style={{ fontSize:'12px', color:'var(--ink-800)', fontWeight:'600', minWidth:'110px' }}>{nombreCliente(cId)}</span>
+                      <select value={(modalUser.datos.gruposPorCliente||{})[cId] || ''}
+                        onChange={e=>setModalUser(p=>({...p,datos:{...p.datos,gruposPorCliente:{...(p.datos.gruposPorCliente||{}), [cId]: e.target.value}}}))}
+                        style={{ flex:1, padding:'9px 12px', border:'1px solid #d1d5db', borderRadius:'14px', fontSize:'13px' }}>
+                        <option value="">Sin grupo</option>
+                        {gruposDeCliente(cId).map(g=><option key={g.id} value={g.id}>{g.nombre}</option>)}
+                      </select>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
 

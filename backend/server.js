@@ -255,7 +255,8 @@ app.post('/api/auth/login', async (req, res) => {
         empresa: user.empresa || 'Kyndryl',
         haceOVT: user.haceOVT !== false,
         clientesIds: user.clientesIds || ['bcochile'],
-        grupoServicioId: user.grupoServicioId || '',
+        gruposPorCliente: user.gruposPorCliente || {},
+        grupoServicioId: user.grupoServicioId || '', // legacy, mantener por compatibilidad
         departamento: user.departamento || ''
       }
     });
@@ -301,7 +302,8 @@ app.get('/api/admin/listar-usuarios', verificarToken, async (req, res) => {
         departamento: d.departamento || '',
         empresa: d.empresa || 'Kyndryl',
         clientesIds: clientesUsuario,
-        grupoServicioId: d.grupoServicioId || '',
+        gruposPorCliente: d.gruposPorCliente || (d.grupoServicioId ? { [clientesUsuario[0]]: d.grupoServicioId } : {}),
+        grupoServicioId: d.grupoServicioId || '', // legacy, mantener por compatibilidad
         haceOVT: d.haceOVT !== false
       });
     });
@@ -344,7 +346,7 @@ app.post('/api/admin/crear-usuario', verificarToken, async (req, res) => {
     const esDpe = req.usuario.rol === 'dpe';
     if (!esAdmin && !esDpe) return res.status(403).json({ error: 'No tienes permisos para crear usuarios' });
 
-    const { usuario, nombre, rol, departamento, contrasena, empresa, clientesIds, grupoServicioId, haceOVT } = req.body;
+    const { usuario, nombre, rol, departamento, contrasena, empresa, clientesIds, grupoServicioId, gruposPorCliente, haceOVT } = req.body;
 
     if (!usuario || !nombre || !contrasena) return res.status(400).json({ error: 'Faltan campos requeridos' });
 
@@ -362,6 +364,12 @@ app.post('/api/admin/crear-usuario', verificarToken, async (req, res) => {
     const existente = await db.collection('usuarios').doc(usuario).get();
     if (existente.exists) return res.status(400).json({ error: 'Ese nombre de usuario ya existe' });
 
+    // gruposPorCliente: { clienteId: grupoId }. Si viene el campo legacy
+    // grupoServicioId en vez del mapa, se asigna al primer cliente asignado.
+    const gruposMap = (gruposPorCliente && typeof gruposPorCliente === 'object')
+      ? gruposPorCliente
+      : (grupoServicioId ? { [clientesAsignados[0]]: grupoServicioId } : {});
+
     await db.collection('usuarios').doc(usuario).set({
       nombre,
       contrasena,
@@ -369,7 +377,8 @@ app.post('/api/admin/crear-usuario', verificarToken, async (req, res) => {
       departamento: departamento || '',
       empresa: empresa || 'Kyndryl',
       clientesIds: clientesAsignados,
-      grupoServicioId: grupoServicioId || '',
+      gruposPorCliente: gruposMap,
+      grupoServicioId: gruposMap[clientesAsignados[0]] || '', // legacy, mantener por compatibilidad
       haceOVT: haceOVT !== false
     });
 
@@ -473,7 +482,7 @@ app.post('/api/admin/editar-usuario', verificarToken, async (req, res) => {
     const esDpe = req.usuario.rol === 'dpe';
     if (!esAdmin && !esDpe) return res.status(403).json({ error: 'No tienes permisos para editar usuarios' });
 
-    const { usuario, empresa, nombre, departamento, haceOVT, grupoServicioId, clientesIds, rol } = req.body;
+    const { usuario, empresa, nombre, departamento, haceOVT, grupoServicioId, gruposPorCliente, clientesIds, rol } = req.body;
     if (!usuario) return res.status(400).json({ error: 'Usuario requerido' });
 
     const userRef = db.collection('usuarios').doc(usuario);
@@ -495,9 +504,22 @@ app.post('/api/admin/editar-usuario', verificarToken, async (req, res) => {
     if (nombre !== undefined && nombre !== '') cambios.nombre = nombre;
     if (departamento !== undefined && departamento !== '') cambios.departamento = departamento;
     if (haceOVT !== undefined) cambios.haceOVT = Boolean(haceOVT);
-    if (grupoServicioId !== undefined) cambios.grupoServicioId = grupoServicioId;
     if (clientesIds !== undefined && Array.isArray(clientesIds)) cambios.clientesIds = clientesIds;
     if (rol !== undefined) cambios.rol = rol;
+
+    // gruposPorCliente: mapa completo {clienteId: grupoId}. Se reemplaza entero
+    // (el frontend siempre manda el mapa completo actualizado, no un parche).
+    // Si solo llega el campo legacy grupoServicioId, se aplica al primer cliente.
+    if (gruposPorCliente !== undefined && typeof gruposPorCliente === 'object') {
+      cambios.gruposPorCliente = gruposPorCliente;
+      const clientesFinal = cambios.clientesIds || userDoc.data().clientesIds || ['bcochile'];
+      cambios.grupoServicioId = gruposPorCliente[clientesFinal[0]] || ''; // legacy
+    } else if (grupoServicioId !== undefined) {
+      const clientesFinal = cambios.clientesIds || userDoc.data().clientesIds || ['bcochile'];
+      const mapaExistente = userDoc.data().gruposPorCliente || {};
+      cambios.gruposPorCliente = { ...mapaExistente, [clientesFinal[0]]: grupoServicioId };
+      cambios.grupoServicioId = grupoServicioId;
+    }
 
     if (Object.keys(cambios).length === 0) return res.status(400).json({ error: 'No se enviaron campos para actualizar' });
 
@@ -1306,10 +1328,16 @@ app.delete('/api/grupos-servicio/:id', verificarToken, async (req, res) => {
       }
     }
 
-    // Verificar que no haya usuarios asignados a este grupo
-    const usuariosConGrupo = await db.collection('usuarios')
-      .where('grupoServicioId', '==', req.params.id).limit(1).get();
-    if (!usuariosConGrupo.empty) {
+    // Verificar que no haya usuarios asignados a este grupo (en cualquier cliente)
+    const usuariosSnap = await db.collection('usuarios').get();
+    const enUso = usuariosSnap.docs.some(doc => {
+      const d = doc.data();
+      if (d.gruposPorCliente && typeof d.gruposPorCliente === 'object') {
+        return Object.values(d.gruposPorCliente).includes(req.params.id);
+      }
+      return d.grupoServicioId === req.params.id; // legacy
+    });
+    if (enUso) {
       return res.status(400).json({ error: 'No se puede eliminar: hay usuarios asignados a este grupo. Reasigna los usuarios primero.' });
     }
 
