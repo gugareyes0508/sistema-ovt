@@ -582,8 +582,8 @@ app.get('/api/registros', verificarToken, async (req, res) => {
       registros.push({ id: doc.id, ...doc.data() });
     });
 
-    // DPE: filtrar por el cliente activo enviado en el header
-    if (rol === 'dpe') {
+    // Admin y DPE: filtrar por el cliente activo enviado en el header
+    if (rol === 'dpe' || rol === 'admin') {
       const clienteActivoId = req.headers['x-cliente-activo'] || '';
       if (clienteActivoId) {
         const clienteDoc = await db.collection('clientes').doc(clienteActivoId).get();
