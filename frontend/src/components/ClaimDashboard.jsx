@@ -444,12 +444,12 @@ const ClaimDashboard = ({ token, apiUrl, clienteActivo = '' }) => {
   };
 
   const limpiarDatos = async () => {
-    if (!window.confirm('¿Eliminar TODOS los datos de Claims de Firestore? No se puede deshacer.')) return;
+    if (!window.confirm(`¿Eliminar los datos de Claims del cliente activo (${clienteActivo || 'sin cliente seleccionado'})? No se puede deshacer. Los demás clientes no se ven afectados.`)) return;
     try {
-      await axios.delete(`${apiUrl}/api/claims`, { headers: getHeaders() });
-      setSemanas([]); setUltimaCarga(null);
-      alert('✅ Datos eliminados');
-    } catch (err) { alert('Error: ' + err.message); }
+      const res = await axios.delete(`${apiUrl}/api/claims`, { headers: getHeaders() });
+      await cargarDatos();
+      alert(`✅ ${res.data.message}`);
+    } catch (err) { alert('Error: ' + (err.response?.data?.error || err.message)); }
   };
 
   // ── filtrado y agregación ──

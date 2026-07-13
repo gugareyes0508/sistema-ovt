@@ -1077,15 +1077,13 @@ app.get('/api/claims', verificarToken, async (req, res) => {
     let semanas = [];
     snap.forEach(doc => semanas.push({ id: doc.id, ...doc.data() }));
 
-    // DPE: filtrar por clienteId guardado en cada semana
-    if (esDpe) {
-      const clienteActivoId = req.headers['x-cliente-activo'] || '';
-      if (clienteActivoId) {
-        semanas = semanas.filter(s =>
-          // Si no tiene clienteId, asumir bcochile (datos migrados antes del campo)
-          (s.clienteId || 'bcochile') === clienteActivoId
-        );
-      }
+    // Filtrar por clienteId guardado en cada semana (admin y DPE, según cliente activo)
+    const clienteActivoId = req.headers['x-cliente-activo'] || '';
+    if (clienteActivoId) {
+      semanas = semanas.filter(s =>
+        // Si no tiene clienteId, asumir bcochile (datos migrados antes del campo)
+        (s.clienteId || 'bcochile') === clienteActivoId
+      );
     }
 
     res.json(semanas);
@@ -1147,15 +1145,41 @@ app.post('/api/claims/upload', verificarToken, async (req, res) => {
   }
 });
 
-// DELETE /api/claims → limpiar TODAS las semanas (solo admin)
+// DELETE /api/claims → limpiar las semanas del cliente activo (solo admin)
 app.delete('/api/claims', verificarToken, async (req, res) => {
   try {
     if (req.usuario.rol !== 'admin') return res.status(403).json({ error: 'Solo admin' });
+
+    const clienteActivoId = req.headers['x-cliente-activo'] || '';
     const snap = await db.collection('claims_semanas').get();
     const batch = db.batch();
-    snap.forEach(doc => batch.delete(doc.ref));
+    let borradas = 0;
+
+    snap.forEach(doc => {
+      const data = doc.data();
+      // Si no hay cliente activo seleccionado, no borra nada (evita borrar todo por accidente)
+      if (!clienteActivoId) return;
+      if ((data.clienteId || 'bcochile') === clienteActivoId) {
+        batch.delete(doc.ref);
+        borradas++;
+      }
+    });
+
+    if (!clienteActivoId) {
+      return res.status(400).json({ error: 'No hay cliente activo seleccionado' });
+    }
+
     await batch.commit();
-    res.json({ message: `${snap.size} semanas eliminadas` });
+
+    await db.collection('auditoria').add({
+      accion: 'CLAIMS_DELETE',
+      usuarioNombre: req.usuario.nombre,
+      clienteId: clienteActivoId,
+      semanasEliminadas: borradas,
+      timestamp: new Date()
+    });
+
+    res.json({ message: `${borradas} semanas eliminadas (cliente: ${clienteActivoId})` });
   } catch (err) {
     console.error('Error DELETE /api/claims:', err);
     res.status(500).json({ error: err.message });
