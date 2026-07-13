@@ -10,6 +10,26 @@ const Badge = ({ text, color='var(--muted)' }) => (
     background:`${color}18`, color, border:`1px solid ${color}40`, whiteSpace:'nowrap' }}>{text}</span>
 );
 
+// IMPORTANTE: Input y Select deben vivir FUERA de GestionUsuarios.
+// Si se definen dentro del componente, se recrean como funciones nuevas en cada
+// render (cada tecla que se escribe dispara un re-render vía setModalUser), y
+// React las trata como un tipo de componente distinto: desmonta y remonta el
+// <input> del DOM en cada letra, perdiendo el foco cada vez.
+const Input = ({ label, ...props }) => (
+  <div style={{ marginBottom:'12px' }}>
+    {label && <label style={{ display:'block', fontSize:'12px', fontWeight:'600', color:'var(--muted)', marginBottom:'5px' }}>{label}</label>}
+    <input style={{ width:'100%', padding:'9px 12px', border:'1px solid #d1d5db', borderRadius:'14px', fontSize:'13px', boxSizing:'border-box' }} {...props} />
+  </div>
+);
+const Select = ({ label, options, ...props }) => (
+  <div style={{ marginBottom:'12px' }}>
+    {label && <label style={{ display:'block', fontSize:'12px', fontWeight:'600', color:'var(--muted)', marginBottom:'5px' }}>{label}</label>}
+    <select style={{ width:'100%', padding:'9px 12px', border:'1px solid #d1d5db', borderRadius:'14px', fontSize:'13px' }} {...props}>
+      {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+    </select>
+  </div>
+);
+
 const GestionUsuarios = ({ token, apiUrl, rolUsuario = 'admin' }) => {
   const esAdmin = rolUsuario === 'admin';
 
@@ -74,15 +94,21 @@ const GestionUsuarios = ({ token, apiUrl, rolUsuario = 'admin' }) => {
   });
 
   // ── Crear / Editar usuario ──
-  const abrirModalCrear = () => setModalUser({
-    abierto: true, modo: 'crear',
-    datos: { usuario:'', nombre:'', rol:'especialista', empresa:'Kyndryl', contrasena:'', departamento:'', clientesIds:[], grupoServicioId:'', haceOVT:true }
-  });
+  const abrirModalCrear = () => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    setModalUser({
+      abierto: true, modo: 'crear',
+      datos: { usuario:'', nombre:'', rol:'especialista', empresa:'Kyndryl', contrasena:'', departamento:'', clientesIds:[], grupoServicioId:'', haceOVT:true }
+    });
+  };
 
-  const abrirModalEditar = (u) => setModalUser({
-    abierto: true, modo: 'editar',
-    datos: { ...u, contrasena:'' }
-  });
+  const abrirModalEditar = (u) => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    setModalUser({
+      abierto: true, modo: 'editar',
+      datos: { ...u, contrasena:'' }
+    });
+  };
 
   const guardarUsuario = async () => {
     const { datos, modo } = modalUser;
@@ -167,20 +193,6 @@ const GestionUsuarios = ({ token, apiUrl, rolUsuario = 'admin' }) => {
   };
 
   // ── helpers UI ──
-  const Input = ({ label, ...props }) => (
-    <div style={{ marginBottom:'12px' }}>
-      {label && <label style={{ display:'block', fontSize:'12px', fontWeight:'600', color:'var(--muted)', marginBottom:'5px' }}>{label}</label>}
-      <input style={{ width:'100%', padding:'9px 12px', border:'1px solid #d1d5db', borderRadius:'14px', fontSize:'13px', boxSizing:'border-box' }} {...props} />
-    </div>
-  );
-  const Select = ({ label, options, ...props }) => (
-    <div style={{ marginBottom:'12px' }}>
-      {label && <label style={{ display:'block', fontSize:'12px', fontWeight:'600', color:'var(--muted)', marginBottom:'5px' }}>{label}</label>}
-      <select style={{ width:'100%', padding:'9px 12px', border:'1px solid #d1d5db', borderRadius:'14px', fontSize:'13px' }} {...props}>
-        {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-      </select>
-    </div>
-  );
 
   if (loading) return <section className="seccion"><p style={{textAlign:'center',color:'var(--muted)',padding:'40px'}}>⏳ Cargando...</p></section>;
 
