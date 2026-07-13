@@ -3,10 +3,10 @@ import axios from 'axios';
 
 const ROLES = ['admin','dpe','teamleader','itsm','especialista'];
 const EMPRESAS = ['Kyndryl','Incosec','Biznet','Otra'];
-const ROL_COLORS = { admin:'#dc2626', dpe:'#2563eb', teamleader:'#7c3aed', itsm:'#059669', especialista:'#d97706', coordinador:'#7c3aed' };
+const ROL_COLORS = { admin:'var(--danger)', dpe:'var(--bank-blue)', teamleader:'#7c3aed', itsm:'var(--success)', especialista:'#d97706', coordinador:'#7c3aed' };
 
-const Badge = ({ text, color='#6b7280' }) => (
-  <span style={{ display:'inline-block', padding:'2px 8px', borderRadius:'12px', fontSize:'11px', fontWeight:'600',
+const Badge = ({ text, color='var(--muted)' }) => (
+  <span style={{ display:'inline-block', padding:'2px 8px', borderRadius:'16px', fontSize:'11px', fontWeight:'600',
     background:`${color}18`, color, border:`1px solid ${color}40`, whiteSpace:'nowrap' }}>{text}</span>
 );
 
@@ -169,20 +169,20 @@ const GestionUsuarios = ({ token, apiUrl, rolUsuario = 'admin' }) => {
   // ── helpers UI ──
   const Input = ({ label, ...props }) => (
     <div style={{ marginBottom:'12px' }}>
-      {label && <label style={{ display:'block', fontSize:'12px', fontWeight:'600', color:'#6b7280', marginBottom:'5px' }}>{label}</label>}
-      <input style={{ width:'100%', padding:'9px 12px', border:'1px solid #d1d5db', borderRadius:'8px', fontSize:'13px', boxSizing:'border-box' }} {...props} />
+      {label && <label style={{ display:'block', fontSize:'12px', fontWeight:'600', color:'var(--muted)', marginBottom:'5px' }}>{label}</label>}
+      <input style={{ width:'100%', padding:'9px 12px', border:'1px solid #d1d5db', borderRadius:'14px', fontSize:'13px', boxSizing:'border-box' }} {...props} />
     </div>
   );
   const Select = ({ label, options, ...props }) => (
     <div style={{ marginBottom:'12px' }}>
-      {label && <label style={{ display:'block', fontSize:'12px', fontWeight:'600', color:'#6b7280', marginBottom:'5px' }}>{label}</label>}
-      <select style={{ width:'100%', padding:'9px 12px', border:'1px solid #d1d5db', borderRadius:'8px', fontSize:'13px' }} {...props}>
+      {label && <label style={{ display:'block', fontSize:'12px', fontWeight:'600', color:'var(--muted)', marginBottom:'5px' }}>{label}</label>}
+      <select style={{ width:'100%', padding:'9px 12px', border:'1px solid #d1d5db', borderRadius:'14px', fontSize:'13px' }} {...props}>
         {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
       </select>
     </div>
   );
 
-  if (loading) return <section className="seccion"><p style={{textAlign:'center',color:'#9ca3af',padding:'40px'}}>⏳ Cargando...</p></section>;
+  if (loading) return <section className="seccion"><p style={{textAlign:'center',color:'var(--muted)',padding:'40px'}}>⏳ Cargando...</p></section>;
 
   return (
     <section className="seccion">
@@ -191,39 +191,39 @@ const GestionUsuarios = ({ token, apiUrl, rolUsuario = 'admin' }) => {
       {/* CLIENTES Y GRUPOS */}
       <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(280px, 1fr))', gap:'14px', marginBottom:'28px' }}>
         {clientes.map(c => (
-          <div key={c.id} style={{ background:'#f9fafb', border:'1px solid #e5e7eb', borderRadius:'10px', padding:'14px 16px' }}>
+          <div key={c.id} style={{ background:'var(--paper-100)', border:'1px solid #e5e7eb', borderRadius:'16px', padding:'14px 16px' }}>
             <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'10px' }}>
               <div>
                 <span style={{ fontWeight:'700', fontSize:'14px' }}>{c.nombre}</span>
-                <span style={{ fontSize:'11px', color:'#9ca3af', marginLeft:'8px' }}>#{c.id}</span>
+                <span style={{ fontSize:'11px', color:'var(--muted)', marginLeft:'8px' }}>#{c.id}</span>
               </div>
               <button onClick={() => setModalGrupo({abierto:true, clienteId:c.id})}
-                style={{ fontSize:'11px', padding:'4px 10px', background:'#2563eb', color:'#fff', border:'none', borderRadius:'6px', cursor:'pointer' }}>
+                style={{ fontSize:'11px', padding:'4px 10px', background:'var(--bank-blue)', color:'rgba(255,255,255,0.84)', border:'none', borderRadius:'10px', cursor:'pointer' }}>
                 + Grupo
               </button>
             </div>
             <div style={{ display:'flex', flexWrap:'wrap', gap:'6px' }}>
               {gruposPorCliente(c.id).map(g => (
-                <div key={g.id} style={{ display:'flex', alignItems:'center', gap:'4px', background:'#e0f2fe', borderRadius:'4px', padding:'2px 4px 2px 8px' }}>
-                  <span style={{ fontSize:'11px', color:'#0369a1' }}>{g.nombre}</span>
+                <div key={g.id} style={{ display:'flex', alignItems:'center', gap:'4px', background:'#e0f2fe', borderRadius:'8px', padding:'2px 4px 2px 8px' }}>
+                  <span style={{ fontSize:'11px', color:'var(--bank-blue)' }}>{g.nombre}</span>
                   <button onClick={() => abrirEditarGrupo(g)} title="Editar grupo"
-                    style={{ background:'none', border:'none', cursor:'pointer', fontSize:'11px', padding:'0 2px', color:'#0369a1', lineHeight:1 }}>✏️</button>
+                    style={{ background:'none', border:'none', cursor:'pointer', fontSize:'11px', padding:'0 2px', color:'var(--bank-blue)', lineHeight:1 }}>✏️</button>
                   <button onClick={() => eliminarGrupo(g)} title="Eliminar grupo"
-                    style={{ background:'none', border:'none', cursor:'pointer', fontSize:'11px', padding:'0 2px', color:'#dc2626', lineHeight:1 }}>✕</button>
+                    style={{ background:'none', border:'none', cursor:'pointer', fontSize:'11px', padding:'0 2px', color:'var(--danger)', lineHeight:1 }}>✕</button>
                 </div>
               ))}
-              {gruposPorCliente(c.id).length === 0 && <span style={{ fontSize:'11px', color:'#9ca3af' }}>Sin grupos</span>}
+              {gruposPorCliente(c.id).length === 0 && <span style={{ fontSize:'11px', color:'var(--muted)' }}>Sin grupos</span>}
             </div>
-            <div style={{ fontSize:'11px', color:'#9ca3af', marginTop:'8px' }}>
+            <div style={{ fontSize:'11px', color:'var(--muted)', marginTop:'8px' }}>
               {usuarios.filter(u=>(u.clientesIds||[]).includes(c.id)).length} usuarios
             </div>
           </div>
         ))}
         {/* Nuevo Cliente — SOLO ADMIN */}
         {esAdmin && (
-          <div style={{ border:'1.5px dashed #d1d5db', borderRadius:'10px', padding:'14px 16px', display:'flex', alignItems:'center', justifyContent:'center' }}>
+          <div style={{ border:'1.5px dashed #d1d5db', borderRadius:'16px', padding:'14px 16px', display:'flex', alignItems:'center', justifyContent:'center' }}>
             <button onClick={() => setModalCliente({abierto:true})}
-              style={{ fontSize:'13px', color:'#6b7280', background:'none', border:'none', cursor:'pointer', fontWeight:'600' }}>
+              style={{ fontSize:'13px', color:'var(--muted)', background:'none', border:'none', cursor:'pointer', fontWeight:'600' }}>
               🏦 + Nuevo Cliente
             </button>
           </div>
@@ -231,30 +231,30 @@ const GestionUsuarios = ({ token, apiUrl, rolUsuario = 'admin' }) => {
       </div>
 
       {/* FILTROS + BOTÓN CREAR */}
-      <div style={{ display:'flex', gap:'10px', alignItems:'flex-end', flexWrap:'wrap', marginBottom:'18px', background:'#f9fafb', border:'1px solid #e5e7eb', borderRadius:'8px', padding:'12px 16px' }}>
+      <div style={{ display:'flex', gap:'10px', alignItems:'flex-end', flexWrap:'wrap', marginBottom:'18px', background:'var(--paper-100)', border:'1px solid #e5e7eb', borderRadius:'14px', padding:'12px 16px' }}>
         <div style={{ flex:1, minWidth:'160px' }}>
-          <label style={{ fontSize:'11px', fontWeight:'600', color:'#6b7280', display:'block', marginBottom:'4px' }}>Buscar</label>
+          <label style={{ fontSize:'11px', fontWeight:'600', color:'var(--muted)', display:'block', marginBottom:'4px' }}>Buscar</label>
           <input value={filtroBusq} onChange={e=>setFiltroBusq(e.target.value)} placeholder="Nombre o usuario..."
-            style={{ width:'100%', padding:'8px 10px', border:'1px solid #d1d5db', borderRadius:'6px', fontSize:'13px' }} />
+            style={{ width:'100%', padding:'8px 10px', border:'1px solid #d1d5db', borderRadius:'10px', fontSize:'13px' }} />
         </div>
         <div style={{ minWidth:'140px' }}>
-          <label style={{ fontSize:'11px', fontWeight:'600', color:'#6b7280', display:'block', marginBottom:'4px' }}>Cliente</label>
+          <label style={{ fontSize:'11px', fontWeight:'600', color:'var(--muted)', display:'block', marginBottom:'4px' }}>Cliente</label>
           <select value={filtroCliente} onChange={e=>setFiltroCliente(e.target.value)}
-            style={{ width:'100%', padding:'8px 10px', border:'1px solid #d1d5db', borderRadius:'6px', fontSize:'13px' }}>
+            style={{ width:'100%', padding:'8px 10px', border:'1px solid #d1d5db', borderRadius:'10px', fontSize:'13px' }}>
             <option value="todos">Todos</option>
             {clientes.map(c=><option key={c.id} value={c.id}>{c.nombre}</option>)}
           </select>
         </div>
         <div style={{ minWidth:'130px' }}>
-          <label style={{ fontSize:'11px', fontWeight:'600', color:'#6b7280', display:'block', marginBottom:'4px' }}>Rol</label>
+          <label style={{ fontSize:'11px', fontWeight:'600', color:'var(--muted)', display:'block', marginBottom:'4px' }}>Rol</label>
           <select value={filtroRol} onChange={e=>setFiltroRol(e.target.value)}
-            style={{ width:'100%', padding:'8px 10px', border:'1px solid #d1d5db', borderRadius:'6px', fontSize:'13px' }}>
+            style={{ width:'100%', padding:'8px 10px', border:'1px solid #d1d5db', borderRadius:'10px', fontSize:'13px' }}>
             <option value="todos">Todos</option>
             {ROLES.map(r=><option key={r} value={r}>{r}</option>)}
           </select>
         </div>
         <button onClick={abrirModalCrear}
-          style={{ padding:'9px 18px', background:'#FF462D', color:'#fff', border:'none', borderRadius:'8px', fontWeight:'700', fontSize:'13px', cursor:'pointer', whiteSpace:'nowrap' }}>
+          style={{ padding:'9px 18px', background:'var(--kyn-red)', color:'rgba(255,255,255,0.84)', border:'none', borderRadius:'14px', fontWeight:'700', fontSize:'13px', cursor:'pointer', whiteSpace:'nowrap' }}>
           ➕ Nuevo Usuario
         </button>
       </div>
@@ -278,21 +278,21 @@ const GestionUsuarios = ({ token, apiUrl, rolUsuario = 'admin' }) => {
             {usuariosFiltrados.map(u => (
               <tr key={u.usuario}>
                 <td><strong>{u.nombre}</strong></td>
-                <td style={{ fontSize:'12px', color:'#6b7280' }}>@{u.usuario}</td>
-                <td><Badge text={u.rol} color={ROL_COLORS[u.rol]||'#6b7280'} /></td>
+                <td style={{ fontSize:'12px', color:'var(--muted)' }}>@{u.usuario}</td>
+                <td><Badge text={u.rol} color={ROL_COLORS[u.rol]||'var(--muted)'} /></td>
                 <td style={{ fontSize:'12px' }}>
                   {(u.clientesIds||['bcochile']).map(cId=>(
-                    <span key={cId} style={{ display:'inline-block', marginRight:'4px', marginBottom:'2px', background:'#eff6ff', color:'#1d4ed8', fontSize:'10px', padding:'2px 6px', borderRadius:'4px' }}>
+                    <span key={cId} style={{ display:'inline-block', marginRight:'4px', marginBottom:'2px', background:'#eff6ff', color:'var(--bank-blue)', fontSize:'10px', padding:'2px 6px', borderRadius:'8px' }}>
                       {nombreCliente(cId)}
                     </span>
                   ))}
                 </td>
-                <td style={{ fontSize:'12px', color:'#6b7280' }}>{u.grupoServicioId ? nombreGrupo(u.grupoServicioId) : '—'}</td>
+                <td style={{ fontSize:'12px', color:'var(--muted)' }}>{u.grupoServicioId ? nombreGrupo(u.grupoServicioId) : '—'}</td>
                 <td style={{ fontSize:'12px' }}>{u.empresa||'Kyndryl'}</td>
                 <td>
                   <button onClick={() => toggleHaceOVT(u)}
-                    style={{ padding:'3px 10px', borderRadius:'12px', fontSize:'11px', fontWeight:'700', border:'none', cursor:'pointer',
-                      background: u.haceOVT ? '#d1fae5' : '#f3f4f6', color: u.haceOVT ? '#065f46' : '#9ca3af' }}>
+                    style={{ padding:'3px 10px', borderRadius:'16px', fontSize:'11px', fontWeight:'700', border:'none', cursor:'pointer',
+                      background: u.haceOVT ? '#d1fae5' : 'var(--paper-100)', color: u.haceOVT ? 'var(--success)' : 'var(--muted)' }}>
                     {u.haceOVT ? '✓ OVT' : 'Solo Labor'}
                   </button>
                 </td>
@@ -313,8 +313,8 @@ const GestionUsuarios = ({ token, apiUrl, rolUsuario = 'admin' }) => {
 
       {/* ── MODAL USUARIO ── */}
       {modalUser.abierto && (
-        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.4)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:9999, padding:'20px' }}>
-          <div style={{ background:'#fff', borderRadius:'14px', padding:'28px', width:'100%', maxWidth:'560px', maxHeight:'90vh', overflowY:'auto', boxShadow:'0 20px 60px rgba(0,0,0,0.3)' }}>
+        <div style={{ position:'fixed', inset:0, background:'rgba(6,24,38,0.5)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:9999, padding:'20px' }}>
+          <div style={{ background:'var(--glass-strong)', backdropFilter:'blur(22px)', borderRadius:'22px', padding:'28px', border:'1px solid rgba(255,255,255,0.72)', boxShadow:'var(--shadow-lift)', width:'100%', maxWidth:'560px', maxHeight:'90vh', overflowY:'auto', boxShadow:'var(--shadow-lift)' }}>
             <h3 style={{ marginTop:0, marginBottom:'20px' }}>
               {modalUser.modo === 'crear' ? '➕ Nuevo Usuario' : `✏️ Editar — ${modalUser.datos.nombre}`}
             </h3>
@@ -340,13 +340,13 @@ const GestionUsuarios = ({ token, apiUrl, rolUsuario = 'admin' }) => {
 
             {/* Clientes — multi-checkbox */}
             <div style={{ marginBottom:'12px' }}>
-              <label style={{ display:'block', fontSize:'12px', fontWeight:'600', color:'#6b7280', marginBottom:'8px' }}>Clientes * (puede tener acceso a más de uno)</label>
+              <label style={{ display:'block', fontSize:'12px', fontWeight:'600', color:'var(--muted)', marginBottom:'8px' }}>Clientes * (puede tener acceso a más de uno)</label>
               <div style={{ display:'flex', flexWrap:'wrap', gap:'8px' }}>
                 {clientes.map(c => {
                   const sel = (modalUser.datos.clientesIds||[]).includes(c.id);
                   return (
-                    <label key={c.id} style={{ display:'flex', alignItems:'center', gap:'6px', padding:'6px 12px', border:`1px solid ${sel?'#2563eb':'#d1d5db'}`,
-                      borderRadius:'8px', cursor:'pointer', background: sel?'#eff6ff':'#fff', fontSize:'13px' }}>
+                    <label key={c.id} style={{ display:'flex', alignItems:'center', gap:'6px', padding:'6px 12px', border:`1px solid ${sel?'var(--bank-blue)':'var(--line)'}`,
+                      borderRadius:'14px', cursor:'pointer', background: sel?'#eff6ff':'rgba(255,255,255,0.84)', fontSize:'13px' }}>
                       <input type="checkbox" checked={sel} onChange={() => {
                         const ids = modalUser.datos.clientesIds||[];
                         setModalUser(p=>({...p,datos:{...p.datos,clientesIds: sel ? ids.filter(x=>x!==c.id) : [...ids,c.id]}}));
@@ -361,10 +361,10 @@ const GestionUsuarios = ({ token, apiUrl, rolUsuario = 'admin' }) => {
             {/* Grupo de servicio */}
             {(modalUser.datos.clientesIds||[]).length > 0 && (
               <div style={{ marginBottom:'12px' }}>
-                <label style={{ display:'block', fontSize:'12px', fontWeight:'600', color:'#6b7280', marginBottom:'5px' }}>Grupo de Servicio</label>
+                <label style={{ display:'block', fontSize:'12px', fontWeight:'600', color:'var(--muted)', marginBottom:'5px' }}>Grupo de Servicio</label>
                 <select value={modalUser.datos.grupoServicioId||''}
                   onChange={e=>setModalUser(p=>({...p,datos:{...p.datos,grupoServicioId:e.target.value}}))}
-                  style={{ width:'100%', padding:'9px 12px', border:'1px solid #d1d5db', borderRadius:'8px', fontSize:'13px' }}>
+                  style={{ width:'100%', padding:'9px 12px', border:'1px solid #d1d5db', borderRadius:'14px', fontSize:'13px' }}>
                   <option value="">Sin grupo</option>
                   {(modalUser.datos.clientesIds||[]).flatMap(cId =>
                     gruposPorCliente(cId).map(g=><option key={g.id} value={g.id}>{nombreCliente(cId)} → {g.nombre}</option>)
@@ -374,23 +374,23 @@ const GestionUsuarios = ({ token, apiUrl, rolUsuario = 'admin' }) => {
             )}
 
             {/* Toggle haceOVT */}
-            <div style={{ display:'flex', alignItems:'center', gap:'12px', padding:'12px', background:'#f9fafb', borderRadius:'8px', marginBottom:'20px' }}>
+            <div style={{ display:'flex', alignItems:'center', gap:'12px', padding:'12px', background:'var(--paper-100)', borderRadius:'14px', marginBottom:'20px' }}>
               <label style={{ display:'flex', alignItems:'center', gap:'8px', cursor:'pointer', fontSize:'13px', fontWeight:'600' }}>
                 <div style={{ position:'relative', width:'38px', height:'22px', flexShrink:0 }} onClick={()=>setModalUser(p=>({...p,datos:{...p.datos,haceOVT:!p.datos.haceOVT}}))}>
-                  <div style={{ width:'38px', height:'22px', borderRadius:'11px', background: modalUser.datos.haceOVT?'#059669':'#d1d5db', transition:'background .2s' }}></div>
-                  <div style={{ position:'absolute', top:'3px', left: modalUser.datos.haceOVT?'19px':'3px', width:'16px', height:'16px', borderRadius:'50%', background:'#fff', transition:'left .2s', boxShadow:'0 1px 3px rgba(0,0,0,.2)' }}></div>
+                  <div style={{ width:'38px', height:'22px', borderRadius:'11px', background: modalUser.datos.haceOVT?'var(--success)':'var(--line)', transition:'background .2s' }}></div>
+                  <div style={{ position:'absolute', top:'3px', left: modalUser.datos.haceOVT?'19px':'3px', width:'16px', height:'16px', borderRadius:'50%', background:'rgba(255,255,255,0.84)', transition:'left .2s', boxShadow:'0 1px 3px rgba(0,0,0,.2)' }}></div>
                 </div>
                 ¿Hace OVT?
               </label>
-              <span style={{ fontSize:'12px', color:'#6b7280' }}>{modalUser.datos.haceOVT ? 'Registra horas extra en el módulo OVT' : 'Solo carga horas en Control de Labor (Claims)'}</span>
+              <span style={{ fontSize:'12px', color:'var(--muted)' }}>{modalUser.datos.haceOVT ? 'Registra horas extra en el módulo OVT' : 'Solo carga horas en Control de Labor (Claims)'}</span>
             </div>
 
             <div style={{ display:'flex', gap:'10px' }}>
-              <button onClick={guardarUsuario} style={{ flex:1, padding:'11px', background:'#FF462D', color:'#fff', border:'none', borderRadius:'8px', fontWeight:'700', fontSize:'13px', cursor:'pointer' }}>
+              <button onClick={guardarUsuario} style={{ flex:1, padding:'11px', background:'var(--kyn-red)', color:'rgba(255,255,255,0.84)', border:'none', borderRadius:'14px', fontWeight:'700', fontSize:'13px', cursor:'pointer' }}>
                 {modalUser.modo==='crear' ? '✅ Crear Usuario' : '✅ Guardar Cambios'}
               </button>
               <button onClick={()=>setModalUser({abierto:false,modo:'crear',datos:{}})}
-                style={{ flex:1, padding:'11px', background:'#f3f4f6', color:'#374151', border:'1px solid #d1d5db', borderRadius:'8px', fontWeight:'600', fontSize:'13px', cursor:'pointer' }}>
+                style={{ flex:1, padding:'11px', background:'var(--paper-100)', color:'var(--ink-800)', border:'1px solid #d1d5db', borderRadius:'14px', fontWeight:'600', fontSize:'13px', cursor:'pointer' }}>
                 Cancelar
               </button>
             </div>
@@ -400,23 +400,23 @@ const GestionUsuarios = ({ token, apiUrl, rolUsuario = 'admin' }) => {
 
       {/* ── MODAL CLIENTE ── */}
       {modalCliente.abierto && (
-        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.4)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:9999 }}>
-          <div style={{ background:'#fff', borderRadius:'14px', padding:'28px', width:'100%', maxWidth:'400px', boxShadow:'0 20px 60px rgba(0,0,0,0.3)' }}>
+        <div style={{ position:'fixed', inset:0, background:'rgba(6,24,38,0.5)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:9999 }}>
+          <div style={{ background:'var(--glass-strong)', backdropFilter:'blur(22px)', borderRadius:'22px', padding:'28px', border:'1px solid rgba(255,255,255,0.72)', boxShadow:'var(--shadow-lift)', width:'100%', maxWidth:'400px', boxShadow:'var(--shadow-lift)' }}>
             <h3 style={{ marginTop:0, marginBottom:'20px' }}>🏦 Nuevo Cliente</h3>
             <div style={{ marginBottom:'12px' }}>
-              <label style={{ display:'block', fontSize:'12px', fontWeight:'600', color:'#6b7280', marginBottom:'5px' }}>ID único (slug) *</label>
+              <label style={{ display:'block', fontSize:'12px', fontWeight:'600', color:'var(--muted)', marginBottom:'5px' }}>ID único (slug) *</label>
               <input value={nuevoClienteId} onChange={e=>setNuevoClienteId(e.target.value)} placeholder="ej: santander"
-                style={{ width:'100%', padding:'9px 12px', border:'1px solid #d1d5db', borderRadius:'8px', fontSize:'13px', boxSizing:'border-box' }} />
-              <small style={{ fontSize:'11px', color:'#9ca3af' }}>Sin espacios, solo minúsculas</small>
+                style={{ width:'100%', padding:'9px 12px', border:'1px solid #d1d5db', borderRadius:'14px', fontSize:'13px', boxSizing:'border-box' }} />
+              <small style={{ fontSize:'11px', color:'var(--muted)' }}>Sin espacios, solo minúsculas</small>
             </div>
             <div style={{ marginBottom:'20px' }}>
-              <label style={{ display:'block', fontSize:'12px', fontWeight:'600', color:'#6b7280', marginBottom:'5px' }}>Nombre *</label>
+              <label style={{ display:'block', fontSize:'12px', fontWeight:'600', color:'var(--muted)', marginBottom:'5px' }}>Nombre *</label>
               <input value={nuevoClienteNombre} onChange={e=>setNuevoClienteNombre(e.target.value)} placeholder="ej: Banco Santander"
-                style={{ width:'100%', padding:'9px 12px', border:'1px solid #d1d5db', borderRadius:'8px', fontSize:'13px', boxSizing:'border-box' }} />
+                style={{ width:'100%', padding:'9px 12px', border:'1px solid #d1d5db', borderRadius:'14px', fontSize:'13px', boxSizing:'border-box' }} />
             </div>
             <div style={{ display:'flex', gap:'10px' }}>
-              <button onClick={crearCliente} style={{ flex:1, padding:'11px', background:'#FF462D', color:'#fff', border:'none', borderRadius:'8px', fontWeight:'700', cursor:'pointer' }}>✅ Crear</button>
-              <button onClick={()=>setModalCliente({abierto:false})} style={{ flex:1, padding:'11px', background:'#f3f4f6', color:'#374151', border:'1px solid #d1d5db', borderRadius:'8px', fontWeight:'600', cursor:'pointer' }}>Cancelar</button>
+              <button onClick={crearCliente} style={{ flex:1, padding:'11px', background:'var(--kyn-red)', color:'rgba(255,255,255,0.84)', border:'none', borderRadius:'14px', fontWeight:'700', cursor:'pointer' }}>✅ Crear</button>
+              <button onClick={()=>setModalCliente({abierto:false})} style={{ flex:1, padding:'11px', background:'var(--paper-100)', color:'var(--ink-800)', border:'1px solid #d1d5db', borderRadius:'14px', fontWeight:'600', cursor:'pointer' }}>Cancelar</button>
             </div>
           </div>
         </div>
@@ -424,47 +424,47 @@ const GestionUsuarios = ({ token, apiUrl, rolUsuario = 'admin' }) => {
 
       {/* ── MODAL EDITAR GRUPO ── */}
       {modalEditGrupo.abierto && (
-        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.4)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:9999 }}>
-          <div style={{ background:'#fff', borderRadius:'14px', padding:'28px', width:'100%', maxWidth:'400px', boxShadow:'0 20px 60px rgba(0,0,0,0.3)' }}>
+        <div style={{ position:'fixed', inset:0, background:'rgba(6,24,38,0.5)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:9999 }}>
+          <div style={{ background:'var(--glass-strong)', backdropFilter:'blur(22px)', borderRadius:'22px', padding:'28px', border:'1px solid rgba(255,255,255,0.72)', boxShadow:'var(--shadow-lift)', width:'100%', maxWidth:'400px', boxShadow:'var(--shadow-lift)' }}>
             <h3 style={{ marginTop:0, marginBottom:'6px' }}>✏️ Editar Grupo</h3>
-            <p style={{ fontSize:'12px', color:'#9ca3af', marginBottom:'20px' }}>
+            <p style={{ fontSize:'12px', color:'var(--muted)', marginBottom:'20px' }}>
               Cliente: <strong>{nombreCliente(modalEditGrupo.grupo?.clienteId)}</strong>
             </p>
             <div style={{ marginBottom:'12px' }}>
-              <label style={{ display:'block', fontSize:'12px', fontWeight:'600', color:'#6b7280', marginBottom:'5px' }}>Nombre *</label>
+              <label style={{ display:'block', fontSize:'12px', fontWeight:'600', color:'var(--muted)', marginBottom:'5px' }}>Nombre *</label>
               <input value={editGrupoNombre} onChange={e=>setEditGrupoNombre(e.target.value)}
-                style={{ width:'100%', padding:'9px 12px', border:'1px solid #d1d5db', borderRadius:'8px', fontSize:'13px', boxSizing:'border-box' }} />
+                style={{ width:'100%', padding:'9px 12px', border:'1px solid #d1d5db', borderRadius:'14px', fontSize:'13px', boxSizing:'border-box' }} />
             </div>
             <div style={{ marginBottom:'20px' }}>
-              <label style={{ display:'block', fontSize:'12px', fontWeight:'600', color:'#6b7280', marginBottom:'5px' }}>Descripción</label>
+              <label style={{ display:'block', fontSize:'12px', fontWeight:'600', color:'var(--muted)', marginBottom:'5px' }}>Descripción</label>
               <input value={editGrupoDesc} onChange={e=>setEditGrupoDesc(e.target.value)}
-                style={{ width:'100%', padding:'9px 12px', border:'1px solid #d1d5db', borderRadius:'8px', fontSize:'13px', boxSizing:'border-box' }} />
+                style={{ width:'100%', padding:'9px 12px', border:'1px solid #d1d5db', borderRadius:'14px', fontSize:'13px', boxSizing:'border-box' }} />
             </div>
             <div style={{ display:'flex', gap:'10px' }}>
-              <button onClick={guardarEditGrupo} style={{ flex:1, padding:'11px', background:'#FF462D', color:'#fff', border:'none', borderRadius:'8px', fontWeight:'700', cursor:'pointer' }}>✅ Guardar</button>
-              <button onClick={()=>setModalEditGrupo({abierto:false,grupo:null})} style={{ flex:1, padding:'11px', background:'#f3f4f6', color:'#374151', border:'1px solid #d1d5db', borderRadius:'8px', fontWeight:'600', cursor:'pointer' }}>Cancelar</button>
+              <button onClick={guardarEditGrupo} style={{ flex:1, padding:'11px', background:'var(--kyn-red)', color:'rgba(255,255,255,0.84)', border:'none', borderRadius:'14px', fontWeight:'700', cursor:'pointer' }}>✅ Guardar</button>
+              <button onClick={()=>setModalEditGrupo({abierto:false,grupo:null})} style={{ flex:1, padding:'11px', background:'var(--paper-100)', color:'var(--ink-800)', border:'1px solid #d1d5db', borderRadius:'14px', fontWeight:'600', cursor:'pointer' }}>Cancelar</button>
             </div>
           </div>
         </div>
       )}
       {modalGrupo.abierto && (
-        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.4)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:9999 }}>
-          <div style={{ background:'#fff', borderRadius:'14px', padding:'28px', width:'100%', maxWidth:'400px', boxShadow:'0 20px 60px rgba(0,0,0,0.3)' }}>
+        <div style={{ position:'fixed', inset:0, background:'rgba(6,24,38,0.5)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:9999 }}>
+          <div style={{ background:'var(--glass-strong)', backdropFilter:'blur(22px)', borderRadius:'22px', padding:'28px', border:'1px solid rgba(255,255,255,0.72)', boxShadow:'var(--shadow-lift)', width:'100%', maxWidth:'400px', boxShadow:'var(--shadow-lift)' }}>
             <h3 style={{ marginTop:0, marginBottom:'6px' }}>📂 Nuevo Grupo de Servicio</h3>
-            <p style={{ fontSize:'12px', color:'#9ca3af', marginBottom:'20px' }}>Cliente: <strong>{nombreCliente(modalGrupo.clienteId)}</strong></p>
+            <p style={{ fontSize:'12px', color:'var(--muted)', marginBottom:'20px' }}>Cliente: <strong>{nombreCliente(modalGrupo.clienteId)}</strong></p>
             <div style={{ marginBottom:'12px' }}>
-              <label style={{ display:'block', fontSize:'12px', fontWeight:'600', color:'#6b7280', marginBottom:'5px' }}>Nombre *</label>
+              <label style={{ display:'block', fontSize:'12px', fontWeight:'600', color:'var(--muted)', marginBottom:'5px' }}>Nombre *</label>
               <input value={nuevoGrupoNombre} onChange={e=>setNuevoGrupoNombre(e.target.value)} placeholder="ej: Middleware"
-                style={{ width:'100%', padding:'9px 12px', border:'1px solid #d1d5db', borderRadius:'8px', fontSize:'13px', boxSizing:'border-box' }} />
+                style={{ width:'100%', padding:'9px 12px', border:'1px solid #d1d5db', borderRadius:'14px', fontSize:'13px', boxSizing:'border-box' }} />
             </div>
             <div style={{ marginBottom:'20px' }}>
-              <label style={{ display:'block', fontSize:'12px', fontWeight:'600', color:'#6b7280', marginBottom:'5px' }}>Descripción</label>
+              <label style={{ display:'block', fontSize:'12px', fontWeight:'600', color:'var(--muted)', marginBottom:'5px' }}>Descripción</label>
               <input value={nuevoGrupoDesc} onChange={e=>setNuevoGrupoDesc(e.target.value)} placeholder="Descripción opcional"
-                style={{ width:'100%', padding:'9px 12px', border:'1px solid #d1d5db', borderRadius:'8px', fontSize:'13px', boxSizing:'border-box' }} />
+                style={{ width:'100%', padding:'9px 12px', border:'1px solid #d1d5db', borderRadius:'14px', fontSize:'13px', boxSizing:'border-box' }} />
             </div>
             <div style={{ display:'flex', gap:'10px' }}>
-              <button onClick={crearGrupo} style={{ flex:1, padding:'11px', background:'#FF462D', color:'#fff', border:'none', borderRadius:'8px', fontWeight:'700', cursor:'pointer' }}>✅ Crear</button>
-              <button onClick={()=>setModalGrupo({abierto:false, clienteId:''})} style={{ flex:1, padding:'11px', background:'#f3f4f6', color:'#374151', border:'1px solid #d1d5db', borderRadius:'8px', fontWeight:'600', cursor:'pointer' }}>Cancelar</button>
+              <button onClick={crearGrupo} style={{ flex:1, padding:'11px', background:'var(--kyn-red)', color:'rgba(255,255,255,0.84)', border:'none', borderRadius:'14px', fontWeight:'700', cursor:'pointer' }}>✅ Crear</button>
+              <button onClick={()=>setModalGrupo({abierto:false, clienteId:''})} style={{ flex:1, padding:'11px', background:'var(--paper-100)', color:'var(--ink-800)', border:'1px solid #d1d5db', borderRadius:'14px', fontWeight:'600', cursor:'pointer' }}>Cancelar</button>
             </div>
           </div>
         </div>

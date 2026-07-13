@@ -221,26 +221,38 @@ function App() {
     }
   }, [token, usuario.rol]);
 
-  // Cerrar dropdown de cliente al hacer click fuera del sidebar
+  // ── Dropdown de cliente: cerrar al click fuera usando ref ──────────────
+  const dropdownRef = React.useRef(null);
   useEffect(() => {
     if (!dropdownClienteAbierto) return;
-    const handler = () => setDropdownClienteAbierto(false);
-    document.addEventListener('click', handler, true);
-    return () => document.removeEventListener('click', handler, true);
+    const handler = (e) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+        setDropdownClienteAbierto(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
   }, [dropdownClienteAbierto]);
 
-  // ── RECARGAR DATOS al cambiar clienteActivo ──────────────────────────────
-  // useEffect dedicado para que el cambio de cliente siempre dispare la recarga
-  const clienteActivoPrev = React.useRef(clienteActivo);
-  useEffect(() => {
-    if (!token || !clienteActivo) return;
-    if (clienteActivoPrev.current === clienteActivo) return;
-    clienteActivoPrev.current = clienteActivo;
-    // Recargar registros con el nuevo cliente
-    cargarRegistros();
-    cargarDashboard();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [clienteActivo, token]);
+  // ── Función de cambio de cliente — llama la API directamente con el nuevo ID ──
+  const cambiarCliente = React.useCallback(async (nuevoClienteId) => {
+    setClienteActivo(nuevoClienteId);
+    localStorage.setItem('clienteActivo', nuevoClienteId);
+    setRegistros([]);
+    setVista('dashboard');
+    setDropdownClienteAbierto(false);
+    // Llamada directa pasando el nuevo ID para no depender del estado que aún no actualizó
+    try {
+      const headers = buildHeaders(token, nuevoClienteId);
+      const [resReg] = await Promise.all([
+        axios.get(`${API_URL}/api/registros`, { headers }),
+        axios.get(`${API_URL}/api/dashboard/resumen`, { headers }).catch(() => null),
+      ]);
+      setRegistros(resReg.data || []);
+    } catch (err) {
+      console.error('Error al cambiar cliente:', err.message);
+    }
+  }, [token]);
 
   // Efecto inicial
   useEffect(() => {
@@ -770,10 +782,8 @@ function App() {
             {clientesDpe.map(c => (
               <button key={c.id} type="button"
                 onClick={() => {
-                  setClienteActivo(c.id);
-                  localStorage.setItem('clienteActivo', c.id);
                   setSeleccionandoCliente(false);
-                  setVista('dashboard');
+                  cambiarCliente(c.id);
                 }}
                 style={{ padding:'14px 16px', background:'rgba(255,255,255,0.72)', border:'1px solid rgba(18,52,78,0.13)',
                   borderRadius:'16px', cursor:'pointer', textAlign:'left', fontSize:'14px', fontWeight:'700',
@@ -852,7 +862,7 @@ function App() {
             const clienteNombre = clientesDisponibles.find(c => c.id === clienteActivo)?.nombre || clienteActivo;
             const tieneVarios = clientesDisponibles.length > 1;
             return (
-              <div style={{ position:'relative' }}>
+              <div style={{ position:'relative' }} ref={dropdownRef}>
                 <button
                   onClick={() => tieneVarios && setDropdownClienteAbierto(prev => !prev)}
                   style={{
@@ -883,11 +893,7 @@ function App() {
                       <button key={c.id}
                         onClick={e => {
                           e.stopPropagation();
-                          setClienteActivo(c.id);
-                          localStorage.setItem('clienteActivo', c.id);
-                          setRegistros([]);
-                          setVista('dashboard');
-                          setDropdownClienteAbierto(false);
+                          cambiarCliente(c.id);
                         }}
                         style={{
                           display:'flex', alignItems:'center', gap:'8px', width:'100%',
@@ -1412,7 +1418,7 @@ function App() {
             </div>
 
             {/* Tabla pendientes */}
-            <div className="seccion" style={{ marginBottom:'16px' }}>
+            <div className="seccion">
               <div className="panel-toolbar">
                 <div>
                   <p className="panel-label">Aprobaciones</p>
@@ -1473,9 +1479,9 @@ function App() {
             </div>
 
             {/* Tablas complementarias */}
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'16px', marginBottom:'16px' }}>
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(340px,1fr))', gap:'16px', marginBottom:'16px' }}>
               {datosEspecialidad.length > 0 && (
-                <div className="seccion" style={{ marginBottom:0 }}>
+                <div className="seccion" style={{ marginBottom:'16px' }}>
                   <p className="panel-label">Distribución</p>
                   <h2>Horas por especialidad</h2>
                   <table className="tabla">
@@ -1489,7 +1495,7 @@ function App() {
                 </div>
               )}
               {datosEspecialista.length > 0 && (
-                <div className="seccion" style={{ marginBottom:0 }}>
+                <div className="seccion" style={{ marginBottom:'16px' }}>
                   <p className="panel-label">Top especialistas</p>
                   <h2>Por horas aprobadas</h2>
                   <table className="tabla">

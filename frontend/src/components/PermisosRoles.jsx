@@ -19,11 +19,11 @@ const VISTAS = [
 ];
 
 const ROLES = [
-  { id:'admin',        label:'admin',        color:'#dc2626', bg:'#fee2e2' },
-  { id:'dpe',          label:'dpe',          color:'#2563eb', bg:'#eff6ff' },
+  { id:'admin',        label:'admin',        color:'var(--danger)', bg:'#fee2e2' },
+  { id:'dpe',          label:'dpe',          color:'var(--bank-blue)', bg:'#eff6ff' },
   { id:'teamleader',   label:'teamleader',   color:'#7c3aed', bg:'#ede9fe' },
   { id:'especialista', label:'especialista', color:'#d97706', bg:'#fef3c7' },
-  { id:'itsm',         label:'itsm',         color:'#059669', bg:'#d1fae5' },
+  { id:'itsm',         label:'itsm',         color:'var(--success)', bg:'#d1fae5' },
 ];
 
 const GRUPOS = ['Admin/DPE','Especialista','ITSM'];
@@ -43,13 +43,13 @@ const Toggle = ({ activo, disabled, onChange }) => (
     role="switch"
     style={{
       width:'38px', height:'22px', borderRadius:'11px', border:'none', cursor: disabled ? 'not-allowed' : 'pointer',
-      background: disabled ? '#e5e7eb' : activo ? '#059669' : '#d1d5db',
+      background: disabled ? 'var(--line)' : activo ? 'var(--success)' : 'var(--line)',
       position:'relative', transition:'background .15s', flexShrink:0, opacity: disabled ? 0.5 : 1
     }}
   >
     <span style={{
       position:'absolute', top:'3px', left: activo ? '19px' : '3px',
-      width:'16px', height:'16px', borderRadius:'50%', background:'#fff',
+      width:'16px', height:'16px', borderRadius:'50%', background:'rgba(255,255,255,0.84)',
       transition:'left .15s', boxShadow:'0 1px 3px rgba(0,0,0,.2)', display:'block'
     }} />
   </button>
@@ -110,17 +110,17 @@ const PermisosRoles = ({ token, apiUrl }) => {
     setMensaje(null);
   };
 
-  if (loading) return <section className="seccion"><p style={{textAlign:'center',color:'#9ca3af',padding:'40px'}}>⏳ Cargando permisos...</p></section>;
+  if (loading) return <section className="seccion"><p style={{textAlign:'center',color:'var(--muted)',padding:'40px'}}>⏳ Cargando permisos...</p></section>;
 
   return (
     <section className="seccion">
       <h2>🔐 Permisos de Roles</h2>
-      <p style={{fontSize:'13px',color:'#6b7280',marginBottom:'20px',marginTop:'-10px'}}>
+      <p style={{fontSize:'13px',color:'var(--muted)',marginBottom:'20px',marginTop:'-10px'}}>
         Define qué módulos ve cada rol. Los cambios se aplican en el próximo inicio de sesión.
       </p>
 
       {/* Info admin */}
-      <div style={{background:'#eff6ff',border:'1px solid #bfdbfe',borderRadius:'8px',padding:'10px 14px',fontSize:'12px',color:'#1e40af',marginBottom:'20px',display:'flex',gap:'8px'}}>
+      <div style={{background:'#eff6ff',border:'1px solid #bfdbfe',borderRadius:'14px',padding:'10px 14px',fontSize:'12px',color:'#1e40af',marginBottom:'20px',display:'flex',gap:'8px'}}>
         <span>ℹ️</span>
         <span>El rol <strong>admin</strong> siempre tiene acceso a todo y no puede ser restringido.</span>
       </div>
@@ -129,8 +129,8 @@ const PermisosRoles = ({ token, apiUrl }) => {
       <div style={{display:'flex',gap:'8px',marginBottom:'16px',flexWrap:'wrap'}}>
         {ROLES.filter(r=>r.id!=='admin').map(r => (
           <div key={r.id} style={{display:'flex',gap:'4px',alignItems:'center'}}>
-            <span style={{fontSize:'11px',color:'#6b7280'}}>
-              <span style={{background:r.bg,color:r.color,padding:'2px 8px',borderRadius:'4px',fontWeight:'600',fontSize:'11px'}}>{r.label}</span>
+            <span style={{fontSize:'11px',color:'var(--muted)'}}>
+              <span style={{background:r.bg,color:r.color,padding:'2px 8px',borderRadius:'8px',fontWeight:'600',fontSize:'11px'}}>{r.label}</span>
             </span>
             <button onClick={() => {
               const todas = VISTAS.every(v => permisos[r.id]?.[v.id]);
@@ -138,12 +138,12 @@ const PermisosRoles = ({ token, apiUrl }) => {
               VISTAS.forEach(v => { nuevo[v.id] = !todas; });
               setPermisos(prev => ({ ...prev, [r.id]: { ...prev[r.id], ...nuevo } }));
               setDirty(true);
-            }} style={{fontSize:'10px',padding:'2px 7px',background:'#f3f4f6',border:'1px solid #e5e7eb',borderRadius:'4px',cursor:'pointer',color:'#374151'}}>
+            }} style={{fontSize:'10px',padding:'2px 7px',background:'var(--paper-100)',border:'1px solid #e5e7eb',borderRadius:'8px',cursor:'pointer',color:'var(--ink-800)'}}>
               {VISTAS.every(v => permisos[r.id]?.[v.id]) ? 'Desactivar todo' : 'Activar todo'}
             </button>
           </div>
         ))}
-        <button onClick={resetear} style={{fontSize:'10px',padding:'2px 10px',background:'none',border:'1px solid #e5e7eb',borderRadius:'4px',cursor:'pointer',color:'#9ca3af',marginLeft:'auto'}}>
+        <button onClick={resetear} style={{fontSize:'10px',padding:'2px 10px',background:'none',border:'1px solid #e5e7eb',borderRadius:'8px',cursor:'pointer',color:'var(--muted)',marginLeft:'auto'}}>
           🔄 Restaurar defaults
         </button>
       </div>
@@ -152,11 +152,11 @@ const PermisosRoles = ({ token, apiUrl }) => {
       <div className="tabla-responsive">
         <table style={{width:'100%',borderCollapse:'collapse',minWidth:'600px'}}>
           <thead>
-            <tr style={{background:'#f9fafb',borderBottom:'2px solid #e5e7eb'}}>
-              <th style={{padding:'12px 14px',textAlign:'left',fontSize:'11px',fontWeight:'700',color:'#6b7280',textTransform:'uppercase',letterSpacing:'.4px',minWidth:'200px'}}>Vista / Módulo</th>
+            <tr style={{background:'var(--paper-100)',borderBottom:'2px solid #e5e7eb'}}>
+              <th style={{padding:'12px 14px',textAlign:'left',fontSize:'11px',fontWeight:'700',color:'var(--muted)',textTransform:'uppercase',letterSpacing:'.4px',minWidth:'200px'}}>Vista / Módulo</th>
               {ROLES.map(r => (
                 <th key={r.id} style={{padding:'12px 14px',textAlign:'center',fontSize:'11px',fontWeight:'700',minWidth:'100px'}}>
-                  <span style={{background:r.bg,color:r.color,padding:'3px 10px',borderRadius:'12px',fontSize:'11px',fontWeight:'700'}}>
+                  <span style={{background:r.bg,color:r.color,padding:'3px 10px',borderRadius:'16px',fontSize:'11px',fontWeight:'700'}}>
                     {r.label}
                   </span>
                 </th>
@@ -169,15 +169,15 @@ const PermisosRoles = ({ token, apiUrl }) => {
               return (
                 <React.Fragment key={grupo}>
                   <tr>
-                    <td colSpan={ROLES.length + 1} style={{padding:'8px 14px',background:'#f3f4f6',fontSize:'11px',fontWeight:'700',color:'#374151',textTransform:'uppercase',letterSpacing:'.5px',borderBottom:'1px solid #e5e7eb'}}>
+                    <td colSpan={ROLES.length + 1} style={{padding:'8px 14px',background:'var(--paper-100)',fontSize:'11px',fontWeight:'700',color:'var(--ink-800)',textTransform:'uppercase',letterSpacing:'.5px',borderBottom:'1px solid #e5e7eb'}}>
                       {grupo}
                     </td>
                   </tr>
                   {vistasGrupo.map(v => (
                     <tr key={v.id} style={{borderBottom:'1px solid #f3f4f6'}}>
                       <td style={{padding:'12px 14px',verticalAlign:'middle'}}>
-                        <div style={{fontWeight:'600',fontSize:'13px',color:'#111827'}}>{v.label}</div>
-                        <div style={{fontSize:'11px',color:'#9ca3af',marginTop:'2px'}}>{v.desc}</div>
+                        <div style={{fontWeight:'600',fontSize:'13px',color:'var(--ink-950)'}}>{v.label}</div>
+                        <div style={{fontSize:'11px',color:'var(--muted)',marginTop:'2px'}}>{v.desc}</div>
                       </td>
                       {ROLES.map(r => (
                         <td key={r.id} style={{padding:'12px 14px',textAlign:'center',verticalAlign:'middle'}}>
@@ -202,9 +202,9 @@ const PermisosRoles = ({ token, apiUrl }) => {
       {/* Mensaje y botones */}
       {mensaje && (
         <div style={{
-          marginTop:'16px', padding:'10px 14px', borderRadius:'8px', fontSize:'13px',
+          marginTop:'16px', padding:'10px 14px', borderRadius:'14px', fontSize:'13px',
           background: mensaje.tipo==='ok' ? '#d1fae5' : '#fee2e2',
-          color: mensaje.tipo==='ok' ? '#065f46' : '#991b1b',
+          color: mensaje.tipo==='ok' ? 'var(--success)' : '#991b1b',
           border: `1px solid ${mensaje.tipo==='ok' ? '#a7f3d0' : '#fca5a5'}`
         }}>
           {mensaje.texto}
@@ -216,8 +216,8 @@ const PermisosRoles = ({ token, apiUrl }) => {
           onClick={guardar}
           disabled={!dirty || guardando}
           style={{
-            padding:'11px 24px', background: (!dirty||guardando) ? '#d1d5db' : '#FF462D',
-            color:'#fff', border:'none', borderRadius:'8px', fontWeight:'700', fontSize:'13px',
+            padding:'11px 24px', background: (!dirty||guardando) ? 'var(--line)' : 'var(--kyn-red)',
+            color:'rgba(255,255,255,0.84)', border:'none', borderRadius:'14px', fontWeight:'700', fontSize:'13px',
             cursor: (!dirty||guardando) ? 'not-allowed' : 'pointer', transition:'background .2s'
           }}
         >

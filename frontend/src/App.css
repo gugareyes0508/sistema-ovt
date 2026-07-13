@@ -223,6 +223,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   min-height: 100vh;
   display: grid;
   grid-template-columns: 240px minmax(0, 1fr);
+  overflow-x: hidden;
   position: relative;
   z-index: 1;
 }
@@ -381,7 +382,8 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 main, .main {
   min-width: 0;
   padding: 24px 28px;
-  overflow: auto;
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
 /* Topbar de cada página */
@@ -508,7 +510,7 @@ main, .main {
 
 .seccion, .panel {
   border: 1px solid rgba(255,255,255,0.72);
-  border-radius: 24px;
+  border-radius: 20px;
   background: var(--glass);
   box-shadow: var(--shadow-soft);
   backdrop-filter: blur(18px);
@@ -686,13 +688,12 @@ input[type="text"], input[type="password"], input[type="date"], input[type="time
    TABLAS
    ============================================================ */
 
-.tabla-responsive { overflow-x: auto; -webkit-overflow-scrolling: touch; width: 100%; }
+.tabla-responsive { overflow-x: auto; -webkit-overflow-scrolling: touch; width: 100%; min-width: 0; }
 
 .tabla {
   width: 100%;
   border-collapse: collapse;
   font-size: 13px;
-  min-width: 580px;
 }
 .tabla thead { background: rgba(238,245,248,0.8); }
 .tabla th {
