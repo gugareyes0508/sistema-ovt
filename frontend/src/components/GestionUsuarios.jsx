@@ -325,8 +325,8 @@ const GestionUsuarios = ({ token, apiUrl, rolUsuario = 'admin' }) => {
 
       {/* ── MODAL USUARIO ── */}
       {modalUser.abierto && (
-        <div style={{ position:'fixed', inset:0, background:'rgba(6,24,38,0.5)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:9999, padding:'20px' }}>
-          <div style={{ background:'var(--glass-strong)', backdropFilter:'blur(22px)', borderRadius:'22px', padding:'28px', border:'1px solid rgba(255,255,255,0.72)', width:'100%', maxWidth:'560px', maxHeight:'90vh', overflowY:'auto', boxShadow:'var(--shadow-lift)' }}>
+        <div style={{ position:'fixed', inset:0, background:'rgba(6,24,38,0.5)', display:'flex', alignItems:'flex-start', justifyContent:'center', zIndex:9999, padding:'20px', overflowY:'auto' }}>
+          <div style={{ background:'var(--glass-strong)', backdropFilter:'blur(22px)', borderRadius:'22px', padding:'28px', border:'1px solid rgba(255,255,255,0.72)', width:'100%', maxWidth:'560px', marginTop:'40px', boxShadow:'var(--shadow-lift)' }}>
             <h3 style={{ marginTop:0, marginBottom:'20px' }}>
               {modalUser.modo === 'crear' ? '➕ Nuevo Usuario' : `✏️ Editar — ${modalUser.datos.nombre}`}
             </h3>
