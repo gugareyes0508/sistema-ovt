@@ -360,19 +360,22 @@ const ClaimDashboard = ({ token, apiUrl, clienteActivo = '' }) => {
 
   useEffect(() => { cargarDatos(); }, [cargarDatos]);
 
-  // Cargar usuarios y grupos para cruce por grupo
+  // Cargar usuarios y grupos para cruce por grupo (filtrado por cliente activo,
+  // si no, "grupos configurados" y el cruce de personas mezclan datos de otros clientes)
   useEffect(() => {
     if (!token) return;
     const h = { Authorization: `Bearer ${token}` };
+    if (clienteActivo) h['x-cliente-activo'] = clienteActivo;
     Promise.all([
       axios.get(`${apiUrl}/api/admin/listar-usuarios`, { headers: h }),
-      axios.get(`${apiUrl}/api/grupos-servicio`, { headers: h })
+      axios.get(`${apiUrl}/api/grupos-servicio`, { headers: h, params: clienteActivo ? { clienteId: clienteActivo } : {} })
     ]).then(([resU, resG]) => {
       setUsuariosFS(resU.data.usuarios || []);
       setGruposFS(resG.data || []);
     }).catch(() => {});
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token, apiUrl]);
+  }, [token, apiUrl, clienteActivo]);
+
 
   // ── procesar Excel y subir a Firestore ──
   const procesarExcel = async (file) => {
@@ -475,10 +478,14 @@ const ClaimDashboard = ({ token, apiUrl, clienteActivo = '' }) => {
 
   todasPersonasExcel.forEach(empName => {
     const userMatch = matchearNombre(empName, usuariosFS);
-    if (userMatch && userMatch.grupoServicioId) {
+    // Usar el grupo asignado para EL CLIENTE ACTIVO (un usuario puede tener
+    // grupos distintos en cada cliente). Si el usuario aún no tiene el mapa
+    // gruposPorCliente (dato legacy), se cae al grupoServicioId viejo.
+    const grupoId = userMatch?.gruposPorCliente?.[clienteActivo] || userMatch?.grupoServicioId || '';
+    if (userMatch && grupoId) {
       gruposPorPersona[empName] = {
-        grupoId: userMatch.grupoServicioId,
-        grupoNombre: mapaGrupos[userMatch.grupoServicioId] || userMatch.grupoServicioId,
+        grupoId,
+        grupoNombre: mapaGrupos[grupoId] || grupoId,
         matched: true
       };
     } else {
