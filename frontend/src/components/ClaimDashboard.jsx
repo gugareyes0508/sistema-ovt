@@ -536,14 +536,6 @@ const ClaimDashboard = ({ token, apiUrl, clienteActivo = '' }) => {
   }));
   const wbsOrdenado = Object.entries(wbsTotal).sort((a,b) => b[1].horas - a[1].horas);
 
-  // Agregación Offering
-  const offTotal = {};
-  filtradas.forEach(s => Object.entries(s.offering||{}).forEach(([k,v]) => {
-    if (!offTotal[k]) offTotal[k] = { horas:0, costo:0 };
-    offTotal[k].horas += v.horas; offTotal[k].costo += v.costo;
-  }));
-  const offOrdenado = Object.entries(offTotal).sort((a,b) => b[1].horas - a[1].horas);
-
   // Agregación Manager (FUNC_MGR_EMAIL) — se muestra el nombre formateado a
   // partir del prefijo del correo, ej. "sergio.zuniga@kyndryl.com" → "Sergio Zuniga"
   const formatManager = (email) => {
