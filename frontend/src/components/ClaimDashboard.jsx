@@ -208,7 +208,7 @@ const GrupoTab = ({ grupoOrdenado, gruposPorPersona, filtradas, totalH, gruposFS
         <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: '10px', padding: '16px 18px' }}>
           <h4 style={{ margin: '0 0 4px', fontSize: '13px', fontWeight: '600' }}>Tendencia semanal — horas y costo</h4>
           <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '12px' }}>
-            {gruposPorCosto.slice(0, 6).map(([nombre], i) => {
+            {gruposPorCosto.slice(0, 10).map(([nombre], i) => {
               const color = nombre === 'Sin grupo asignado' ? COLOR_SIN_GRUPO : COLORES_GRUPO[i % COLORES_GRUPO.length];
               return (
                 <button key={nombre} onClick={() => setGrupoSel(i)}
