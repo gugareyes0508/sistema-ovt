@@ -91,27 +91,33 @@ const chartBase = { responsive:true, maintainAspectRatio:false, plugins:{ legend
 // ─── componente principal ─────────────────────────────────────────────────
 // ─── Sub-componente: Tab Por Grupo ───────────────────────────────────────────
 const GrupoTab = ({ grupoOrdenado, gruposPorPersona, filtradas, totalH, gruposFS, todasPersonasExcel, sinGrupo, sinGrupoConHoras, COLORES_GRUPO, COLOR_SIN_GRUPO, fmt, fmtK, KPI }) => {
-  const [grupoSel, setGrupoSel] = React.useState(0);
   const [detalleGrupo, setDetalleGrupo] = React.useState(null);
+  const [gruposActivos, setGruposActivos] = React.useState(null); // se inicializa con el top al calcular gruposPorCosto
+  const [puntoDetalle, setPuntoDetalle] = React.useState(null); // { grupoNombre, semanaLabel, semanaIdx }
 
   // Ordenar por costo descendente
   const gruposPorCosto = [...grupoOrdenado].sort((a, b) => b[1].costo - a[1].costo);
   const maxCosto = gruposPorCosto[0]?.[1].costo || 1;
+  const top10Grupos = gruposPorCosto.slice(0, 10);
 
-  // Datos del grupo seleccionado para el chart dual
-  const grupoActual = gruposPorCosto[grupoSel];
-  const colorActual = grupoActual ? (grupoActual[0] === 'Sin grupo asignado' ? COLOR_SIN_GRUPO : COLORES_GRUPO[grupoSel % COLORES_GRUPO.length]) : '#2a78d6';
+  // Por defecto, solo el grupo top queda activo en el gráfico de tendencia
+  React.useEffect(() => {
+    if (gruposActivos === null && top10Grupos.length > 0) {
+      setGruposActivos(new Set([top10Grupos[0][0]]));
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [top10Grupos.length]);
+
+  const toggleGrupoActivo = (nombre) => {
+    setGruposActivos(prev => {
+      const next = new Set(prev);
+      if (next.has(nombre)) next.delete(nombre); else next.add(nombre);
+      return next;
+    });
+    setPuntoDetalle(null);
+  };
 
   const semanasLabels = filtradas.map(s => s.label);
-
-  const horasPorSemana = filtradas.map(s =>
-    Object.entries(s.personas || {}).reduce((sum, [emp, datos]) =>
-      gruposPorPersona[emp]?.grupoNombre === grupoActual?.[0] ? sum + (datos.horas || 0) : sum, 0)
-  );
-  const costoPorSemana = filtradas.map(s =>
-    Object.entries(s.personas || {}).reduce((sum, [emp, datos]) =>
-      gruposPorPersona[emp]?.grupoNombre === grupoActual?.[0] ? sum + (datos.costo || 0) : sum, 0)
-  );
 
   // Personas del grupo para el panel detalle
   const personasDelGrupo = (nombreGrupo) => {
@@ -128,43 +134,68 @@ const GrupoTab = ({ grupoOrdenado, gruposPorPersona, filtradas, totalH, gruposFS
     return Object.entries(personas).sort((a, b) => b[1].costo - a[1].costo);
   };
 
+  // Personas de un grupo en UNA semana específica (para el clic en el punto del gráfico)
+  const personasDelGrupoEnSemana = (nombreGrupo, semanaIdx) => {
+    const s = filtradas[semanaIdx];
+    if (!s) return [];
+    const personas = [];
+    Object.entries(s.personas || {}).forEach(([emp, datos]) => {
+      if (gruposPorPersona[emp]?.grupoNombre === nombreGrupo) {
+        personas.push([emp, datos]);
+      }
+    });
+    return personas.sort((a, b) => b[1].horas - a[1].horas);
+  };
+
   const chartRef = React.useRef(null);
   const chartInstance = React.useRef(null);
 
   React.useEffect(() => {
-    if (!chartRef.current || semanasLabels.length === 0) return;
+    if (!chartRef.current || semanasLabels.length === 0 || !gruposActivos) return;
     if (chartInstance.current) chartInstance.current.destroy();
+
+    const datasets = top10Grupos
+      .filter(([nombre]) => gruposActivos.has(nombre))
+      .map(([nombre], _i) => {
+        const idxColor = top10Grupos.findIndex(([n]) => n === nombre);
+        const color = nombre === 'Sin grupo asignado' ? COLOR_SIN_GRUPO : COLORES_GRUPO[idxColor % COLORES_GRUPO.length];
+        const horasPorSemana = filtradas.map(s =>
+          Object.entries(s.personas || {}).reduce((sum, [emp, datos]) =>
+            gruposPorPersona[emp]?.grupoNombre === nombre ? sum + (datos.horas || 0) : sum, 0)
+        );
+        return {
+          label: nombre, data: horasPorSemana,
+          borderColor: color, backgroundColor: color,
+          borderWidth: 2, tension: 0.3, fill: false,
+          pointRadius: 5, pointHoverRadius: 7, pointBackgroundColor: color, pointBorderColor: '#fff', pointBorderWidth: 2
+        };
+      });
+
     chartInstance.current = new ChartJS(chartRef.current, {
-      type: 'bar',
-      data: {
-        labels: semanasLabels,
-        datasets: [
-          {
-            label: 'Horas', type: 'bar', data: horasPorSemana,
-            backgroundColor: colorActual + 'AA', borderColor: colorActual, borderWidth: 1, yAxisID: 'y'
-          },
-          {
-            label: 'Costo USD', type: 'line', data: costoPorSemana,
-            borderColor: '#e24b4a', backgroundColor: 'transparent',
-            borderWidth: 2.5, tension: 0.3, fill: false,
-            pointRadius: 5, pointBackgroundColor: '#e24b4a', pointBorderColor: '#fff', pointBorderWidth: 2,
-            yAxisID: 'y2'
-          }
-        ]
-      },
+      type: 'line',
+      data: { labels: semanasLabels, datasets },
       options: {
         responsive: true, maintainAspectRatio: false,
-        plugins: { legend: { display: false }, tooltip: { mode: 'index', intersect: false } },
+        onClick: (evt, elements) => {
+          if (!elements.length) return;
+          const el = elements[0];
+          const dataset = datasets[el.datasetIndex];
+          setPuntoDetalle({ grupoNombre: dataset.label, semanaLabel: semanasLabels[el.index], semanaIdx: el.index });
+        },
+        onHover: (evt, elements) => { evt.native.target.style.cursor = elements.length ? 'pointer' : 'default'; },
+        plugins: {
+          legend: { display: datasets.length > 1, position: 'bottom', labels: { font: { size: 10 }, boxWidth: 10, padding: 10 } },
+          tooltip: { mode: 'index', intersect: false, callbacks: { label: ctx => `${ctx.dataset.label}: ${fmt(ctx.parsed.y)}h` } }
+        },
         scales: {
           x: { ticks: { font: { size: 9 }, color: '#888', maxRotation: 45, autoSkip: false }, grid: { display: false } },
-          y: { position: 'left', beginAtZero: true, ticks: { font: { size: 9 }, color: '#888', callback: v => v + 'h' }, grid: { color: 'rgba(128,128,128,0.12)' } },
-          y2: { position: 'right', beginAtZero: true, ticks: { font: { size: 9 }, color: '#e24b4a', callback: v => '$' + Math.round(v / 1000) + 'K' }, grid: { display: false } }
+          y: { beginAtZero: true, ticks: { font: { size: 9 }, color: '#888', callback: v => v + 'h' }, grid: { color: 'rgba(128,128,128,0.12)' } }
         }
       }
     });
     return () => { if (chartInstance.current) chartInstance.current.destroy(); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [grupoSel, filtradas.length]);
+  }, [gruposActivos, filtradas.length]);
 
   return (
     <div>
@@ -206,16 +237,18 @@ const GrupoTab = ({ grupoOrdenado, gruposPorPersona, filtradas, totalH, gruposFS
 
         {/* Gráfico dual — barras horas + línea costo */}
         <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: '10px', padding: '16px 18px' }}>
-          <h4 style={{ margin: '0 0 4px', fontSize: '13px', fontWeight: '600' }}>Tendencia semanal — horas y costo</h4>
+          <h4 style={{ margin: '0 0 4px', fontSize: '13px', fontWeight: '600' }}>Tendencia semanal por grupo</h4>
+          <p style={{ fontSize: '11px', color: 'var(--muted)', margin: '0 0 10px' }}>Prende/apaga grupos para comparar · haz clic en un punto para ver los especialistas de esa semana</p>
           <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '12px' }}>
-            {gruposPorCosto.slice(0, 10).map(([nombre], i) => {
+            {top10Grupos.map(([nombre], i) => {
               const color = nombre === 'Sin grupo asignado' ? COLOR_SIN_GRUPO : COLORES_GRUPO[i % COLORES_GRUPO.length];
+              const activo = gruposActivos && gruposActivos.has(nombre);
               return (
-                <button key={nombre} onClick={() => setGrupoSel(i)}
-                  style={{ fontSize: '10px', padding: '3px 9px', borderRadius: '12px', border: 'none', cursor: 'pointer',
-                    background: grupoSel === i ? color : '#f3f4f6',
-                    color: grupoSel === i ? '#fff' : 'var(--muted)',
-                    fontWeight: grupoSel === i ? '700' : '400' }}>
+                <button key={nombre} onClick={() => toggleGrupoActivo(nombre)}
+                  style={{ fontSize: '10px', padding: '4px 10px', borderRadius: '12px', border: 'none', cursor: 'pointer', display:'flex', alignItems:'center', gap:'5px',
+                    background: activo ? '#fff' : '#f3f4f6', boxShadow: activo ? '0 1px 4px rgba(0,0,0,0.12)' : 'none',
+                    color: activo ? 'var(--ink-950)' : 'var(--muted)', fontWeight: activo ? '700' : '400' }}>
+                  <span style={{ width:'8px', height:'8px', borderRadius:'50%', background: activo ? color : '#c3c9ce', display:'inline-block' }}></span>
                   {nombre.length > 14 ? nombre.slice(0, 14) + '…' : nombre}
                 </button>
               );
@@ -224,14 +257,29 @@ const GrupoTab = ({ grupoOrdenado, gruposPorPersona, filtradas, totalH, gruposFS
           <div style={{ position: 'relative', height: '200px' }}>
             <canvas ref={chartRef} />
           </div>
-          <div style={{ display: 'flex', gap: '16px', marginTop: '8px' }}>
-            <span style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '11px', color: 'var(--muted)' }}>
-              <span style={{ width: '12px', height: '10px', background: colorActual + 'AA', display: 'inline-block', borderRadius: '2px' }}></span>Horas (eje izq.)
-            </span>
-            <span style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '11px', color: 'var(--muted)' }}>
-              <span style={{ width: '16px', height: '2px', background: '#e24b4a', display: 'inline-block', borderRadius: '1px' }}></span>Costo USD (eje der.)
-            </span>
-          </div>
+
+          {puntoDetalle && (() => {
+            const personas = personasDelGrupoEnSemana(puntoDetalle.grupoNombre, puntoDetalle.semanaIdx);
+            const totalSemGrupo = personas.reduce((s, [, v]) => s + (v.horas || 0), 0);
+            return (
+              <div style={{ marginTop: '14px', background: 'var(--paper-50, #f9fafb)', border: '1px solid #e5e7eb', borderRadius: '10px', padding: '12px 14px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                  <div style={{ fontSize: '11px', fontWeight: '700', color: 'var(--ink-950)' }}>
+                    {puntoDetalle.grupoNombre} · semana {puntoDetalle.semanaLabel}
+                  </div>
+                  <button onClick={() => setPuntoDetalle(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', fontSize: '12px' }}>✕</button>
+                </div>
+                {personas.length === 0 ? (
+                  <p style={{ fontSize: '11px', color: 'var(--muted)', margin: 0 }}>Sin especialistas con horas en este grupo esa semana</p>
+                ) : personas.map(([emp, datos]) => (
+                  <div key={emp} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', padding: '4px 0', borderBottom: '1px solid #eee' }}>
+                    <span style={{ fontWeight: '600', color: 'var(--ink-800)' }}>{emp}</span>
+                    <span style={{ color: 'var(--muted)' }}>{fmt(datos.horas)}h{totalSemGrupo > 0 ? ` · ${fmt(datos.horas / totalSemGrupo * 100)}%` : ''}</span>
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
         </div>
       </div>
 
