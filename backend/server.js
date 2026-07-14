@@ -647,30 +647,24 @@ app.get('/api/registros', verificarToken, async (req, res) => {
       query = query.where('createdBy', '==', req.usuario.usuario);
     }
 
+    // Admin y DPE: filtrar por clienteId directo en la consulta de Firestore
+    // (antes traía TODA la colección —132 docs cada vez, sin importar el
+    // cliente— y filtraba en memoria por el nombre del cliente. Ahora que
+    // todos los registros tienen clienteId, se filtra del lado del servidor).
+    if (rol === 'dpe' || rol === 'admin') {
+      const clienteActivoId = req.headers['x-cliente-activo'] || '';
+      if (clienteActivoId) {
+        query = query.where('clienteId', '==', clienteActivoId);
+      }
+    }
+
+    // TL: ve todos los registros de todos los clientes (puede aprobar/rechazar) — sin filtro adicional
+
     const snapshot = await query.get();
     let registros = [];
     snapshot.forEach(doc => {
       registros.push({ id: doc.id, ...doc.data() });
     });
-
-    // Admin y DPE: filtrar por el cliente activo enviado en el header
-    if (rol === 'dpe' || rol === 'admin') {
-      const clienteActivoId = req.headers['x-cliente-activo'] || '';
-      if (clienteActivoId) {
-        const clienteDoc = await db.collection('clientes').doc(clienteActivoId).get();
-        const nombreCliente = clienteDoc.exists ? clienteDoc.data().nombre : null;
-        if (nombreCliente) {
-          registros = registros.filter(r =>
-            String(r.cliente || '').toLowerCase() === nombreCliente.toLowerCase()
-          );
-        } else {
-          registros = [];
-        }
-      }
-    }
-
-    // TL: ve todos los registros (puede aprobar/rechazar)
-    // No se aplica filtro adicional — mismo comportamiento que admin
 
     registros.sort((a, b) => {
       const fechaA = a.createdAt?.toDate?.() || new Date(a.createdAt) || new Date(0);
