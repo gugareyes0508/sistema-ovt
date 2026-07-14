@@ -410,6 +410,7 @@ const ClaimDashboard = ({ token, apiUrl, clienteActivo = '' }) => {
         const offering = String(fila[h['OFFERING_NAME']] || '').replace('CLOUD: ','').trim();
         const nivel = NIVEL_MAP[String(fila[h['EMP_LEVEL_CODE']] || '')] || 'Otro';
         const jobRole = String(fila[h['PRIMARY_JOB_ROLE']] || '').trim();
+        const manager = String(fila[h['FUNC_MGR_EMAIL']] || '').trim().toLowerCase();
 
         if (!porSemana[key]) {
           porSemana[key] = {
@@ -418,23 +419,28 @@ const ClaimDashboard = ({ token, apiUrl, clienteActivo = '' }) => {
             mes: fecha.getMonth() + 1,
             anio: fecha.getFullYear(),
             base:0, ot:0, sb:0, costo:0,
-            personas:{}, wbs:{}, offering:{}, nivel:{}, jobRoles:{}
+            personas:{}, wbs:{}, offering:{}, nivel:{}, jobRoles:{}, managers:{}
           };
         }
         const s = porSemana[key];
-        if (ot.includes('Over Time')) s.ot += horas;
-        else if (ot.includes('Stand')) s.sb += horas;
+        const esOT = ot.includes('Over Time');
+        const esSB = ot.includes('Stand');
+        if (esOT) s.ot += horas;
+        else if (esSB) s.sb += horas;
         else s.base += horas;
         s.costo += costo;
         if (persona) {
-          if (!s.personas[persona]) s.personas[persona] = { horas:0, costo:0 };
+          if (!s.personas[persona]) s.personas[persona] = { horas:0, costo:0, horasOT:0, horasSB:0 };
           s.personas[persona].horas += horas;
           s.personas[persona].costo += costo;
+          if (esOT) s.personas[persona].horasOT += horas;
+          if (esSB) s.personas[persona].horasSB += horas;
         }
         if (wbs) { if (!s.wbs[wbs]) s.wbs[wbs] = { horas:0, costo:0 }; s.wbs[wbs].horas += horas; s.wbs[wbs].costo += costo; }
         if (offering) { if (!s.offering[offering]) s.offering[offering] = { horas:0, costo:0 }; s.offering[offering].horas += horas; s.offering[offering].costo += costo; }
         if (nivel) { if (!s.nivel[nivel]) s.nivel[nivel] = { horas:0, costo:0 }; s.nivel[nivel].horas += horas; s.nivel[nivel].costo += costo; }
         if (jobRole) { if (!s.jobRoles[jobRole]) s.jobRoles[jobRole] = 0; s.jobRoles[jobRole] += horas; }
+        if (manager) { if (!s.managers[manager]) s.managers[manager] = { horas:0, costo:0 }; s.managers[manager].horas += horas; s.managers[manager].costo += costo; }
       }
 
       const nuevasSemanas = Object.values(porSemana).sort((a,b) => a.fecha.localeCompare(b.fecha));
@@ -493,18 +499,27 @@ const ClaimDashboard = ({ token, apiUrl, clienteActivo = '' }) => {
     }
   });
 
-  // Acumular horas/costo por grupo
+  // Acumular horas/costo por grupo (total, y separado por OT/SB para los
+  // gráficos de "OVT por grupo" y "Standby por grupo")
   const grupoTotal = {};
   filtradas.forEach(s => {
     Object.entries(s.personas||{}).forEach(([empName, datos]) => {
       const { grupoNombre } = gruposPorPersona[empName] || { grupoNombre: 'Sin grupo asignado' };
-      if (!grupoTotal[grupoNombre]) grupoTotal[grupoNombre] = { horas:0, costo:0, personas:new Set() };
+      if (!grupoTotal[grupoNombre]) grupoTotal[grupoNombre] = { horas:0, costo:0, horasOT:0, horasSB:0, personas:new Set() };
       grupoTotal[grupoNombre].horas += datos.horas || 0;
       grupoTotal[grupoNombre].costo += datos.costo || 0;
+      grupoTotal[grupoNombre].horasOT += datos.horasOT || 0;
+      grupoTotal[grupoNombre].horasSB += datos.horasSB || 0;
       grupoTotal[grupoNombre].personas.add(empName);
     });
   });
   const grupoOrdenado = Object.entries(grupoTotal).sort((a,b) => b[1].horas - a[1].horas);
+  // Rankings para los gráficos de "OVT por grupo" y "Standby por grupo" —
+  // solo grupos con horas > 0 en esa categoría específica
+  const grupoOTOrdenado = Object.entries(grupoTotal).filter(([,v]) => v.horasOT > 0).sort((a,b) => b[1].horasOT - a[1].horasOT);
+  const grupoSBOrdenado = Object.entries(grupoTotal).filter(([,v]) => v.horasSB > 0).sort((a,b) => b[1].horasSB - a[1].horasSB);
+  const totalOTGrupos = grupoOTOrdenado.reduce((sum,[,v]) => sum + v.horasOT, 0);
+  const totalSBGrupos = grupoSBOrdenado.reduce((sum,[,v]) => sum + v.horasSB, 0);
   // Personas sin match o sin grupo
   const sinGrupo = [...todasPersonasExcel].filter(p => gruposPorPersona[p]?.grupoId === '__sin_grupo__');
   const sinGrupoConHoras = sinGrupo.map(p => {
@@ -528,6 +543,19 @@ const ClaimDashboard = ({ token, apiUrl, clienteActivo = '' }) => {
     offTotal[k].horas += v.horas; offTotal[k].costo += v.costo;
   }));
   const offOrdenado = Object.entries(offTotal).sort((a,b) => b[1].horas - a[1].horas);
+
+  // Agregación Manager (FUNC_MGR_EMAIL) — se muestra el nombre formateado a
+  // partir del prefijo del correo, ej. "sergio.zuniga@kyndryl.com" → "Sergio Zuniga"
+  const formatManager = (email) => {
+    const prefijo = String(email||'').split('@')[0];
+    return prefijo.split(/[._]/).filter(Boolean).map(p => p.charAt(0).toUpperCase()+p.slice(1)).join(' ') || 'Sin manager';
+  };
+  const mgrTotal = {};
+  filtradas.forEach(s => Object.entries(s.managers||{}).forEach(([k,v]) => {
+    if (!mgrTotal[k]) mgrTotal[k] = { horas:0, costo:0 };
+    mgrTotal[k].horas += v.horas; mgrTotal[k].costo += v.costo;
+  }));
+  const mgrOrdenado = Object.entries(mgrTotal).sort((a,b) => b[1].horas - a[1].horas);
 
   // Agregación Personas
   const perTotal = {};
@@ -561,13 +589,17 @@ const ClaimDashboard = ({ token, apiUrl, clienteActivo = '' }) => {
     labels: filtradas.map(s => s.label),
     datasets:[{ label:'Costo USD', data:filtradas.map(s=>s.costo), borderColor:'#1baf7a', backgroundColor:'rgba(27,175,122,0.08)', borderWidth:2, fill:true, tension:0.35, pointRadius:4, pointBackgroundColor:'#1baf7a', pointBorderColor:'#fff', pointBorderWidth:1.5 }]
   };
-  const chartDonutOff = {
-    labels: offOrdenado.map(([k]) => k.substring(0,30)),
-    datasets:[{ data:offOrdenado.map(([,v])=>v.horas), backgroundColor:COLORES_OFF, borderWidth:0 }]
+  const chartDonutMgr = {
+    labels: mgrOrdenado.map(([k]) => formatManager(k)),
+    datasets:[{ data:mgrOrdenado.map(([,v])=>v.horas), backgroundColor:COLORES_OFF, borderWidth:0 }]
   };
-  const chartDonutWbs = {
-    labels: wbsOrdenado.slice(0,5).map(([k]) => k.substring(0,30)),
-    datasets:[{ data:wbsOrdenado.slice(0,5).map(([,v])=>v.horas), backgroundColor:['#2a78d6','#1baf7a','#eda100','#4a3aa7','#e24b4a'], borderWidth:0 }]
+  const chartDonutOTGrupo = {
+    labels: grupoOTOrdenado.slice(0,6).map(([k]) => k.substring(0,30)),
+    datasets:[{ data:grupoOTOrdenado.slice(0,6).map(([,v])=>v.horasOT), backgroundColor:COLORES_GRUPO, borderWidth:0 }]
+  };
+  const chartDonutSBGrupo = {
+    labels: grupoSBOrdenado.slice(0,6).map(([k]) => k.substring(0,30)),
+    datasets:[{ data:grupoSBOrdenado.slice(0,6).map(([,v])=>v.horasSB), backgroundColor:COLORES_GRUPO, borderWidth:0 }]
   };
 
   // Tendencia — todas las semanas
@@ -702,40 +734,65 @@ const ClaimDashboard = ({ token, apiUrl, clienteActivo = '' }) => {
                       <Line data={chartCosto} options={lineOpts} />
                     </ChartCard>
                   </div>
-                  <div style={grid2}>
-                    <div style={{ background:'rgba(255,255,255,0.84)', border:'1px solid #e5e7eb', borderRadius:'10px', padding:'16px 18px' }}>
-                      <h4 style={{ margin:'0 0 12px', fontSize:'13px', color:'var(--ink-800)', fontWeight:'600' }}>Distribución por Offering</h4>
+                  <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(280px,1fr))', gap:'16px', marginBottom:'16px' }}>
+                    <div style={{ border:'1px solid rgba(255,255,255,0.72)', borderRadius:'22px', background:'var(--glass)', boxShadow:'var(--shadow-soft)', backdropFilter:'blur(18px)', padding:'20px' }}>
+                      <h4 style={{ margin:'0 0 12px', fontSize:'13px', color:'var(--ink-800)', fontWeight:'600' }}>Distribución por Manager</h4>
                       <div style={{ display:'flex', alignItems:'center', gap:'16px' }}>
                         <div style={{ position:'relative', width:'110px', height:'110px', flexShrink:0 }}>
-                          <Doughnut data={chartDonutOff} options={donutOpts} />
+                          <Doughnut data={chartDonutMgr} options={donutOpts} />
                         </div>
                         <div>
-                          {offOrdenado.map(([k,v],i) => (
+                          {mgrOrdenado.map(([k,v],i) => (
                             <div key={k} style={{ display:'flex', alignItems:'center', gap:'7px', fontSize:'11px', color:'var(--muted)', marginBottom:'6px' }}>
-                              <div style={{ width:'10px', height:'10px', borderRadius:'2px', background:COLORES_OFF[i]||'#888', flexShrink:0 }}></div>
-                              <div><div style={{ fontWeight:'600', color:'var(--ink-800)' }}>{k.substring(0,35)}</div>
+                              <div style={{ width:'10px', height:'10px', borderRadius:'2px', background:COLORES_OFF[i%COLORES_OFF.length]||'#888', flexShrink:0 }}></div>
+                              <div><div style={{ fontWeight:'600', color:'var(--ink-800)' }}>{formatManager(k)}</div>
                               <div>{fmt(v.horas)}h · {fmtK(v.costo)} · {totalH>0?fmt(v.horas/totalH*100):'0'}%</div></div>
                             </div>
                           ))}
                         </div>
                       </div>
                     </div>
-                    <div style={{ background:'rgba(255,255,255,0.84)', border:'1px solid #e5e7eb', borderRadius:'10px', padding:'16px 18px' }}>
-                      <h4 style={{ margin:'0 0 12px', fontSize:'13px', color:'var(--ink-800)', fontWeight:'600' }}>Distribución por tipo de WBS</h4>
-                      <div style={{ display:'flex', alignItems:'center', gap:'16px' }}>
-                        <div style={{ position:'relative', width:'110px', height:'110px', flexShrink:0 }}>
-                          <Doughnut data={chartDonutWbs} options={donutOpts} />
+                    <div style={{ border:'1px solid rgba(255,255,255,0.72)', borderRadius:'22px', background:'var(--glass)', boxShadow:'var(--shadow-soft)', backdropFilter:'blur(18px)', padding:'20px' }}>
+                      <h4 style={{ margin:'0 0 12px', fontSize:'13px', color:'var(--ink-800)', fontWeight:'600' }}>OVT por Grupo de Servicio</h4>
+                      {grupoOTOrdenado.length === 0 ? (
+                        <p style={{ fontSize:'12px', color:'var(--muted)', fontWeight:'600' }}>Sin horas de overtime en este período</p>
+                      ) : (
+                        <div style={{ display:'flex', alignItems:'center', gap:'16px' }}>
+                          <div style={{ position:'relative', width:'110px', height:'110px', flexShrink:0 }}>
+                            <Doughnut data={chartDonutOTGrupo} options={donutOpts} />
+                          </div>
+                          <div>
+                            {grupoOTOrdenado.slice(0,6).map(([k,v],i) => (
+                              <div key={k} style={{ display:'flex', alignItems:'center', gap:'7px', fontSize:'11px', color:'var(--muted)', marginBottom:'6px' }}>
+                                <div style={{ width:'10px', height:'10px', borderRadius:'2px', background:COLORES_GRUPO[i%COLORES_GRUPO.length], flexShrink:0 }}></div>
+                                <div><div style={{ fontWeight:'600', color:'var(--ink-800)' }}>{k.substring(0,30)}</div>
+                                <div>{fmt(v.horasOT)}h · {totalOTGrupos>0?fmt(v.horasOT/totalOTGrupos*100):'0'}%</div></div>
+                              </div>
+                            ))}
+                          </div>
                         </div>
-                        <div>
-                          {wbsOrdenado.slice(0,5).map(([k,v],i) => (
-                            <div key={k} style={{ display:'flex', alignItems:'center', gap:'7px', fontSize:'11px', color:'var(--muted)', marginBottom:'6px' }}>
-                              <div style={{ width:'10px', height:'10px', borderRadius:'2px', background:['#2a78d6','#1baf7a','#eda100','#4a3aa7','#e24b4a'][i], flexShrink:0 }}></div>
-                              <div><div style={{ fontWeight:'600', color:'var(--ink-800)' }}>{k.substring(0,30)}</div>
-                              <div>{fmt(v.horas)}h · {fmtK(v.costo)}</div></div>
-                            </div>
-                          ))}
+                      )}
+                    </div>
+                    <div style={{ border:'1px solid rgba(255,255,255,0.72)', borderRadius:'22px', background:'var(--glass)', boxShadow:'var(--shadow-soft)', backdropFilter:'blur(18px)', padding:'20px' }}>
+                      <h4 style={{ margin:'0 0 12px', fontSize:'13px', color:'var(--ink-800)', fontWeight:'600' }}>Standby por Grupo de Servicio</h4>
+                      {grupoSBOrdenado.length === 0 ? (
+                        <p style={{ fontSize:'12px', color:'var(--muted)', fontWeight:'600' }}>Sin horas de standby en este período</p>
+                      ) : (
+                        <div style={{ display:'flex', alignItems:'center', gap:'16px' }}>
+                          <div style={{ position:'relative', width:'110px', height:'110px', flexShrink:0 }}>
+                            <Doughnut data={chartDonutSBGrupo} options={donutOpts} />
+                          </div>
+                          <div>
+                            {grupoSBOrdenado.slice(0,6).map(([k,v],i) => (
+                              <div key={k} style={{ display:'flex', alignItems:'center', gap:'7px', fontSize:'11px', color:'var(--muted)', marginBottom:'6px' }}>
+                                <div style={{ width:'10px', height:'10px', borderRadius:'2px', background:COLORES_GRUPO[i%COLORES_GRUPO.length], flexShrink:0 }}></div>
+                                <div><div style={{ fontWeight:'600', color:'var(--ink-800)' }}>{k.substring(0,30)}</div>
+                                <div>{fmt(v.horasSB)}h · {totalSBGrupos>0?fmt(v.horasSB/totalSBGrupos*100):'0'}%</div></div>
+                              </div>
+                            ))}
+                          </div>
                         </div>
-                      </div>
+                      )}
                     </div>
                   </div>
                 </div>
