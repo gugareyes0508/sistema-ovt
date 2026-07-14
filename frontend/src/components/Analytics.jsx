@@ -620,7 +620,7 @@ Sé conciso, específico y ORIGINAL.`;
       </div>
 
       {/* ── KPI MÉTRICAS ── */}
-      <div style={{ display:'grid', gridTemplateColumns:'repeat(6,minmax(0,1fr))', gap:'1px', background:'var(--line)', marginBottom:'20px' }}>
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(140px,1fr))', gap:'14px', marginBottom:'20px' }}>
         {[
           { label:'Total HHEE',      val:`${datos.total.toFixed(0)}h`,                           color:'var(--kyn-red)' },
           { label:'Cambios',         val:`${datos.porTipo.cambios.toFixed(0)}h`,                  color:'var(--bank-blue)' },
@@ -629,7 +629,7 @@ Sé conciso, específico y ORIGINAL.`;
           { label:'Requerimientos',  val:`${datos.porTipo.requerimientos.toFixed(0)}h`,           color:'var(--success)' },
           { label:'Registros',       val:datos.registrosFiltrados.length,                         color:'var(--ink-800)' },
         ].map(k=>(
-          <div key={k.label} style={{ background:'var(--glass)', backdropFilter:'blur(18px)', padding:'16px 14px' }}>
+          <div key={k.label} style={{ background:'var(--glass)', border:'1px solid rgba(255,255,255,0.72)', borderRadius:'24px', boxShadow:'var(--shadow-soft)', backdropFilter:'blur(18px)', padding:'16px' }}>
             <div style={{ fontFamily:"'IBM Plex Mono',monospace", fontSize:'9px', fontWeight:'700', color:'var(--muted)', textTransform:'uppercase', letterSpacing:'.07em', marginBottom:'8px' }}>{k.label}</div>
             <div style={{ fontSize:'1.8rem', fontWeight:'800', lineHeight:1, letterSpacing:'-.07em', color:k.color }}>{k.val}</div>
           </div>
