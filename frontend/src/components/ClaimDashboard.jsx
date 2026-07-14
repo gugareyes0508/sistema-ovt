@@ -668,7 +668,7 @@ const ClaimDashboard = ({ token, apiUrl, clienteActivo = '' }) => {
           </div>
 
           {/* KPIs globales del período */}
-          <div style={{ display:'grid', gridTemplateColumns:'repeat(5,minmax(0,1fr))', gap:'1px', background:'var(--line)', marginBottom:'20px' }}>
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(160px,1fr))', gap:'14px', marginBottom:'20px' }}>
             <KPI label="Horas imputadas" value={fmt(totalH)+'h'} sub={`OT: ${fmt(totalOT)}h · SB: ${fmt(totalSB)}h`} color="var(--bank-blue)" />
             <KPI label="Costo total USD" value={fmtK(totalCosto)} sub={`Prom: ${fmtK(filtradas.length ? totalCosto/filtradas.length : 0)}/sem`} color="var(--success)" />
             <KPI label="Semanas con OT/SB" value={semsConOT} sub={`de ${filtradas.length} semanas`} color="var(--warning)" />
