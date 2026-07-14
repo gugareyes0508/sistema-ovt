@@ -43,6 +43,14 @@ const GestionUsuarios = ({ token, apiUrl, rolUsuario = 'admin' }) => {
   const [filtroRol, setFiltroRol] = useState('todos');
   const [filtroBusq, setFiltroBusq] = useState('');
 
+  // Paginación de la tabla — la consulta a Firestore ya trae solo los
+  // usuarios del cliente activo (una sola llamada, sin costo extra); esto
+  // solo pagina lo que se MUESTRA, para que la tabla no renderice todo de
+  // una. El buscador sigue funcionando sobre el set completo ya cargado.
+  const [pagina, setPagina] = useState(1);
+  const PAGE_SIZE = 10;
+  useEffect(() => { setPagina(1); }, [filtroCliente, filtroRol, filtroBusq]);
+
   // Modal usuario
   const [modalUser, setModalUser] = useState({ abierto:false, modo:'crear', datos:{} });
   // Modal cliente
@@ -92,6 +100,10 @@ const GestionUsuarios = ({ token, apiUrl, rolUsuario = 'admin' }) => {
     }
     return true;
   });
+
+  const totalPaginas = Math.max(1, Math.ceil(usuariosFiltrados.length / PAGE_SIZE));
+  const paginaSegura = Math.min(pagina, totalPaginas);
+  const usuariosPagina = usuariosFiltrados.slice((paginaSegura-1)*PAGE_SIZE, paginaSegura*PAGE_SIZE);
 
   // ── Crear / Editar usuario ──
   const abrirModalCrear = () => {
@@ -292,7 +304,7 @@ const GestionUsuarios = ({ token, apiUrl, rolUsuario = 'admin' }) => {
             </tr>
           </thead>
           <tbody>
-            {usuariosFiltrados.map(u => (
+            {usuariosPagina.map(u => (
               <tr key={u.usuario}>
                 <td><strong>{u.nombre}</strong></td>
                 <td style={{ fontSize:'12px', color:'var(--muted)' }}>@{u.usuario}</td>
@@ -339,6 +351,25 @@ const GestionUsuarios = ({ token, apiUrl, rolUsuario = 'admin' }) => {
           </tbody>
         </table>
         {usuariosFiltrados.length === 0 && <p className="sin-datos">Sin usuarios para los filtros seleccionados</p>}
+
+        {usuariosFiltrados.length > PAGE_SIZE && (
+          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginTop:'14px', fontSize:'13px' }}>
+            <span style={{ color:'var(--muted)' }}>
+              Mostrando {(paginaSegura-1)*PAGE_SIZE+1}–{Math.min(paginaSegura*PAGE_SIZE, usuariosFiltrados.length)} de {usuariosFiltrados.length}
+            </span>
+            <div style={{ display:'flex', gap:'8px', alignItems:'center' }}>
+              <button onClick={() => setPagina(p => Math.max(1, p-1))} disabled={paginaSegura===1}
+                style={{ padding:'6px 12px', borderRadius:'10px', border:'1px solid #d1d5db', background:'white', cursor: paginaSegura===1?'not-allowed':'pointer', opacity: paginaSegura===1?0.5:1 }}>
+                ← Anterior
+              </button>
+              <span style={{ color:'var(--muted)' }}>Página {paginaSegura} de {totalPaginas}</span>
+              <button onClick={() => setPagina(p => Math.min(totalPaginas, p+1))} disabled={paginaSegura===totalPaginas}
+                style={{ padding:'6px 12px', borderRadius:'10px', border:'1px solid #d1d5db', background:'white', cursor: paginaSegura===totalPaginas?'not-allowed':'pointer', opacity: paginaSegura===totalPaginas?0.5:1 }}>
+                Siguiente →
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* ── MODAL USUARIO ── */}
