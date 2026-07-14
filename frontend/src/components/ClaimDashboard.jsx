@@ -593,7 +593,7 @@ const ClaimDashboard = ({ token, apiUrl, clienteActivo = '' }) => {
 
   // KPI box helper
   const KPI = ({ icon, label, value, sub, color='var(--ink-950)' }) => (
-    <div style={{ background:'var(--glass)', border:'1px solid rgba(255,255,255,0.72)', borderRadius:'18px', padding:'16px', backdropFilter:'blur(18px)', boxShadow:'var(--shadow-soft)' }}>
+    <div style={{ background:'var(--glass)', border:'1px solid rgba(255,255,255,0.72)', borderRadius:'24px', padding:'16px', backdropFilter:'blur(18px)', boxShadow:'var(--shadow-soft)' }}>
       <div style={{ fontFamily:"'IBM Plex Mono',monospace", fontSize:'9px', fontWeight:'700', color:'var(--muted)', textTransform:'uppercase', letterSpacing:'.07em', marginBottom:'8px' }}>{label}</div>
       <div style={{ fontSize:'1.8rem', fontWeight:'800', color, lineHeight:1, letterSpacing:'-.07em', marginBottom:'4px' }}>{value}</div>
       {sub && <div style={{ fontSize:'11px', fontWeight:'600', color:'var(--muted)' }}>{sub}</div>}
