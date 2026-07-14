@@ -397,6 +397,7 @@ const ClaimDashboard = ({ token, apiUrl, clienteActivo = '' }) => {
   const [filtroMes, setFiltroMes] = useState(new Date().getMonth() + 1);
   const [filtroAnio, setFiltroAnio] = useState(new Date().getFullYear());
   const [tabAnalitca, setTabAnalitica] = useState('resumen');
+  const [grupoAnualSel, setGrupoAnualSel] = useState(null); // grupo elegido para el gráfico anual "Tendencia por grupo"
   // Datos para cruce por grupo
   const [usuariosFS, setUsuariosFS] = useState([]);
   const [gruposFS, setGruposFS] = useState([]);
@@ -677,6 +678,42 @@ const ClaimDashboard = ({ token, apiUrl, clienteActivo = '' }) => {
   };
   const donutOpts = { responsive:true, maintainAspectRatio:false, cutout:'65%', plugins:{ legend:{display:false} } };
   const barOpts = { ...chartBase, scales:{ ...chartBase.scales, x:{...chartBase.scales.x,stacked:true}, y:{...chartBase.scales.y,stacked:true} } };
+
+  // Tendencia por grupo — ANUAL (todas las semanas cargadas, no solo el mes
+  // filtrado), un grupo a la vez, horas y costo juntos como en el gráfico
+  // general de arriba.
+  const grupoTotalAnual = {};
+  todosSem.forEach(s => {
+    Object.entries(s.personas||{}).forEach(([empName, datos]) => {
+      const { grupoNombre } = gruposPorPersona[empName] || { grupoNombre: 'Sin grupo asignado' };
+      if (!grupoTotalAnual[grupoNombre]) grupoTotalAnual[grupoNombre] = { horas:0, costo:0 };
+      grupoTotalAnual[grupoNombre].horas += datos.horas || 0;
+      grupoTotalAnual[grupoNombre].costo += datos.costo || 0;
+    });
+  });
+  const grupoOrdenadoAnual = Object.entries(grupoTotalAnual).sort((a,b) => b[1].costo - a[1].costo);
+  const top10GruposAnual = grupoOrdenadoAnual.slice(0, 10);
+  const grupoAnualActivo = grupoAnualSel && top10GruposAnual.some(([n]) => n === grupoAnualSel)
+    ? grupoAnualSel
+    : (top10GruposAnual[0]?.[0] || null);
+  const idxColorAnual = top10GruposAnual.findIndex(([n]) => n === grupoAnualActivo);
+  const colorGrupoAnual = grupoAnualActivo === 'Sin grupo asignado' ? COLOR_SIN_GRUPO : COLORES_GRUPO[idxColorAnual % COLORES_GRUPO.length] || '#2a78d6';
+
+  const horasPorSemanaGrupoAnual = todosSem.map(s =>
+    Object.entries(s.personas||{}).reduce((sum,[emp,datos]) =>
+      (gruposPorPersona[emp]?.grupoNombre === grupoAnualActivo) ? sum + (datos.horas||0) : sum, 0)
+  );
+  const costoPorSemanaGrupoAnual = todosSem.map(s =>
+    Object.entries(s.personas||{}).reduce((sum,[emp,datos]) =>
+      (gruposPorPersona[emp]?.grupoNombre === grupoAnualActivo) ? sum + (datos.costo||0) : sum, 0)
+  );
+  const chartTendenciaGrupoAnual = {
+    labels: todosSem.map(s => s.label),
+    datasets:[
+      { label:'Horas', data:horasPorSemanaGrupoAnual, borderColor:colorGrupoAnual, backgroundColor:colorGrupoAnual+'12', borderWidth:2, fill:true, tension:0.35, pointRadius:3, pointBackgroundColor:colorGrupoAnual, yAxisID:'y' },
+      { label:'Costo USD', data:costoPorSemanaGrupoAnual, borderColor:'#1baf7a', backgroundColor:'transparent', borderWidth:2, borderDash:[4,3], fill:false, tension:0.35, pointRadius:3, pointBackgroundColor:'#1baf7a', yAxisID:'y2' }
+    ]
+  };
   const lineOpts = { ...chartBase, scales:{ ...chartBase.scales, y:{...chartBase.scales.y, ticks:{...chartBase.scales.y.ticks, callback:v=>'$'+Math.round(v/1000)+'K'}} } };
 
   // KPI box helper
@@ -981,6 +1018,28 @@ const ClaimDashboard = ({ token, apiUrl, clienteActivo = '' }) => {
                       sub={todosSem.find(s=>s.costo===Math.max(...todosSem.map(x=>x.costo)))?.label||''}
                       color="#059669" />
                     <KPI icon="🔢" label="Total semanas cargadas" value={semanas.length} sub={`${semanas[0]?.label||''} → ${semanas[semanas.length-1]?.label||''}`} />
+                  </div>
+
+                  {/* Tendencia anual por grupo — mismo rango completo, un grupo a la vez */}
+                  <div style={{ border:'1px solid rgba(255,255,255,0.72)', borderRadius:'22px', background:'var(--glass)', boxShadow:'var(--shadow-soft)', backdropFilter:'blur(18px)', padding:'18px 20px', marginTop:'16px' }}>
+                    <div style={{ fontFamily:"'IBM Plex Mono',monospace", fontSize:'9px', fontWeight:'700', color:'var(--muted)', textTransform:'uppercase', letterSpacing:'.09em', marginBottom:'4px' }}>Gráfico</div>
+                    <h4 style={{ margin:'0 0 12px', fontSize:'1rem', fontWeight:'800', color:'var(--ink-950)', letterSpacing:'-.03em' }}>Tendencia anual por grupo — horas y costo</h4>
+                    <div style={{ display:'flex', gap:'6px', flexWrap:'wrap', marginBottom:'14px' }}>
+                      {top10GruposAnual.map(([nombre], i) => {
+                        const color = nombre === 'Sin grupo asignado' ? COLOR_SIN_GRUPO : COLORES_GRUPO[i % COLORES_GRUPO.length];
+                        const activo = nombre === grupoAnualActivo;
+                        return (
+                          <button key={nombre} onClick={() => setGrupoAnualSel(nombre)}
+                            style={{ fontSize:'10px', padding:'4px 10px', borderRadius:'12px', border:'none', cursor:'pointer', display:'flex', alignItems:'center', gap:'5px',
+                              background: activo ? color : '#f3f4f6', color: activo ? '#fff' : 'var(--muted)', fontWeight: activo ? '700' : '400' }}>
+                            {nombre.length > 16 ? nombre.slice(0,16)+'…' : nombre}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <div style={{ position:'relative', height:'220px', overflow:'hidden' }}>
+                      <Line data={chartTendenciaGrupoAnual} options={chartTendOpts} />
+                    </div>
                   </div>
                 </div>
               )}
