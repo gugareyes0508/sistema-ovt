@@ -278,22 +278,26 @@ app.get('/api/admin/listar-usuarios', verificarToken, async (req, res) => {
     // Cliente activo desde header — si viene, filtrar solo por ese cliente
     const clienteActivoId = req.headers['x-cliente-activo'] || '';
 
-    const snapshot = await db.collection('usuarios').get();
+    // Antes esto traía TODA la colección de usuarios en cada llamada (189
+    // ejecuciones ≈ 10,200 lecturas) y filtraba por cliente en memoria.
+    // clientesIds ya es un array en cada doc, así que Firestore puede filtrar
+    // esto del lado del servidor con array-contains / array-contains-any.
+    let query = db.collection('usuarios');
+    if (clienteActivoId) {
+      query = query.where('clientesIds', 'array-contains', clienteActivoId);
+    } else if (esDpe) {
+      const clientesDpe = (req.usuario.clientesIds || []).slice(0, 30); // límite de Firestore para array-contains-any
+      if (clientesDpe.length > 0) {
+        query = query.where('clientesIds', 'array-contains-any', clientesDpe);
+      }
+    }
+    // Admin sin cliente activo: ve todos (se mantiene el full scan, caso poco frecuente)
+
+    const snapshot = await query.get();
     const usuariosList = [];
     snapshot.forEach(doc => {
       const d = doc.data();
       const clientesUsuario = d.clientesIds || ['bcochile'];
-
-      // Si viene cliente activo, mostrar solo usuarios de ese cliente
-      if (clienteActivoId) {
-        if (!clientesUsuario.includes(clienteActivoId)) return;
-      } else if (esDpe) {
-        // Sin cliente activo: DPE ve todos sus clientes
-        const clientesDpe = req.usuario.clientesIds || [];
-        const tieneAcceso = clientesDpe.some(c => clientesUsuario.includes(c));
-        if (!tieneAcceso) return;
-      }
-      // Admin sin cliente activo: ve todos
 
       usuariosList.push({
         usuario: doc.id,
@@ -588,6 +592,51 @@ app.post('/api/admin/eliminar-usuario', verificarToken, async (req, res) => {
 // RUTAS: REGISTROS MEJORADOS
 // ============================================
 
+// MIGRACIÓN ÚNICA: agrega clienteId a los registros históricos que no lo
+// tienen (creados antes de este cambio). Se corre una sola vez desde el
+// navegador o Postman, apuntada por un admin. No borra ni modifica nada más.
+app.post('/api/admin/migrar-clienteid-registros', verificarToken, async (req, res) => {
+  try {
+    if (req.usuario.usuario !== 'admin') return res.status(403).json({ error: 'Solo admin' });
+
+    const [registrosSnap, clientesSnap] = await Promise.all([
+      db.collection('registros').get(),
+      db.collection('clientes').get()
+    ]);
+
+    const clientesPorNombre = {};
+    clientesSnap.forEach(d => { clientesPorNombre[String(d.data().nombre || '').toLowerCase()] = d.id; });
+
+    const batch = db.batch();
+    let actualizados = 0;
+    let sinMatch = [];
+
+    registrosSnap.forEach(doc => {
+      const data = doc.data();
+      if (data.clienteId) return; // ya migrado, no tocar
+
+      const nombreCliente = String(data.cliente || '').toLowerCase();
+      const clienteId = clientesPorNombre[nombreCliente] || 'bcochile';
+      if (!clientesPorNombre[nombreCliente]) sinMatch.push({ id: doc.id, cliente: data.cliente });
+
+      batch.update(doc.ref, { clienteId });
+      actualizados++;
+    });
+
+    if (actualizados > 0) await batch.commit();
+
+    res.json({
+      success: true,
+      message: `${actualizados} registros migrados con clienteId`,
+      totalRegistros: registrosSnap.size,
+      sinMatchExacto: sinMatch // revisar estos: quedaron con clienteId='bcochile' por defecto
+    });
+  } catch (err) {
+    console.error('Error en migración:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.get('/api/registros', verificarToken, async (req, res) => {
   try {
     const rol = req.usuario.rol;
@@ -658,10 +707,24 @@ app.post('/api/registros', verificarToken, async (req, res) => {
       return res.status(400).json({ error: 'Campos requeridos faltando' });
     }
 
+    // Resolver clienteId a partir del nombre de cliente del formulario, para
+    // poder filtrar en Firestore por clienteId en vez de traer toda la
+    // colección y filtrar en memoria (esto es lo que estaba generando ~130
+    // lecturas por cada consulta a /api/registros, sin importar el cliente).
+    let clienteId = 'bcochile';
+    try {
+      const clientesSnap = await db.collection('clientes').get();
+      const match = clientesSnap.docs.find(d =>
+        String(d.data().nombre || '').toLowerCase() === String(cliente).toLowerCase()
+      );
+      if (match) clienteId = match.id;
+    } catch (e) { /* si falla, se guarda con clienteId por defecto */ }
+
     const docRef = await db.collection('registros').add({
       tipo: String(tipo),
       descripcion: String(descripcion),
       cliente: String(cliente),
+      clienteId,
       fechaInicio: new Date(fechaInicio),
       fechaFin: new Date(fechaFin),
       horas: parseFloat(horas),
