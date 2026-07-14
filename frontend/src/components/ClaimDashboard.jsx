@@ -58,7 +58,7 @@ const parseFecha = (v) => {
 // ─── sub-componentes de gráfico ───────────────────────────────────────────
 const MiniBar = ({ label, value, max, color='var(--bank-blue)', right='' }) => (
   <div style={{ display:'flex', alignItems:'center', gap:'8px', marginBottom:'8px' }}>
-    <div style={{ fontSize:'11px', fontFamily:"'IBM Plex Mono',monospace", color:'var(--muted)', width:'140px', flexShrink:0, textAlign:'right', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{label}</div>
+    <div title={label} style={{ fontSize:'11px', fontFamily:"'IBM Plex Mono',monospace", color:'var(--muted)', width:'170px', flexShrink:0, textAlign:'right', whiteSpace:'normal', lineHeight:1.3, wordBreak:'break-word' }}>{label}</div>
     <div style={{ flex:1, background:'var(--paper-200)', borderRadius:'3px', height:'6px', overflow:'hidden' }}>
       <div style={{ width:`${Math.round(value/max*100)}%`, height:'100%', background:color, borderRadius:'3px' }} />
     </div>
@@ -729,6 +729,9 @@ const ClaimDashboard = ({ token, apiUrl, clienteActivo = '' }) => {
                   <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(280px,1fr))', gap:'16px', marginBottom:'16px' }}>
                     <div style={{ border:'1px solid rgba(255,255,255,0.72)', borderRadius:'22px', background:'var(--glass)', boxShadow:'var(--shadow-soft)', backdropFilter:'blur(18px)', padding:'20px' }}>
                       <h4 style={{ margin:'0 0 12px', fontSize:'13px', color:'var(--ink-800)', fontWeight:'600' }}>Distribución por Manager</h4>
+                      {mgrOrdenado.length === 0 ? (
+                        <p style={{ fontSize:'12px', color:'var(--muted)', fontWeight:'600' }}>Sin datos de manager en este período — vuelve a subir el Export.xlsx para incluirlos</p>
+                      ) : (
                       <div style={{ display:'flex', alignItems:'center', gap:'16px' }}>
                         <div style={{ position:'relative', width:'110px', height:'110px', flexShrink:0 }}>
                           <Doughnut data={chartDonutMgr} options={donutOpts} />
@@ -743,11 +746,12 @@ const ClaimDashboard = ({ token, apiUrl, clienteActivo = '' }) => {
                           ))}
                         </div>
                       </div>
+                      )}
                     </div>
                     <div style={{ border:'1px solid rgba(255,255,255,0.72)', borderRadius:'22px', background:'var(--glass)', boxShadow:'var(--shadow-soft)', backdropFilter:'blur(18px)', padding:'20px' }}>
                       <h4 style={{ margin:'0 0 12px', fontSize:'13px', color:'var(--ink-800)', fontWeight:'600' }}>OVT por Grupo de Servicio</h4>
                       {grupoOTOrdenado.length === 0 ? (
-                        <p style={{ fontSize:'12px', color:'var(--muted)', fontWeight:'600' }}>Sin horas de overtime en este período</p>
+                        <p style={{ fontSize:'12px', color:'var(--muted)', fontWeight:'600' }}>Sin horas de overtime en este período — si esperabas ver datos, vuelve a subir el Export.xlsx</p>
                       ) : (
                         <div style={{ display:'flex', alignItems:'center', gap:'16px' }}>
                           <div style={{ position:'relative', width:'110px', height:'110px', flexShrink:0 }}>
@@ -768,7 +772,7 @@ const ClaimDashboard = ({ token, apiUrl, clienteActivo = '' }) => {
                     <div style={{ border:'1px solid rgba(255,255,255,0.72)', borderRadius:'22px', background:'var(--glass)', boxShadow:'var(--shadow-soft)', backdropFilter:'blur(18px)', padding:'20px' }}>
                       <h4 style={{ margin:'0 0 12px', fontSize:'13px', color:'var(--ink-800)', fontWeight:'600' }}>Standby por Grupo de Servicio</h4>
                       {grupoSBOrdenado.length === 0 ? (
-                        <p style={{ fontSize:'12px', color:'var(--muted)', fontWeight:'600' }}>Sin horas de standby en este período</p>
+                        <p style={{ fontSize:'12px', color:'var(--muted)', fontWeight:'600' }}>Sin horas de standby en este período — si esperabas ver datos, vuelve a subir el Export.xlsx</p>
                       ) : (
                         <div style={{ display:'flex', alignItems:'center', gap:'16px' }}>
                           <div style={{ position:'relative', width:'110px', height:'110px', flexShrink:0 }}>
