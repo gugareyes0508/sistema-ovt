@@ -194,17 +194,18 @@ function App() {
   }, [token]);
 
   // Cargar auditoría
-  const cargarAuditoria = useCallback(async () => {
+  const [diasAuditoria, setDiasAuditoria] = useState(1); // 1 = hoy, 7 = ultima semana, 30 = ultimo mes
+  const cargarAuditoria = useCallback(async (dias = diasAuditoria) => {
     if (!token || usuario.rol !== 'admin') return;
     try {
-      const response = await axios.get(`${API_URL}/api/auditoria`, {
+      const response = await axios.get(`${API_URL}/api/auditoria?dias=${dias}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setAuditoria(response.data || []);
     } catch (err) {
       console.error('Error:', err.message);
     }
-  }, [token, usuario.rol]);
+  }, [token, usuario.rol, diasAuditoria]);
 
   // Cargar lista de usuarios (para admin/dpe, filtrada por cliente activo)
   const cargarUsuarios = useCallback(async () => {
@@ -263,10 +264,9 @@ function App() {
     cargarRegistros();
     cargarDashboard();
     if (usuario.rol === 'admin') {
-      cargarAuditoria();
       cargarUsuarios();
     }
-  }, [token, cargarRegistros, cargarDashboard, cargarAuditoria, cargarUsuarios, usuario.rol]);
+  }, [token, cargarRegistros, cargarDashboard, cargarUsuarios, usuario.rol]);
 
   // Cargar usuarios cuando se abre la vista de gestión
   useEffect(() => {
@@ -274,6 +274,16 @@ function App() {
       cargarUsuarios();
     }
   }, [vista, cargarUsuarios, usuario.rol]);
+
+  // Cargar auditoría solo cuando se abre esa pestaña, no en cada carga de la
+  // app (antes traía 100 registros en cada login/cambio de cliente, se
+  // hubiera abierto o no la pestaña — de ahí el grueso de las 4,000 lecturas
+  // que vimos en Firestore para esta consulta)
+  useEffect(() => {
+    if (vista === 'auditoria' && usuario.rol === 'admin') {
+      cargarAuditoria();
+    }
+  }, [vista, cargarAuditoria, usuario.rol, clienteActivo]);
 
   // Calcular horas automáticamente
   const calcularHoras = (inicio, fin) => {
@@ -1555,8 +1565,19 @@ function App() {
         {vista === 'auditoria' && usuario.rol === 'admin' && (
           <div className="seccion">
             <p className="panel-label">Sistema</p>
-            <h2>Log de auditoría</h2>
-            {auditoria.length === 0 ? <p className="sin-datos">Sin registros de auditoría</p> : (
+            <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', flexWrap:'wrap', gap:'12px'}}>
+              <h2 style={{margin:0}}>Log de auditoría</h2>
+              <div style={{display:'flex', gap:'8px', alignItems:'center'}}>
+                <label style={{fontSize:'12px', fontWeight:'600', color:'var(--muted)'}}>Rango:</label>
+                <select value={diasAuditoria} onChange={e=>setDiasAuditoria(parseInt(e.target.value))}
+                  style={{padding:'8px 12px', borderRadius:'12px', border:'1px solid #d1d5db', fontSize:'13px'}}>
+                  <option value={1}>Hoy</option>
+                  <option value={7}>Últimos 7 días</option>
+                  <option value={30}>Últimos 30 días</option>
+                </select>
+              </div>
+            </div>
+            {auditoria.length === 0 ? <p className="sin-datos">Sin registros de auditoría en este rango</p> : (
               <div className="tabla-responsive">
                 <table className="tabla">
                   <thead><tr>

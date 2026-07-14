@@ -1066,7 +1066,22 @@ app.get('/api/auditoria', verificarToken, async (req, res) => {
       return res.status(403).json({ error: 'No autorizado' });
     }
 
-    const snapshot = await db.collection('auditoria').orderBy('timestamp', 'desc').limit(100).get();
+    // Por defecto trae solo el día de hoy (hora de Chile). Se puede pedir más
+    // historial con ?dias=N (ej. ?dias=7 para la última semana).
+    const dias = parseInt(req.query.dias) || 1;
+    const ahora = new Date();
+    const fechaChile = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Santiago' }).format(ahora); // 'YYYY-MM-DD'
+    // Nota: se usa -04:00 como aproximación de la hora de Chile (puede estar
+    // hasta 1 hora desfasado según la época del año); el corte del día es
+    // solo para acotar la consulta, no requiere precisión al minuto.
+    const inicioDia = new Date(`${fechaChile}T00:00:00-04:00`);
+    inicioDia.setDate(inicioDia.getDate() - (dias - 1));
+
+    const snapshot = await db.collection('auditoria')
+      .where('timestamp', '>=', inicioDia)
+      .orderBy('timestamp', 'desc')
+      .limit(200)
+      .get();
     const logs = [];
 
     snapshot.forEach(doc => {
