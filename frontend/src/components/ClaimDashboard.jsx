@@ -94,6 +94,7 @@ const GrupoTab = ({ grupoOrdenado, gruposPorPersona, filtradas, totalH, gruposFS
   const [detalleGrupo, setDetalleGrupo] = React.useState(null);
   const [gruposActivos, setGruposActivos] = React.useState(null); // se inicializa con el top al calcular gruposPorCosto
   const [puntoDetalle, setPuntoDetalle] = React.useState(null); // { grupoNombre, semanaLabel, semanaIdx }
+  const [metrica, setMetrica] = React.useState('horas'); // 'horas' | 'costo' — qué muestra el gráfico de tendencia
 
   // Ordenar por costo descendente
   const gruposPorCosto = [...grupoOrdenado].sort((a, b) => b[1].costo - a[1].costo);
@@ -154,17 +155,18 @@ const GrupoTab = ({ grupoOrdenado, gruposPorPersona, filtradas, totalH, gruposFS
     if (!chartRef.current || semanasLabels.length === 0 || !gruposActivos) return;
     if (chartInstance.current) chartInstance.current.destroy();
 
+    const campo = metrica === 'costo' ? 'costo' : 'horas';
     const datasets = top10Grupos
       .filter(([nombre]) => gruposActivos.has(nombre))
       .map(([nombre], _i) => {
         const idxColor = top10Grupos.findIndex(([n]) => n === nombre);
         const color = nombre === 'Sin grupo asignado' ? COLOR_SIN_GRUPO : COLORES_GRUPO[idxColor % COLORES_GRUPO.length];
-        const horasPorSemana = filtradas.map(s =>
+        const valorPorSemana = filtradas.map(s =>
           Object.entries(s.personas || {}).reduce((sum, [emp, datos]) =>
-            gruposPorPersona[emp]?.grupoNombre === nombre ? sum + (datos.horas || 0) : sum, 0)
+            gruposPorPersona[emp]?.grupoNombre === nombre ? sum + (datos[campo] || 0) : sum, 0)
         );
         return {
-          label: nombre, data: horasPorSemana,
+          label: nombre, data: valorPorSemana,
           borderColor: color, backgroundColor: color,
           borderWidth: 2, tension: 0.3, fill: false,
           pointRadius: 5, pointHoverRadius: 7, pointBackgroundColor: color, pointBorderColor: '#fff', pointBorderWidth: 2
@@ -185,17 +187,17 @@ const GrupoTab = ({ grupoOrdenado, gruposPorPersona, filtradas, totalH, gruposFS
         onHover: (evt, elements) => { evt.native.target.style.cursor = elements.length ? 'pointer' : 'default'; },
         plugins: {
           legend: { display: datasets.length > 1, position: 'bottom', labels: { font: { size: 10 }, boxWidth: 10, padding: 10 } },
-          tooltip: { mode: 'index', intersect: false, callbacks: { label: ctx => `${ctx.dataset.label}: ${fmt(ctx.parsed.y)}h` } }
+          tooltip: { mode: 'index', intersect: false, callbacks: { label: ctx => `${ctx.dataset.label}: ${metrica === 'costo' ? fmtK(ctx.parsed.y) : fmt(ctx.parsed.y)+'h'}` } }
         },
         scales: {
           x: { ticks: { font: { size: 9 }, color: '#888', maxRotation: 45, autoSkip: false }, grid: { display: false } },
-          y: { beginAtZero: true, ticks: { font: { size: 9 }, color: '#888', callback: v => v + 'h' }, grid: { color: 'rgba(128,128,128,0.12)' } }
+          y: { beginAtZero: true, ticks: { font: { size: 9 }, color: '#888', callback: v => metrica === 'costo' ? '$'+Math.round(v/1000)+'K' : v + 'h' }, grid: { color: 'rgba(128,128,128,0.12)' } }
         }
       }
     });
     return () => { if (chartInstance.current) chartInstance.current.destroy(); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [gruposActivos, filtradas.length]);
+  }, [gruposActivos, filtradas.length, metrica]);
 
   return (
     <div>
@@ -237,8 +239,22 @@ const GrupoTab = ({ grupoOrdenado, gruposPorPersona, filtradas, totalH, gruposFS
 
         {/* Gráfico dual — barras horas + línea costo */}
         <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: '10px', padding: '16px 18px' }}>
-          <h4 style={{ margin: '0 0 4px', fontSize: '13px', fontWeight: '600' }}>Tendencia semanal por grupo</h4>
-          <p style={{ fontSize: '11px', color: 'var(--muted)', margin: '0 0 10px' }}>Prende/apaga grupos para comparar · haz clic en un punto para ver los especialistas de esa semana</p>
+          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', gap:'10px', flexWrap:'wrap' }}>
+            <div>
+              <h4 style={{ margin: '0 0 4px', fontSize: '13px', fontWeight: '600' }}>Tendencia semanal por grupo</h4>
+              <p style={{ fontSize: '11px', color: 'var(--muted)', margin: '0 0 10px' }}>Prende/apaga grupos para comparar · haz clic en un punto para ver los especialistas de esa semana</p>
+            </div>
+            <div style={{ display:'flex', gap:'4px', background:'#f3f4f6', borderRadius:'10px', padding:'3px', flexShrink:0 }}>
+              <button onClick={() => setMetrica('horas')}
+                style={{ fontSize:'11px', padding:'5px 10px', borderRadius:'8px', border:'none', cursor:'pointer', fontWeight:'700',
+                  background: metrica==='horas' ? '#fff' : 'transparent', color: metrica==='horas' ? 'var(--ink-950)' : 'var(--muted)',
+                  boxShadow: metrica==='horas' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none' }}>Horas</button>
+              <button onClick={() => setMetrica('costo')}
+                style={{ fontSize:'11px', padding:'5px 10px', borderRadius:'8px', border:'none', cursor:'pointer', fontWeight:'700',
+                  background: metrica==='costo' ? '#fff' : 'transparent', color: metrica==='costo' ? 'var(--ink-950)' : 'var(--muted)',
+                  boxShadow: metrica==='costo' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none' }}>Costo USD</button>
+            </div>
+          </div>
           <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '12px' }}>
             {top10Grupos.map(([nombre], i) => {
               const color = nombre === 'Sin grupo asignado' ? COLOR_SIN_GRUPO : COLORES_GRUPO[i % COLORES_GRUPO.length];
@@ -274,7 +290,7 @@ const GrupoTab = ({ grupoOrdenado, gruposPorPersona, filtradas, totalH, gruposFS
                 ) : personas.map(([emp, datos]) => (
                   <div key={emp} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', padding: '4px 0', borderBottom: '1px solid #eee' }}>
                     <span style={{ fontWeight: '600', color: 'var(--ink-800)' }}>{emp}</span>
-                    <span style={{ color: 'var(--muted)' }}>{fmt(datos.horas)}h{totalSemGrupo > 0 ? ` · ${fmt(datos.horas / totalSemGrupo * 100)}%` : ''}</span>
+                    <span style={{ color: 'var(--muted)' }}>{fmt(datos.horas)}h · {fmtK(datos.costo)}{totalSemGrupo > 0 ? ` · ${fmt(datos.horas / totalSemGrupo * 100)}%` : ''}</span>
                   </div>
                 ))}
               </div>
