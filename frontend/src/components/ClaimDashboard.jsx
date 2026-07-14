@@ -564,6 +564,25 @@ const ClaimDashboard = ({ token, apiUrl, clienteActivo = '' }) => {
     }
   });
 
+  // Versión ANUAL del cruce persona→grupo (todas las semanas cargadas, no
+  // solo el mes/año filtrado). gruposPorPersona de arriba está acotado al
+  // mes filtrado a propósito (así las KPIs "Personas sin grupo" de esta
+  // pestaña reflejan el período seleccionado) — pero eso hacía que el
+  // gráfico "Tendencia anual por grupo" no encontrara a nadie fuera del mes
+  // actual, mostrando 0h en semanas de otros meses.
+  const gruposPorPersonaAnual = {};
+  const todasPersonasExcelAnual = new Set();
+  semanas.forEach(s => Object.keys(s.personas||{}).forEach(p => todasPersonasExcelAnual.add(p)));
+  todasPersonasExcelAnual.forEach(empName => {
+    const userMatch = matchearNombre(empName, usuariosFS);
+    const grupoId = userMatch?.gruposPorCliente?.[clienteActivo] || userMatch?.grupoServicioId || '';
+    if (userMatch && grupoId) {
+      gruposPorPersonaAnual[empName] = { grupoId, grupoNombre: mapaGrupos[grupoId] || grupoId, matched: true };
+    } else {
+      gruposPorPersonaAnual[empName] = { grupoId: '__sin_grupo__', grupoNombre: 'Sin grupo asignado', matched: !!userMatch };
+    }
+  });
+
   // Acumular horas/costo por grupo (total, y separado por OT/SB para los
   // gráficos de "OVT por grupo" y "Standby por grupo")
   const grupoTotal = {};
@@ -685,7 +704,7 @@ const ClaimDashboard = ({ token, apiUrl, clienteActivo = '' }) => {
   const grupoTotalAnual = {};
   todosSem.forEach(s => {
     Object.entries(s.personas||{}).forEach(([empName, datos]) => {
-      const { grupoNombre } = gruposPorPersona[empName] || { grupoNombre: 'Sin grupo asignado' };
+      const { grupoNombre } = gruposPorPersonaAnual[empName] || { grupoNombre: 'Sin grupo asignado' };
       if (!grupoTotalAnual[grupoNombre]) grupoTotalAnual[grupoNombre] = { horas:0, costo:0 };
       grupoTotalAnual[grupoNombre].horas += datos.horas || 0;
       grupoTotalAnual[grupoNombre].costo += datos.costo || 0;
@@ -701,11 +720,11 @@ const ClaimDashboard = ({ token, apiUrl, clienteActivo = '' }) => {
 
   const horasPorSemanaGrupoAnual = todosSem.map(s =>
     Object.entries(s.personas||{}).reduce((sum,[emp,datos]) =>
-      (gruposPorPersona[emp]?.grupoNombre === grupoAnualActivo) ? sum + (datos.horas||0) : sum, 0)
+      (gruposPorPersonaAnual[emp]?.grupoNombre === grupoAnualActivo) ? sum + (datos.horas||0) : sum, 0)
   );
   const costoPorSemanaGrupoAnual = todosSem.map(s =>
     Object.entries(s.personas||{}).reduce((sum,[emp,datos]) =>
-      (gruposPorPersona[emp]?.grupoNombre === grupoAnualActivo) ? sum + (datos.costo||0) : sum, 0)
+      (gruposPorPersonaAnual[emp]?.grupoNombre === grupoAnualActivo) ? sum + (datos.costo||0) : sum, 0)
   );
   const chartTendenciaGrupoAnual = {
     labels: todosSem.map(s => s.label),
