@@ -398,6 +398,9 @@ const ClaimDashboard = ({ token, apiUrl, clienteActivo = '' }) => {
   const [filtroAnio, setFiltroAnio] = useState(new Date().getFullYear());
   const [tabAnalitca, setTabAnalitica] = useState('resumen');
   const [grupoAnualSel, setGrupoAnualSel] = useState(null); // grupo elegido para el gráfico anual "Tendencia por grupo"
+  const [iaLoading, setIaLoading] = useState(false);
+  const [iaError, setIaError] = useState(null);
+  const [iaInsights, setIaInsights] = useState(null);
   // Datos para cruce por grupo
   const [usuariosFS, setUsuariosFS] = useState([]);
   const [gruposFS, setGruposFS] = useState([]);
@@ -767,6 +770,64 @@ const ClaimDashboard = ({ token, apiUrl, clienteActivo = '' }) => {
   };
   const lineOpts = { ...chartBase, scales:{ ...chartBase.scales, y:{...chartBase.scales.y, ticks:{...chartBase.scales.y.ticks, callback:v=>'$'+Math.round(v/1000)+'K'}} } };
 
+  // Análisis IA de tendencias (GROQ) — mismo patrón que Analytics.jsx, pero
+  // con los datos de tendencia semanal/mensual/por grupo en vez de por
+  // especialidad.
+  const generarInsightsTendencia = async () => {
+    setIaLoading(true);
+    setIaError(null);
+    try {
+      const resumenMensual = mesesConsolidado.map(m =>
+        `${m.label}: ${fmt(m.horas)}h, ${fmtK(m.costo)}, rate $${fmt(m.rate)}/h, ${m.semanas} semanas${m.parcial ? ' (mes en curso, parcial)' : ''}${m.variacion!==null ? `, variación ${m.variacion>=0?'+':''}${fmt(m.variacion)}% vs mes anterior` : ''}`
+      ).join('\n');
+      const resumenGrupos = top10GruposAnual.slice(0,8).map(([nombre,v]) =>
+        `${nombre}: ${fmt(v.horas)}h, ${fmtK(v.costo)}`
+      ).join('\n');
+
+      const prompt = `Analiza estos datos de horas extra (OVT) de Kyndryl Chile a lo largo del tiempo y genera un análisis breve.
+
+CONSOLIDADO POR MES (histórico completo, ${todosSem.length} semanas cargadas):
+${resumenMensual}
+
+DISTRIBUCIÓN POR GRUPO DE SERVICIO (acumulado del período completo):
+${resumenGrupos}
+
+Genera un análisis en este formato exacto:
+1. [TENDENCIA] - ¿Las horas/costo están subiendo, bajando o estables mes a mes? (máx 100 caracteres)
+2. [ALERTA] - Anomalía o mes fuera de patrón, si existe (aumento/caída brusca, rate/hora subiendo, grupo concentrando demasiado costo)
+3. [RECOMENDACIÓN] - Una acción concreta y accionable para el equipo de gestión
+
+Sé conciso, específico y basado solo en los números entregados.`;
+
+      const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${process.env.REACT_APP_GROQ_API_KEY}`
+        },
+        body: JSON.stringify({
+          model: 'llama-3.1-8b-instant',
+          messages: [{ role: 'user', content: prompt }],
+          temperature: 0.6,
+          max_tokens: 600
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error('Error en GROQ: ' + (errorData.error?.message || response.statusText));
+      }
+
+      const data = await response.json();
+      setIaInsights(data.choices[0].message.content);
+    } catch (err) {
+      setIaError('Error generando análisis: ' + err.message);
+      console.error(err);
+    } finally {
+      setIaLoading(false);
+    }
+  };
+
   // KPI box helper
   const KPI = ({ icon, label, value, sub, color='var(--ink-950)' }) => (
     <div style={{ background:'var(--glass)', border:'1px solid rgba(255,255,255,0.72)', borderRadius:'24px', padding:'16px', backdropFilter:'blur(18px)', boxShadow:'var(--shadow-soft)' }}>
@@ -1133,6 +1194,32 @@ const ClaimDashboard = ({ token, apiUrl, clienteActivo = '' }) => {
                         </tbody>
                       </table>
                     </div>
+                  </div>
+
+                  {/* Análisis IA de tendencias */}
+                  <div style={{ border:'1px solid rgba(255,255,255,0.72)', borderRadius:'22px', background:'var(--glass)', boxShadow:'var(--shadow-soft)', backdropFilter:'blur(18px)', padding:'18px 20px', marginTop:'16px' }}>
+                    <div style={{ fontFamily:"'IBM Plex Mono',monospace", fontSize:'9px', fontWeight:'700', color:'var(--muted)', textTransform:'uppercase', letterSpacing:'.09em', marginBottom:'4px' }}>IA</div>
+                    <h4 style={{ margin:'0 0 12px', fontSize:'1rem', fontWeight:'800', color:'var(--ink-950)', letterSpacing:'-.03em' }}>Análisis de tendencias con IA</h4>
+
+                    {iaLoading && <p style={{ color:'var(--muted)', fontStyle:'italic', fontSize:'13px' }}>⏳ Analizando tendencia mensual y por grupo...</p>}
+                    {iaError && <p style={{ color:'#e24b4a', fontSize:'13px' }}>❌ {iaError}</p>}
+                    {iaInsights && !iaLoading && (
+                      <div>
+                        <div style={{ whiteSpace:'pre-wrap', fontFamily:'monospace', fontSize:'13px', lineHeight:'1.6', color:'var(--ink-950)', background:'rgba(238,245,248,0.6)', padding:'15px', borderRadius:'10px', marginBottom:'12px' }}>
+                          {iaInsights}
+                        </div>
+                        <button onClick={generarInsightsTendencia}
+                          style={{ padding:'9px 16px', background:'#4CAF50', color:'#fff', border:'none', borderRadius:'8px', cursor:'pointer', fontSize:'12px', fontWeight:'700' }}>
+                          🔄 Regenerar análisis
+                        </button>
+                      </div>
+                    )}
+                    {!iaLoading && !iaInsights && !iaError && (
+                      <button onClick={generarInsightsTendencia}
+                        style={{ padding:'10px 18px', background:'#3266ad', color:'#fff', border:'none', borderRadius:'8px', cursor:'pointer', fontSize:'13px', fontWeight:'700' }}>
+                        🚀 Generar análisis IA
+                      </button>
+                    )}
                   </div>
                 </div>
               )}
