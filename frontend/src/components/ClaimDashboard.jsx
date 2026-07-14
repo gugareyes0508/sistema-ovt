@@ -770,34 +770,57 @@ const ClaimDashboard = ({ token, apiUrl, clienteActivo = '' }) => {
   };
   const lineOpts = { ...chartBase, scales:{ ...chartBase.scales, y:{...chartBase.scales.y, ticks:{...chartBase.scales.y.ticks, callback:v=>'$'+Math.round(v/1000)+'K'}} } };
 
-  // Análisis IA de tendencias (GROQ) — mismo patrón que Analytics.jsx, pero
-  // con los datos de tendencia semanal/mensual/por grupo en vez de por
-  // especialidad.
+  // ── Análisis global IA (Resumen Ejecutivo + tarjetas por grupo) ──
+  // Las cifras (horas, costo, %, tendencia) se calculan en JS para que sean
+  // exactas; la IA solo redacta el resumen ejecutivo y una recomendación
+  // corta por grupo — no inventa números.
+  const totalHorasAnual = todosSem.reduce((s,x)=>s+(x.base||0)+(x.ot||0)+(x.sb||0),0);
+  const totalCostoAnual = todosSem.reduce((s,x)=>s+(x.costo||0),0);
+  const mesMayorCarga = [...mesesConsolidado].sort((a,b)=>b.horas-a.horas)[0] || null;
+
+  const statsGruposAnual = top10GruposAnual.slice(0,8).map(([nombre, v], i) => {
+    // Tendencia: compara la 2da mitad del período vs la 1ra mitad para este grupo
+    const mitad = Math.ceil(todosSem.length/2);
+    const primeraMitad = todosSem.slice(0, mitad);
+    const segundaMitad = todosSem.slice(mitad);
+    const horasPrimera = primeraMitad.reduce((s,sem)=>s+Object.entries(sem.personas||{}).reduce((a,[emp,d])=>gruposPorPersonaAnual[emp]?.grupoNombre===nombre?a+(d.horas||0):a,0),0);
+    const horasSegunda = segundaMitad.reduce((s,sem)=>s+Object.entries(sem.personas||{}).reduce((a,[emp,d])=>gruposPorPersonaAnual[emp]?.grupoNombre===nombre?a+(d.horas||0):a,0),0);
+    let tendencia = 'estable';
+    if (horasPrimera > 0) {
+      if (horasSegunda > horasPrimera * 1.15) tendencia = 'creciente';
+      else if (horasSegunda < horasPrimera * 0.85) tendencia = 'decreciente';
+    }
+    return {
+      nombre, horas: v.horas, costo: v.costo,
+      pct: totalHorasAnual > 0 ? (v.horas/totalHorasAnual*100) : 0,
+      tendencia,
+      color: nombre === 'Sin grupo asignado' ? COLOR_SIN_GRUPO : COLORES_GRUPO[i % COLORES_GRUPO.length],
+      recomendacion: '' // se completa con la respuesta de IA
+    };
+  });
+
   const generarInsightsTendencia = async () => {
     setIaLoading(true);
     setIaError(null);
     try {
-      const resumenMensual = mesesConsolidado.map(m =>
-        `${m.label}: ${fmt(m.horas)}h, ${fmtK(m.costo)}, rate $${fmt(m.rate)}/h, ${m.semanas} semanas${m.parcial ? ' (mes en curso, parcial)' : ''}${m.variacion!==null ? `, variación ${m.variacion>=0?'+':''}${fmt(m.variacion)}% vs mes anterior` : ''}`
-      ).join('\n');
-      const resumenGrupos = top10GruposAnual.slice(0,8).map(([nombre,v]) =>
-        `${nombre}: ${fmt(v.horas)}h, ${fmtK(v.costo)}`
+      const resumenGrupos = statsGruposAnual.map(g =>
+        `${g.nombre}: ${fmt(g.horas)}h (${fmt(g.pct)}%), ${fmtK(g.costo)}, tendencia ${g.tendencia}`
       ).join('\n');
 
-      const prompt = `Analiza estos datos de horas extra (OVT) de Kyndryl Chile a lo largo del tiempo y genera un análisis breve.
+      const prompt = `Analiza estos datos de horas extra (OVT) de Kyndryl Chile.
 
-CONSOLIDADO POR MES (histórico completo, ${todosSem.length} semanas cargadas):
-${resumenMensual}
+TOTAL DEL PERÍODO: ${fmt(totalHorasAnual)}h, ${fmtK(totalCostoAnual)}, ${todosSem.length} semanas cargadas.
+MES CON MAYOR CARGA: ${mesMayorCarga ? `${mesMayorCarga.label} (${fmt(mesMayorCarga.horas)}h)` : 'sin datos'}.
 
-DISTRIBUCIÓN POR GRUPO DE SERVICIO (acumulado del período completo):
+HORAS POR GRUPO DE SERVICIO:
 ${resumenGrupos}
 
-Genera un análisis en este formato exacto:
-1. [TENDENCIA] - ¿Las horas/costo están subiendo, bajando o estables mes a mes? (máx 100 caracteres)
-2. [ALERTA] - Anomalía o mes fuera de patrón, si existe (aumento/caída brusca, rate/hora subiendo, grupo concentrando demasiado costo)
-3. [RECOMENDACIÓN] - Una acción concreta y accionable para el equipo de gestión
+Responde en EXACTAMENTE este formato de texto plano, una línea por elemento, sin markdown ni numeración:
+RESUMEN: <1-2 oraciones resumiendo la carga de trabajo y dónde se concentra, máx 220 caracteres>
+GRUPO: ${statsGruposAnual[0]?.nombre || ''} | <recomendación de gestión de máx 40 caracteres para este grupo>
+${statsGruposAnual.slice(1).map(g => `GRUPO: ${g.nombre} | <recomendación de máx 40 caracteres>`).join('\n')}
 
-Sé conciso, específico y basado solo en los números entregados.`;
+No agregues texto fuera de ese formato.`;
 
       const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
         method: 'POST',
@@ -808,8 +831,8 @@ Sé conciso, específico y basado solo en los números entregados.`;
         body: JSON.stringify({
           model: 'llama-3.1-8b-instant',
           messages: [{ role: 'user', content: prompt }],
-          temperature: 0.6,
-          max_tokens: 600
+          temperature: 0.5,
+          max_tokens: 700
         })
       });
 
@@ -819,7 +842,28 @@ Sé conciso, específico y basado solo en los números entregados.`;
       }
 
       const data = await response.json();
-      setIaInsights(data.choices[0].message.content);
+      const texto = data.choices[0].message.content;
+
+      // Parsear el formato RESUMEN: / GRUPO: nombre | recomendación
+      const lineas = texto.split('\n').map(l => l.trim()).filter(Boolean);
+      let resumen = '';
+      const recomendaciones = {};
+      lineas.forEach(linea => {
+        if (linea.startsWith('RESUMEN:')) {
+          resumen = linea.replace('RESUMEN:', '').trim();
+        } else if (linea.startsWith('GRUPO:')) {
+          const resto = linea.replace('GRUPO:', '').trim();
+          const [nombreG, ...rec] = resto.split('|');
+          if (nombreG) recomendaciones[nombreG.trim()] = rec.join('|').trim();
+        }
+      });
+
+      const gruposConRecomendacion = statsGruposAnual.map(g => ({
+        ...g,
+        recomendacion: recomendaciones[g.nombre] || 'Sin recomendación específica'
+      }));
+
+      setIaInsights({ resumen: resumen || 'Análisis generado sin resumen ejecutivo.', grupos: gruposConRecomendacion });
     } catch (err) {
       setIaError('Error generando análisis: ' + err.message);
       console.error(err);
@@ -1199,15 +1243,57 @@ Sé conciso, específico y basado solo en los números entregados.`;
                   {/* Análisis IA de tendencias */}
                   <div style={{ border:'1px solid rgba(255,255,255,0.72)', borderRadius:'22px', background:'var(--glass)', boxShadow:'var(--shadow-soft)', backdropFilter:'blur(18px)', padding:'18px 20px', marginTop:'16px' }}>
                     <div style={{ fontFamily:"'IBM Plex Mono',monospace", fontSize:'9px', fontWeight:'700', color:'var(--muted)', textTransform:'uppercase', letterSpacing:'.09em', marginBottom:'4px' }}>IA</div>
-                    <h4 style={{ margin:'0 0 12px', fontSize:'1rem', fontWeight:'800', color:'var(--ink-950)', letterSpacing:'-.03em' }}>Análisis de tendencias con IA</h4>
+                    <h4 style={{ margin:'0 0 12px', fontSize:'1rem', fontWeight:'800', color:'var(--ink-950)', letterSpacing:'-.03em' }}>Análisis global de tendencias — costos, horas y grupos</h4>
 
                     {iaLoading && <p style={{ color:'var(--muted)', fontStyle:'italic', fontSize:'13px' }}>⏳ Analizando tendencia mensual y por grupo...</p>}
                     {iaError && <p style={{ color:'#e24b4a', fontSize:'13px' }}>❌ {iaError}</p>}
+
                     {iaInsights && !iaLoading && (
                       <div>
-                        <div style={{ whiteSpace:'pre-wrap', fontFamily:'monospace', fontSize:'13px', lineHeight:'1.6', color:'var(--ink-950)', background:'rgba(238,245,248,0.6)', padding:'15px', borderRadius:'10px', marginBottom:'12px' }}>
-                          {iaInsights}
+                        {/* Resumen Ejecutivo */}
+                        <div style={{ background:'rgba(238,245,248,0.7)', border:'1px solid rgba(11,41,64,0.08)', borderRadius:'14px', padding:'14px 16px', marginBottom:'16px' }}>
+                          <div style={{ fontSize:'11px', fontWeight:'800', color:'var(--ink-950)', marginBottom:'6px' }}>📋 Resumen Ejecutivo</div>
+                          <p style={{ fontSize:'13px', color:'var(--ink-800)', margin:'0 0 8px', lineHeight:'1.5' }}>{iaInsights.resumen}</p>
+                          <div style={{ display:'flex', gap:'16px', flexWrap:'wrap', fontSize:'11px', color:'var(--muted)' }}>
+                            {mesMayorCarga && <span>🏔️ Mayor carga: <strong style={{color:'var(--ink-950)'}}>{mesMayorCarga.label}</strong> ({fmt(mesMayorCarga.horas)}h)</span>}
+                            <span>📊 Total analizado: <strong style={{color:'var(--ink-950)'}}>{fmt(totalHorasAnual)}h · {fmtK(totalCostoAnual)}</strong></span>
+                          </div>
                         </div>
+
+                        {/* Tarjetas por grupo */}
+                        <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(240px,1fr))', gap:'12px', marginBottom:'14px' }}>
+                          {iaInsights.grupos.map(g => {
+                            const tendIcon = g.tendencia === 'creciente' ? '📈' : g.tendencia === 'decreciente' ? '📉' : '➡️';
+                            return (
+                              <div key={g.nombre} style={{ borderRadius:'16px', overflow:'hidden', border:'1px solid rgba(11,41,64,0.08)', background:'#fff' }}>
+                                <div style={{ background:g.color, color:'#fff', padding:'10px 14px', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                                  <span style={{ fontSize:'12px', fontWeight:'800' }}>{g.nombre}</span>
+                                  <span style={{ fontSize:'10px', fontWeight:'700', background:'rgba(255,255,255,0.25)', padding:'2px 8px', borderRadius:'10px' }}>{tendIcon} {g.tendencia}</span>
+                                </div>
+                                <div style={{ padding:'12px 14px' }}>
+                                  <div style={{ display:'flex', gap:'14px', marginBottom:'10px' }}>
+                                    <div>
+                                      <div style={{ fontSize:'15px', fontWeight:'800', color:'var(--ink-950)' }}>{fmt(g.horas)}h</div>
+                                      <div style={{ fontSize:'9px', color:'var(--muted)', textTransform:'uppercase', fontWeight:'700' }}>Horas</div>
+                                    </div>
+                                    <div>
+                                      <div style={{ fontSize:'15px', fontWeight:'800', color:'var(--ink-950)' }}>{fmt(g.pct)}%</div>
+                                      <div style={{ fontSize:'9px', color:'var(--muted)', textTransform:'uppercase', fontWeight:'700' }}>Del total</div>
+                                    </div>
+                                    <div>
+                                      <div style={{ fontSize:'15px', fontWeight:'800', color:'var(--ink-950)' }}>{fmtK(g.costo)}</div>
+                                      <div style={{ fontSize:'9px', color:'var(--muted)', textTransform:'uppercase', fontWeight:'700' }}>Costo</div>
+                                    </div>
+                                  </div>
+                                  <div style={{ fontSize:'11px', color:'var(--ink-800)', background:'rgba(238,245,248,0.7)', borderRadius:'8px', padding:'6px 10px', display:'flex', alignItems:'center', gap:'6px' }}>
+                                    💡 {g.recomendacion}
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+
                         <button onClick={generarInsightsTendencia}
                           style={{ padding:'9px 16px', background:'#4CAF50', color:'#fff', border:'none', borderRadius:'8px', cursor:'pointer', fontSize:'12px', fontWeight:'700' }}>
                           🔄 Regenerar análisis
