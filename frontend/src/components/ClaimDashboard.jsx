@@ -714,6 +714,38 @@ const ClaimDashboard = ({ token, apiUrl, clienteActivo = '' }) => {
       { label:'Costo USD', data:costoPorSemanaGrupoAnual, borderColor:'#1baf7a', backgroundColor:'transparent', borderWidth:2, borderDash:[4,3], fill:false, tension:0.35, pointRadius:3, pointBackgroundColor:'#1baf7a', yAxisID:'y2' }
     ]
   };
+
+  // Consolidado mensual — suma todas las semanas dentro de cada mes calendario
+  const MESES_NOMBRE = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+  const mesesMap = {};
+  todosSem.forEach(s => {
+    const key = `${s.anio}-${String(s.mes).padStart(2,'0')}`;
+    if (!mesesMap[key]) mesesMap[key] = { anio:s.anio, mes:s.mes, horas:0, costo:0, semanas:0 };
+    mesesMap[key].horas += (s.base||0)+(s.ot||0)+(s.sb||0);
+    mesesMap[key].costo += s.costo||0;
+    mesesMap[key].semanas += 1;
+  });
+  const hoy = new Date();
+  const mesesConsolidado = Object.keys(mesesMap).sort().map((key, i, arr) => {
+    const m = mesesMap[key];
+    const esUltimo = i === arr.length - 1;
+    const esMesActual = esUltimo && m.anio === hoy.getFullYear() && m.mes === (hoy.getMonth()+1);
+    const anterior = i > 0 ? mesesMap[arr[i-1]] : null;
+    const variacion = anterior && anterior.horas > 0 ? ((m.horas - anterior.horas) / anterior.horas) * 100 : null;
+    return {
+      key, label: `${MESES_NOMBRE[m.mes-1]} ${m.anio}`,
+      horas: m.horas, costo: m.costo, semanas: m.semanas,
+      rate: m.horas > 0 ? m.costo / m.horas : 0,
+      parcial: esMesActual, variacion
+    };
+  });
+  const chartMensual = {
+    labels: mesesConsolidado.map(m => m.label),
+    datasets:[
+      { label:'Horas', type:'bar', data:mesesConsolidado.map(m=>m.horas), backgroundColor:'#2a78d6', borderRadius:6, yAxisID:'y' },
+      { label:'Costo USD', type:'line', data:mesesConsolidado.map(m=>m.costo), borderColor:'#1baf7a', backgroundColor:'transparent', borderWidth:2.5, borderDash:[5,3], fill:false, tension:0.3, pointRadius:5, pointBackgroundColor:'#1baf7a', pointBorderColor:'#fff', pointBorderWidth:2, yAxisID:'y2' }
+    ]
+  };
   const lineOpts = { ...chartBase, scales:{ ...chartBase.scales, y:{...chartBase.scales.y, ticks:{...chartBase.scales.y.ticks, callback:v=>'$'+Math.round(v/1000)+'K'}} } };
 
   // KPI box helper
@@ -1039,6 +1071,48 @@ const ClaimDashboard = ({ token, apiUrl, clienteActivo = '' }) => {
                     </div>
                     <div style={{ position:'relative', height:'220px', overflow:'hidden' }}>
                       <Line data={chartTendenciaGrupoAnual} options={chartTendOpts} />
+                    </div>
+                  </div>
+
+                  {/* Consolidado mensual */}
+                  <div style={{ border:'1px solid rgba(255,255,255,0.72)', borderRadius:'22px', background:'var(--glass)', boxShadow:'var(--shadow-soft)', backdropFilter:'blur(18px)', padding:'18px 20px', marginTop:'16px' }}>
+                    <div style={{ fontFamily:"'IBM Plex Mono',monospace", fontSize:'9px', fontWeight:'700', color:'var(--muted)', textTransform:'uppercase', letterSpacing:'.09em', marginBottom:'4px' }}>Gráfico</div>
+                    <h4 style={{ margin:'0 0 4px', fontSize:'1rem', fontWeight:'800', color:'var(--ink-950)', letterSpacing:'-.03em' }}>Consolidado mensual — horas y costo</h4>
+                    <p style={{ fontSize:'11px', color:'var(--muted)', margin:'0 0 14px' }}>Suma de todas las semanas dentro de cada mes calendario</p>
+                    <div style={{ position:'relative', height:'220px', overflow:'hidden', marginBottom:'18px' }}>
+                      <Line data={chartMensual} options={chartTendOpts} />
+                    </div>
+
+                    <div style={{ fontFamily:"'IBM Plex Mono',monospace", fontSize:'9px', fontWeight:'700', color:'var(--muted)', textTransform:'uppercase', letterSpacing:'.07em', marginBottom:'8px' }}>Detalle</div>
+                    <div style={{ overflowX:'auto' }}>
+                      <table style={{ width:'100%', borderCollapse:'collapse', fontSize:'12px' }}>
+                        <thead>
+                          <tr style={{ textAlign:'left', color:'var(--muted)', fontSize:'10px', textTransform:'uppercase', letterSpacing:'.05em' }}>
+                            <th style={{ padding:'6px 8px 6px 0', fontWeight:'700' }}>Mes</th>
+                            <th style={{ padding:'6px 8px', fontWeight:'700' }}>Semanas</th>
+                            <th style={{ padding:'6px 8px', fontWeight:'700', textAlign:'right' }}>Horas</th>
+                            <th style={{ padding:'6px 8px', fontWeight:'700', textAlign:'right' }}>Costo</th>
+                            <th style={{ padding:'6px 8px', fontWeight:'700', textAlign:'right' }}>Rate/h</th>
+                            <th style={{ padding:'6px 0 6px 8px', fontWeight:'700', textAlign:'right' }}>Var. vs mes ant.</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {mesesConsolidado.map(m => (
+                            <tr key={m.key} style={{ borderTop:'1px solid rgba(11,41,64,0.06)' }}>
+                              <td style={{ padding:'8px 8px 8px 0', fontWeight:'700', color:'var(--ink-950)' }}>{m.label}</td>
+                              <td style={{ padding:'8px', color:'var(--muted)' }}>
+                                {m.semanas}{m.parcial && <span style={{ color:'#d97706', fontWeight:'700' }}> · parcial</span>}
+                              </td>
+                              <td style={{ padding:'8px', textAlign:'right', fontWeight:'700', color:'var(--ink-950)' }}>{fmt(m.horas)}h</td>
+                              <td style={{ padding:'8px', textAlign:'right', color:'#1baf7a', fontWeight:'700' }}>{fmtK(m.costo)}</td>
+                              <td style={{ padding:'8px', textAlign:'right', color:'var(--muted)' }}>${fmt(m.rate)}/h</td>
+                              <td style={{ padding:'8px 0 8px 8px', textAlign:'right', fontWeight:'700', color: m.variacion===null ? 'var(--muted)' : (m.variacion>=0 ? '#e24b4a' : '#1baf7a') }}>
+                                {m.variacion===null ? '—' : `${m.variacion>=0?'▲':'▼'} ${fmt(Math.abs(m.variacion))}%`}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
                     </div>
                   </div>
                 </div>
