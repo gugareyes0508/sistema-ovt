@@ -1,1 +1,6 @@
-.env 
+.env
+.env*
+.vercel
+node_modules/
+*.pem
+.DS_Store
