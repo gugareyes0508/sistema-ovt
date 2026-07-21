@@ -48,6 +48,18 @@ en dos cuentas de cliente: Banco de Chile (bcochile) y Sura. Un solo dev
 - Herramientas de Mac: Homebrew, GitHub CLI (`gh`) para autenticación con
   GitHub (login vía navegador, sin manejo manual de tokens/SSH keys).
 
+- **VPN corporativa Kyndryl hace SSL inspection** (certificados: "Kyndryl PKI
+  Root CA", "Kyndryl Certification Authority T1", "Kyndryl SSL Inspection",
+  visibles en Keychain Access → System). Esto rompe conexiones HTTPS/gRPC de
+  herramientas que no confían en el almacén de certs del sistema:
+  - npm/vercel CLI: exportar los 3 certs desde Keychain Access a .pem,
+    concatenarlos en un bundle, y `npm config set cafile ~/Downloads/kyndryl-bundle.pem`
+  - Firestore (`@google-cloud/firestore`) usa gRPC, que la inspección SSL
+    rompe incluso con el cert correcto instalado. Fix: forzar modo REST con
+    `export FIRESTORE_PREFER_REST=true` en `~/.zshrc`.
+  - Variables agregadas a `~/.zshrc`: `NODE_EXTRA_CA_CERTS`,
+    `GRPC_DEFAULT_SSL_ROOTS_FILE_PATH`, `FIRESTORE_PREFER_REST=true`.
+
 ## Herramientas / recursos
 - IA: GROQ API (free tier), modelo `llama-3.1-8b-instant`, key en
   `REACT_APP_GROQ_API_KEY` (local y Vercel).
