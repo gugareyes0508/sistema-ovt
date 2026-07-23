@@ -10,6 +10,7 @@ import ExcelUpload from './components/ExcelUpload';
 import Analytics from './components/Analytics';
 import GestionUsuarios from './components/GestionUsuarios';
 import PermisosRoles from './components/PermisosRoles';
+import ControlAlertas from './components/ControlAlertas';
 import './App.css';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
@@ -938,6 +939,7 @@ function App() {
             {puedeVer('registros') && <button className={vista==='registros'?'nav-btn active':'nav-btn'} onClick={()=>setVista('registros')}><i className="ti ti-edit" aria-hidden="true"></i>Registrar cambio</button>}
             {puedeVer('resumen') && <button className={vista==='resumen'?'nav-btn active':'nav-btn'} onClick={()=>setVista('resumen')}><i className="ti ti-chart-bar" aria-hidden="true"></i>Mi resumen</button>}
             {puedeVer('carga-excel') && <button className={vista==='excel-upload'?'nav-btn active':'nav-btn'} onClick={()=>setVista('excel-upload')}><i className="ti ti-upload" aria-hidden="true"></i>Cargar Excel</button>}
+            {puedeVer('alertas') && <button className={vista==='alertas'?'nav-btn active':'nav-btn'} onClick={()=>setVista('alertas')}><i className="ti ti-bell" aria-hidden="true"></i>Control de Alertas</button>}
           </nav>
         )}
 
@@ -946,6 +948,7 @@ function App() {
             {puedeVer('proyeccion-nueva') && <button className={vista==='proyeccion-nueva'?'nav-btn active':'nav-btn'} onClick={()=>setVista('proyeccion-nueva')}><i className="ti ti-plus" aria-hidden="true"></i>Nueva proyección</button>}
             {puedeVer('proyeccion-mis') && <button className={vista==='proyeccion-mis'?'nav-btn active':'nav-btn'} onClick={()=>setVista('proyeccion-mis')}><i className="ti ti-list" aria-hidden="true"></i>Mis proyecciones</button>}
             {puedeVer('proyeccion-excel') && <button className={vista==='proyeccion-excel'?'nav-btn active':'nav-btn'} onClick={()=>setVista('proyeccion-excel')}><i className="ti ti-upload" aria-hidden="true"></i>Cargar Excel</button>}
+            {puedeVer('alertas') && <button className={vista==='alertas'?'nav-btn active':'nav-btn'} onClick={()=>setVista('alertas')}><i className="ti ti-bell" aria-hidden="true"></i>Control de Alertas</button>}
           </nav>
         )}
 
@@ -967,6 +970,7 @@ function App() {
               {puedeVer('analytics') && <button className={vista==='analytics'?'nav-btn active':'nav-btn'} onClick={()=>setVista('analytics')}><i className="ti ti-chart-bar" aria-hidden="true"></i>Analytics</button>}
               {puedeVer('ovt-proyectado') && <button className={vista==='ovt-proyectado'?'nav-btn active':'nav-btn'} onClick={()=>setVista('ovt-proyectado')}><i className="ti ti-calendar" aria-hidden="true"></i>OVT Proyectado</button>}
               {puedeVer('claim') && <button className={vista==='claim'?'nav-btn active':'nav-btn'} onClick={()=>setVista('claim')}><i className="ti ti-clock" aria-hidden="true"></i>Control de Labor</button>}
+              {puedeVer('alertas') && <button className={vista==='alertas'?'nav-btn active':'nav-btn'} onClick={()=>setVista('alertas')}><i className="ti ti-bell" aria-hidden="true"></i>Control de Alertas</button>}
             </nav>
             <div className="sidebar-section">Administración</div>
             <nav className="nav">
@@ -1900,6 +1904,11 @@ function App() {
         {/* Permisos de Roles — solo admin */}
         {vista === 'permisos-roles' && usuario.rol === 'admin' && (
           <PermisosRoles token={token} apiUrl={API_URL} />
+        )}
+
+        {/* Control de Alertas — admin, especialista, itsm */}
+        {vista === 'alertas' && (usuario.rol === 'admin' || usuario.rol === 'especialista' || usuario.rol === 'itsm') && (
+          <ControlAlertas key={`alertas-${clienteActivo}`} token={token} apiUrl={API_URL} clienteActivo={clienteActivo} usuario={usuario} />
         )}
       </main>
 

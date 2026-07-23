@@ -1431,11 +1431,11 @@ app.delete('/api/grupos-servicio/:id', verificarToken, async (req, res) => {
 // ============================================
 
 const PERMISOS_DEFAULT = {
-  admin:        { dashboard:true, analytics:true, 'ovt-proyectado':true, claim:true, usuarios:true, mantenedor:true, auditoria:true, registros:false, resumen:false, 'carga-excel':false, 'proyeccion-nueva':false, 'proyeccion-mis':false, 'permisos-roles':true },
-  dpe:          { dashboard:true, analytics:true, 'ovt-proyectado':true, claim:true, usuarios:true, mantenedor:false, auditoria:false, registros:false, resumen:false, 'carga-excel':false, 'proyeccion-nueva':false, 'proyeccion-mis':false, 'permisos-roles':false },
-  teamleader:   { dashboard:true, analytics:true, 'ovt-proyectado':false, claim:false, usuarios:false, mantenedor:false, auditoria:false, registros:false, resumen:false, 'carga-excel':false, 'proyeccion-nueva':false, 'proyeccion-mis':false, 'permisos-roles':false },
-  especialista: { dashboard:false, analytics:false, 'ovt-proyectado':false, claim:false, usuarios:false, mantenedor:false, auditoria:false, registros:true, resumen:true, 'carga-excel':true, 'proyeccion-nueva':false, 'proyeccion-mis':false, 'permisos-roles':false },
-  itsm:         { dashboard:false, analytics:false, 'ovt-proyectado':false, claim:false, usuarios:false, mantenedor:false, auditoria:false, registros:false, resumen:false, 'carga-excel':false, 'proyeccion-nueva':true, 'proyeccion-mis':true, 'permisos-roles':false },
+  admin:        { dashboard:true, analytics:true, 'ovt-proyectado':true, claim:true, usuarios:true, mantenedor:true, auditoria:true, registros:false, resumen:false, 'carga-excel':false, 'proyeccion-nueva':false, 'proyeccion-mis':false, 'permisos-roles':true, alertas:true },
+  dpe:          { dashboard:true, analytics:true, 'ovt-proyectado':true, claim:true, usuarios:true, mantenedor:false, auditoria:false, registros:false, resumen:false, 'carga-excel':false, 'proyeccion-nueva':false, 'proyeccion-mis':false, 'permisos-roles':false, alertas:false },
+  teamleader:   { dashboard:true, analytics:true, 'ovt-proyectado':false, claim:false, usuarios:false, mantenedor:false, auditoria:false, registros:false, resumen:false, 'carga-excel':false, 'proyeccion-nueva':false, 'proyeccion-mis':false, 'permisos-roles':false, alertas:false },
+  especialista: { dashboard:false, analytics:false, 'ovt-proyectado':false, claim:false, usuarios:false, mantenedor:false, auditoria:false, registros:true, resumen:true, 'carga-excel':true, 'proyeccion-nueva':false, 'proyeccion-mis':false, 'permisos-roles':false, alertas:true },
+  itsm:         { dashboard:false, analytics:false, 'ovt-proyectado':false, claim:false, usuarios:false, mantenedor:false, auditoria:false, registros:false, resumen:false, 'carga-excel':false, 'proyeccion-nueva':true, 'proyeccion-mis':true, 'permisos-roles':false, alertas:true },
 };
 
 // GET /api/permisos-roles — cualquier usuario autenticado puede leer
@@ -1476,6 +1476,344 @@ app.post('/api/permisos-roles', verificarToken, async (req, res) => {
     res.json({ success: true, message: 'Permisos actualizados correctamente' });
   } catch (err) {
     console.error('Error POST /api/permisos-roles:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ============================================
+// CONTROL DE ALERTAS
+// ============================================
+
+const ALERTAS_ROLES_PERMITIDOS = ['admin', 'especialista', 'itsm'];
+
+function extraerHostDeDescripcion(descripcion, tipo) {
+  const texto = String(descripcion || '');
+  let m = /Host:\s*([^\n]+)/.exec(texto);
+  if (m) return m[1].trim();
+  m = /Name\[0\]:\s*([^\n]+)/.exec(texto);
+  if (m) return m[1].trim();
+  m = /Kubernetes workload\s*\n([^\n]+)/.exec(texto);
+  if (m) return m[1].trim();
+  // Alertas de balanceadores/servicios donde el propio "Tipo" ya identifica el recurso
+  if (tipo && /^el balancer|^lbaas/i.test(tipo)) return tipo.trim();
+  return null;
+}
+
+function slugAlertaKey(host, tipo) {
+  const norm = (s) => String(s || 'desconocido')
+    .toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/(^-|-$)/g, '');
+  return `${norm(host)}__${norm(tipo)}`;
+}
+
+// POST /api/alertas/upload — recibe array de alertas ya parseadas desde el Excel (frontend usa xlsx)
+app.post('/api/alertas/upload', verificarToken, async (req, res) => {
+  try {
+    if (!ALERTAS_ROLES_PERMITIDOS.includes(req.usuario.rol)) {
+      return res.status(403).json({ error: 'Sin permisos' });
+    }
+
+    const { alertas } = req.body;
+    if (!Array.isArray(alertas) || alertas.length === 0) {
+      return res.status(400).json({ error: 'No se recibieron alertas' });
+    }
+
+    const clienteActivoId = req.headers['x-cliente-activo'] || 'bcochile';
+
+    const existSnap = await db.collection('alertas_raw')
+      .where('clienteId', '==', clienteActivoId)
+      .get();
+    const existentes = new Set();
+    existSnap.forEach(doc => existentes.add(doc.id));
+
+    const nuevas = alertas.filter(a => a.numero && !existentes.has(a.numero));
+    if (nuevas.length === 0) {
+      return res.json({ message: 'Todas las alertas ya estaban cargadas', nuevas: 0, total: alertas.length });
+    }
+
+    const chunks = [];
+    for (let i = 0; i < nuevas.length; i += 450) chunks.push(nuevas.slice(i, i + 450));
+
+    for (const chunk of chunks) {
+      const batch = db.batch();
+      chunk.forEach(a => {
+        const host = a.host || extraerHostDeDescripcion(a.descripcion, a.tipo);
+        const ref = db.collection('alertas_raw').doc(a.numero);
+        batch.set(ref, {
+          numero: a.numero,
+          gravedad: a.gravedad || '',
+          tipo: a.tipo || '',
+          recurso: a.recurso || '',
+          descripcionBreve: a.descripcionBreve || '',
+          descripcion: a.descripcion || '',
+          host: host || null,
+          grupo: a.grupo || '',
+          grupoAsignacion: a.grupoAsignacion || '',
+          asignadoA: a.asignadoA || '',
+          prioridad: a.prioridad || null,
+          horaEventoInicial: a.horaEventoInicial ? new Date(a.horaEventoInicial) : null,
+          horaUltimoEvento: a.horaUltimoEvento ? new Date(a.horaUltimoEvento) : null,
+          creado: a.creado ? new Date(a.creado) : new Date(),
+          estado: a.estado || '',
+          clienteId: clienteActivoId,
+          importadoPor: req.usuario.nombre,
+          importadoEn: new Date()
+        });
+      });
+      await batch.commit();
+    }
+
+    await db.collection('auditoria').add({
+      accion: 'ALERTAS_UPLOAD',
+      usuarioNombre: req.usuario.nombre,
+      alertasNuevas: nuevas.length,
+      alertasTotales: alertas.length,
+      clienteId: clienteActivoId,
+      timestamp: new Date()
+    });
+
+    res.json({ message: 'Carga exitosa', nuevas: nuevas.length, total: alertas.length });
+  } catch (err) {
+    console.error('Error POST /api/alertas/upload:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/alertas — listado filtrable
+app.get('/api/alertas', verificarToken, async (req, res) => {
+  try {
+    if (!ALERTAS_ROLES_PERMITIDOS.includes(req.usuario.rol)) {
+      return res.status(403).json({ error: 'Sin permisos' });
+    }
+    const clienteActivoId = req.headers['x-cliente-activo'] || 'bcochile';
+    const { grupo, gravedad, estado, host, tipo } = req.query;
+
+    let query = db.collection('alertas_raw').where('clienteId', '==', clienteActivoId);
+    if (grupo) query = query.where('grupo', '==', grupo);
+    if (gravedad) query = query.where('gravedad', '==', gravedad);
+    if (estado) query = query.where('estado', '==', estado);
+
+    const snap = await query.get();
+    let alertas = [];
+    snap.forEach(doc => alertas.push({ id: doc.id, ...doc.data() }));
+
+    // host/tipo se filtran en memoria (dataset pequeño), evita índices compuestos extra
+    if (host) alertas = alertas.filter(a => (a.host || 'Desconocido') === host);
+    if (tipo) alertas = alertas.filter(a => a.tipo === tipo);
+
+    alertas.sort((a, b) => (b.creado?._seconds || 0) - (a.creado?._seconds || 0));
+
+    res.json(alertas);
+  } catch (err) {
+    console.error('Error GET /api/alertas:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// DELETE /api/alertas — limpia alertas_raw y alertas_gestion del cliente activo (solo admin)
+app.delete('/api/alertas', verificarToken, async (req, res) => {
+  try {
+    if (req.usuario.rol !== 'admin') return res.status(403).json({ error: 'Solo admin' });
+    const clienteActivoId = req.headers['x-cliente-activo'] || '';
+    if (!clienteActivoId) return res.status(400).json({ error: 'No hay cliente activo seleccionado' });
+
+    const snapRaw = await db.collection('alertas_raw').where('clienteId', '==', clienteActivoId).get();
+    const snapGestion = await db.collection('alertas_gestion').where('clienteId', '==', clienteActivoId).get();
+
+    const docs = [...snapRaw.docs, ...snapGestion.docs];
+    const chunks = [];
+    for (let i = 0; i < docs.length; i += 450) chunks.push(docs.slice(i, i + 450));
+    for (const chunk of chunks) {
+      const batch = db.batch();
+      chunk.forEach(doc => batch.delete(doc.ref));
+      await batch.commit();
+    }
+
+    await db.collection('auditoria').add({
+      accion: 'ALERTAS_RESET',
+      usuarioNombre: req.usuario.nombre,
+      clienteId: clienteActivoId,
+      eliminadas: docs.length,
+      timestamp: new Date()
+    });
+
+    res.json({ message: `${snapRaw.size} alertas y ${snapGestion.size} gestiones eliminadas` });
+  } catch (err) {
+    console.error('Error DELETE /api/alertas:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/alertas/resumen — KPIs + tendencia semanal para el dashboard
+app.get('/api/alertas/resumen', verificarToken, async (req, res) => {
+  try {
+    if (!ALERTAS_ROLES_PERMITIDOS.includes(req.usuario.rol)) {
+      return res.status(403).json({ error: 'Sin permisos' });
+    }
+    const clienteActivoId = req.headers['x-cliente-activo'] || 'bcochile';
+
+    // Una sola lectura de cada colección; los 3 grupos (Todas + los 2 grupos) se
+    // calculan en memoria para no volver a golpear Firestore en cada filtro.
+    const snap = await db.collection('alertas_raw').where('clienteId', '==', clienteActivoId).get();
+    const todasAlertas = [];
+    snap.forEach(doc => todasAlertas.push(doc.data()));
+
+    const gestionSnap = await db.collection('alertas_gestion').where('clienteId', '==', clienteActivoId).get();
+    const gestionadas = new Set();
+    gestionSnap.forEach(doc => {
+      const d = doc.data();
+      if (Array.isArray(d.notas) && d.notas.length > 0) gestionadas.add(doc.id);
+    });
+
+    const calcular = (alertas) => {
+      const total = alertas.length;
+      const criticas = alertas.filter(a => a.gravedad === 'Critical').length;
+
+      const conteoPorClave = {};
+      alertas.forEach(a => {
+        const clave = slugAlertaKey(a.host, a.tipo);
+        conteoPorClave[clave] = (conteoPorClave[clave] || 0) + 1;
+      });
+      const reiterativas = Object.values(conteoPorClave).filter(c => c >= 3).length;
+
+      const semanas = {};
+      alertas.forEach(a => {
+        const fecha = a.creado?._seconds ? new Date(a.creado._seconds * 1000) : (a.creado ? new Date(a.creado) : null);
+        if (!fecha) return;
+        const onejan = new Date(fecha.getFullYear(), 0, 1);
+        const semanaNum = Math.ceil((((fecha - onejan) / 86400000) + onejan.getDay() + 1) / 7);
+        const key = `Sem ${semanaNum}`;
+        if (!semanas[key]) semanas[key] = { Critical: 0, Major: 0, otros: 0 };
+        if (a.gravedad === 'Critical') semanas[key].Critical++;
+        else if (a.gravedad === 'Major') semanas[key].Major++;
+        else semanas[key].otros++;
+      });
+
+      const clavesReiterativas = Object.keys(conteoPorClave).filter(k => conteoPorClave[k] >= 3);
+      const sinGestion = clavesReiterativas.filter(k => !gestionadas.has(k)).length;
+
+      return { total, criticas, reiterativas, sinGestion, tendenciaSemanal: semanas };
+    };
+
+    res.json({
+      Todas: calcular(todasAlertas),
+      'Operaciones Cloud': calcular(todasAlertas.filter(a => a.grupo === 'Operaciones Cloud')),
+      'Middleware Cloud': calcular(todasAlertas.filter(a => a.grupo === 'Middleware Cloud'))
+    });
+  } catch (err) {
+    console.error('Error GET /api/alertas/resumen:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/alertas/reiterativas — ranking de alertas reiterativas con su estado de gestión
+app.get('/api/alertas/reiterativas', verificarToken, async (req, res) => {
+  try {
+    if (!ALERTAS_ROLES_PERMITIDOS.includes(req.usuario.rol)) {
+      return res.status(403).json({ error: 'Sin permisos' });
+    }
+    const clienteActivoId = req.headers['x-cliente-activo'] || 'bcochile';
+    const snap = await db.collection('alertas_raw').where('clienteId', '==', clienteActivoId).get();
+
+    const grupos = {};
+    snap.forEach(doc => {
+      const a = doc.data();
+      const clave = slugAlertaKey(a.host, a.tipo);
+      if (!grupos[clave]) grupos[clave] = { clave, host: a.host || 'Desconocido', tipo: a.tipo, grupo: a.grupo, veces: 0 };
+      grupos[clave].veces++;
+    });
+
+    const gestionSnap = await db.collection('alertas_gestion').where('clienteId', '==', clienteActivoId).get();
+    const gestionPorClave = {};
+    gestionSnap.forEach(doc => { gestionPorClave[doc.id] = doc.data(); });
+
+    const ranking = Object.values(grupos)
+      .filter(g => g.veces >= 3)
+      .map(g => {
+        const gestion = gestionPorClave[g.clave];
+        const ultimaNota = gestion?.notas?.length ? gestion.notas[gestion.notas.length - 1] : null;
+        return {
+          ...g,
+          estadoGestion: gestion?.estado || 'sin_gestion',
+          ultimaNota: ultimaNota?.texto || null,
+          ultimaNotaAutor: ultimaNota?.autor || null
+        };
+      })
+      .sort((a, b) => b.veces - a.veces);
+
+    res.json(ranking);
+  } catch (err) {
+    console.error('Error GET /api/alertas/reiterativas:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/alertas/gestion/:clave — historial completo de gestión de una alerta reiterativa
+app.get('/api/alertas/gestion/:clave', verificarToken, async (req, res) => {
+  try {
+    if (!ALERTAS_ROLES_PERMITIDOS.includes(req.usuario.rol)) {
+      return res.status(403).json({ error: 'Sin permisos' });
+    }
+    const doc = await db.collection('alertas_gestion').doc(req.params.clave).get();
+    if (!doc.exists) return res.json({ clave: req.params.clave, estado: 'sin_gestion', notas: [] });
+    res.json({ id: doc.id, ...doc.data() });
+  } catch (err) {
+    console.error('Error GET /api/alertas/gestion/:clave:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/alertas/gestion — agrega una nota de gestión / actualiza estado
+app.post('/api/alertas/gestion', verificarToken, async (req, res) => {
+  try {
+    if (!ALERTAS_ROLES_PERMITIDOS.includes(req.usuario.rol)) {
+      return res.status(403).json({ error: 'Sin permisos' });
+    }
+    const { host, tipo, grupo, nota, estado } = req.body;
+    if (!host || !tipo) return res.status(400).json({ error: 'host y tipo son requeridos' });
+
+    const clienteActivoId = req.headers['x-cliente-activo'] || 'bcochile';
+    const clave = slugAlertaKey(host, tipo);
+    const ref = db.collection('alertas_gestion').doc(clave);
+    const doc = await ref.get();
+
+    const nuevaNota = nota ? {
+      texto: nota,
+      autor: req.usuario.nombre,
+      fecha: new Date()
+    } : null;
+
+    if (!doc.exists) {
+      await ref.set({
+        host, tipo, grupo: grupo || '',
+        clienteId: clienteActivoId,
+        estado: estado || 'en_gestion',
+        notas: nuevaNota ? [nuevaNota] : [],
+        creadoEn: new Date()
+      });
+    } else {
+      const data = doc.data();
+      const notas = Array.isArray(data.notas) ? data.notas : [];
+      if (nuevaNota) notas.push(nuevaNota);
+      await ref.update({
+        estado: estado || data.estado || 'en_gestion',
+        notas,
+        actualizadoEn: new Date()
+      });
+    }
+
+    await db.collection('auditoria').add({
+      accion: 'ALERTA_GESTION',
+      usuarioNombre: req.usuario.nombre,
+      host, tipo, estado: estado || 'en_gestion',
+      timestamp: new Date()
+    });
+
+    res.json({ success: true, clave });
+  } catch (err) {
+    console.error('Error POST /api/alertas/gestion:', err);
     res.status(500).json({ error: err.message });
   }
 });
