@@ -760,9 +760,9 @@ function App() {
           <div className="login-brand">
             <span className="login-wordmark">kyndryl</span>
             <div className="login-sep"></div>
-            <span className="login-client-chip">Sistema OVT</span>
+            <span className="login-client-chip">Management System</span>
           </div>
-          <h1>Control de<br/>Overtime</h1>
+          <h1>Management<br/>System</h1>
           <h2>Acceso corporativo · Kyndryl Chile</h2>
           <form onSubmit={manejarLogin}>
             <div className="login-field">
@@ -1914,7 +1914,7 @@ function App() {
 
       {/* FOOTER */}
       <footer className="footer">
-        <p>Sistema OVT v2.0 © 2024 - Control de Overtime y Cambios/Alertas</p>
+        <p>Management System v2.0 © 2024 - Control de Overtime y Cambios/Alertas</p>
       </footer>
     </div>
   );
