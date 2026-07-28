@@ -17,8 +17,17 @@ const TABS_ANALITICA = [
   { id:'personas',  label:'👥 Por Persona' },
   { id:'nivel',     label:'🏅 Por Nivel' },
   { id:'grupo',     label:'🏢 Por Grupo' },
-  { id:'tendencia', label:'📈 Tendencia' }
+  { id:'tendencia', label:'📈 Tendencia' },
+  { id:'iniciativas', label:'📋 Iniciativas' }
 ];
+
+const ESTADOS_INICIATIVA = {
+  no_iniciada: { label: 'No iniciada', bg: 'rgba(107,114,128,0.12)', fg: '#4b5563' },
+  en_curso: { label: 'En curso', bg: 'rgba(37,99,235,0.12)', fg: '#1d4ed8' },
+  en_riesgo: { label: 'En riesgo', bg: 'rgba(217,119,6,0.14)', fg: '#8a5a06' },
+  bloqueada: { label: 'Bloqueada', bg: 'rgba(215,59,71,0.12)', fg: '#a61e2b' },
+  completada: { label: 'Completada', bg: 'rgba(32,166,106,0.14)', fg: '#116642' }
+};
 const COLORES_GRUPO = ['#2a78d6','#059669','#7c3aed','#e24b4a','#1baf7a','#d97706','#0891b2','#be185d'];
 const COLOR_SIN_GRUPO = '#d97706';
 
@@ -427,6 +436,55 @@ const ClaimDashboard = ({ token, apiUrl, clienteActivo = '' }) => {
   }, [apiUrl, getHeaders]);
 
   useEffect(() => { cargarDatos(); }, [cargarDatos]);
+
+  // ── Iniciativas e Issues ──
+  const [iniciativas, setIniciativas] = useState([]);
+  const [cargandoIniciativas, setCargandoIniciativas] = useState(false);
+  const [errorIniciativas, setErrorIniciativas] = useState(null);
+  const [modalIniciativa, setModalIniciativa] = useState(null); // null = cerrado, {} = nueva, {...} = editando
+  const [guardandoIniciativa, setGuardandoIniciativa] = useState(false);
+
+  const cargarIniciativas = useCallback(async () => {
+    setCargandoIniciativas(true);
+    setErrorIniciativas(null);
+    try {
+      const res = await axios.get(`${apiUrl}/api/iniciativas`, { headers: getHeaders() });
+      setIniciativas(res.data || []);
+    } catch (err) {
+      setErrorIniciativas('Error cargando iniciativas: ' + (err.response?.data?.error || err.message));
+    } finally {
+      setCargandoIniciativas(false);
+    }
+  }, [apiUrl, getHeaders]);
+
+  useEffect(() => { cargarIniciativas(); }, [cargarIniciativas]);
+
+  const guardarIniciativa = async (datos) => {
+    setGuardandoIniciativa(true);
+    try {
+      if (datos.id) {
+        await axios.put(`${apiUrl}/api/iniciativas/${datos.id}`, datos, { headers: getHeaders() });
+      } else {
+        await axios.post(`${apiUrl}/api/iniciativas`, datos, { headers: getHeaders() });
+      }
+      setModalIniciativa(null);
+      cargarIniciativas();
+    } catch (err) {
+      setErrorIniciativas('Error guardando: ' + (err.response?.data?.error || err.message));
+    } finally {
+      setGuardandoIniciativa(false);
+    }
+  };
+
+  const eliminarIniciativa = async (id) => {
+    if (!window.confirm('¿Eliminar esta iniciativa? No se puede deshacer.')) return;
+    try {
+      await axios.delete(`${apiUrl}/api/iniciativas/${id}`, { headers: getHeaders() });
+      cargarIniciativas();
+    } catch (err) {
+      setErrorIniciativas('Error eliminando: ' + (err.response?.data?.error || err.message));
+    }
+  };
 
   // Cargar usuarios y grupos para cruce por grupo (filtrado por cliente activo,
   // si no, "grupos configurados" y el cruce de personas mezclan datos de otros clientes)
@@ -968,7 +1026,7 @@ No agregues texto fuera de ese formato.`;
             ))}
           </div>
 
-          {filtradas.length === 0 ? (
+          {(filtradas.length === 0 && tabAnalitca !== 'iniciativas') ? (
             <p style={{ textAlign:'center', padding:'40px', color:'var(--muted)' }}>Sin datos para {MESES[filtroMes]} {filtroAnio}</p>
           ) : (
             <>
@@ -1309,9 +1367,173 @@ No agregues texto fuera de ese formato.`;
                   </div>
                 </div>
               )}
+
+              {/* ── TAB INICIATIVAS ── */}
+              {tabAnalitca === 'iniciativas' && (
+                <div>
+                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'16px', flexWrap:'wrap', gap:'10px' }}>
+                    <div>
+                      <h3 style={{ margin:0, fontSize:'1rem', fontWeight:'800', color:'var(--ink-950)' }}>Iniciativas e Issues</h3>
+                      <p style={{ margin:'2px 0 0', fontSize:'12px', color:'var(--muted)' }}>Seguimiento de iniciativas y problemas abiertos de la cuenta.</p>
+                    </div>
+                    <button
+                      onClick={() => setModalIniciativa({ nombre:'', fechaCompromiso:'', estado:'no_iniciada', progreso:0, responsable:'', tipo:'iniciativa', notas:'' })}
+                      style={{ borderRadius:'999px', background:'linear-gradient(135deg,var(--ink-900),var(--bank-blue))', color:'#fff', padding:'10px 18px', fontSize:'12px', fontWeight:'900', border:'none', cursor:'pointer', boxShadow:'0 12px 28px rgba(0,59,113,0.22)' }}
+                    >
+                      + Nueva iniciativa
+                    </button>
+                  </div>
+
+                  {errorIniciativas && (
+                    <div style={{ background:'rgba(215,59,71,0.08)', border:'1px solid rgba(215,59,71,0.24)', borderRadius:'12px', padding:'10px 16px', color:'#a61e2b', fontSize:'13px', fontWeight:'600', marginBottom:'14px' }}>
+                      {errorIniciativas}
+                    </div>
+                  )}
+
+                  {cargandoIniciativas ? (
+                    <p style={{ textAlign:'center', color:'var(--muted)', padding:'30px' }}>Cargando...</p>
+                  ) : (
+                    <div className="tabla-responsive">
+                      <table className="tabla">
+                        <thead>
+                          <tr>
+                            <th>Nombre</th>
+                            <th>Tipo</th>
+                            <th>Fecha compromiso</th>
+                            <th>Estado</th>
+                            <th style={{ width:'160px' }}>Progreso</th>
+                            <th>Responsable</th>
+                            <th></th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {iniciativas.length === 0 && (
+                            <tr><td colSpan={7} style={{ textAlign:'center', color:'var(--muted)', fontWeight:'600' }}>Sin iniciativas registradas aún.</td></tr>
+                          )}
+                          {iniciativas.map(it => {
+                            const est = ESTADOS_INICIATIVA[it.estado] || ESTADOS_INICIATIVA.no_iniciada;
+                            return (
+                              <tr key={it.id}>
+                                <td style={{ fontWeight:'700' }}>{it.nombre}</td>
+                                <td style={{ textTransform:'capitalize' }}>{it.tipo === 'issue' ? 'Issue' : 'Iniciativa'}</td>
+                                <td>{it.fechaCompromiso ? new Date(it.fechaCompromiso + 'T00:00:00').toLocaleDateString('es-CL') : '—'}</td>
+                                <td>
+                                  <span style={{ background:est.bg, color:est.fg, fontSize:'11px', fontWeight:'800', padding:'4px 10px', borderRadius:'999px', whiteSpace:'nowrap' }}>
+                                    {est.label}
+                                  </span>
+                                </td>
+                                <td>
+                                  <div style={{ display:'flex', alignItems:'center', gap:'8px' }}>
+                                    <div style={{ flex:1, height:'6px', borderRadius:'999px', background:'rgba(18,52,78,0.1)', overflow:'hidden' }}>
+                                      <div style={{ width:`${it.progreso || 0}%`, height:'100%', background:'var(--bank-blue)' }} />
+                                    </div>
+                                    <span style={{ fontSize:'11px', fontWeight:'700', color:'var(--muted)', flexShrink:0 }}>{it.progreso || 0}%</span>
+                                  </div>
+                                </td>
+                                <td>{it.responsable || '—'}</td>
+                                <td className="acciones">
+                                  <button className="btn-editar" onClick={() => setModalIniciativa(it)}>Editar</button>
+                                  <button className="btn-eliminar" onClick={() => eliminarIniciativa(it.id)}>Eliminar</button>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              )}
             </>
           )}
         </>
+      )}
+
+      {/* MODAL CREAR/EDITAR INICIATIVA */}
+      {modalIniciativa && (
+        <div style={{ position:'fixed', inset:0, background:'rgba(6,24,38,0.55)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:1000, padding:'20px' }}>
+          <div style={{ background:'var(--paper-50)', border:'1px solid rgba(255,255,255,0.72)', borderRadius:'22px', boxShadow:'var(--shadow-lift)', padding:'22px', width:480, maxHeight:'85vh', overflowY:'auto' }}>
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:'16px' }}>
+              <p style={{ fontWeight:'800', margin:0, color:'var(--ink-950)', fontSize:'15px' }}>
+                {modalIniciativa.id ? 'Editar iniciativa' : 'Nueva iniciativa'}
+              </p>
+              <button onClick={() => setModalIniciativa(null)} style={{ background:'none', border:'none', color:'var(--muted)', cursor:'pointer', fontSize:'18px', padding:'4px' }}>✕</button>
+            </div>
+
+            <label style={{ fontSize:'10px', fontWeight:'700', color:'var(--muted)', textTransform:'uppercase', letterSpacing:'.06em', display:'block', marginBottom:'6px' }}>Nombre</label>
+            <input
+              type="text"
+              value={modalIniciativa.nombre}
+              onChange={e => setModalIniciativa({ ...modalIniciativa, nombre: e.target.value })}
+              placeholder="Nombre de la iniciativa o issue"
+              style={{ width:'100%', marginBottom:'14px', border:'1px solid var(--line)', borderRadius:'12px', padding:'9px 14px', fontSize:'13px', background:'rgba(255,255,255,0.84)', color:'var(--ink-950)' }}
+            />
+
+            <label style={{ fontSize:'10px', fontWeight:'700', color:'var(--muted)', textTransform:'uppercase', letterSpacing:'.06em', display:'block', marginBottom:'6px' }}>Tipo</label>
+            <select
+              value={modalIniciativa.tipo || 'iniciativa'}
+              onChange={e => setModalIniciativa({ ...modalIniciativa, tipo: e.target.value })}
+              style={{ width:'100%', marginBottom:'14px', border:'1px solid var(--line)', borderRadius:'12px', padding:'9px 14px', fontSize:'13px', fontWeight:'600', background:'rgba(255,255,255,0.84)', color:'var(--ink-950)' }}
+            >
+              <option value="iniciativa">Iniciativa</option>
+              <option value="issue">Issue</option>
+            </select>
+
+            <label style={{ fontSize:'10px', fontWeight:'700', color:'var(--muted)', textTransform:'uppercase', letterSpacing:'.06em', display:'block', marginBottom:'6px' }}>Fecha de compromiso</label>
+            <input
+              type="date"
+              value={modalIniciativa.fechaCompromiso || ''}
+              onChange={e => setModalIniciativa({ ...modalIniciativa, fechaCompromiso: e.target.value })}
+              style={{ width:'100%', marginBottom:'14px', border:'1px solid var(--line)', borderRadius:'12px', padding:'9px 14px', fontSize:'13px', background:'rgba(255,255,255,0.84)', color:'var(--ink-950)' }}
+            />
+
+            <label style={{ fontSize:'10px', fontWeight:'700', color:'var(--muted)', textTransform:'uppercase', letterSpacing:'.06em', display:'block', marginBottom:'6px' }}>Estado</label>
+            <select
+              value={modalIniciativa.estado}
+              onChange={e => setModalIniciativa({ ...modalIniciativa, estado: e.target.value })}
+              style={{ width:'100%', marginBottom:'14px', border:'1px solid var(--line)', borderRadius:'12px', padding:'9px 14px', fontSize:'13px', fontWeight:'600', background:'rgba(255,255,255,0.84)', color:'var(--ink-950)' }}
+            >
+              {Object.entries(ESTADOS_INICIATIVA).map(([valor, cfg]) => (
+                <option key={valor} value={valor}>{cfg.label}</option>
+              ))}
+            </select>
+
+            <label style={{ fontSize:'10px', fontWeight:'700', color:'var(--muted)', textTransform:'uppercase', letterSpacing:'.06em', display:'block', marginBottom:'6px' }}>
+              Progreso — {modalIniciativa.progreso || 0}%
+            </label>
+            <input
+              type="range" min="0" max="100" step="5"
+              value={modalIniciativa.progreso || 0}
+              onChange={e => setModalIniciativa({ ...modalIniciativa, progreso: Number(e.target.value) })}
+              style={{ width:'100%', marginBottom:'14px' }}
+            />
+
+            <label style={{ fontSize:'10px', fontWeight:'700', color:'var(--muted)', textTransform:'uppercase', letterSpacing:'.06em', display:'block', marginBottom:'6px' }}>Responsable</label>
+            <input
+              type="text"
+              value={modalIniciativa.responsable || ''}
+              onChange={e => setModalIniciativa({ ...modalIniciativa, responsable: e.target.value })}
+              placeholder="Nombre del responsable"
+              style={{ width:'100%', marginBottom:'14px', border:'1px solid var(--line)', borderRadius:'12px', padding:'9px 14px', fontSize:'13px', background:'rgba(255,255,255,0.84)', color:'var(--ink-950)' }}
+            />
+
+            <label style={{ fontSize:'10px', fontWeight:'700', color:'var(--muted)', textTransform:'uppercase', letterSpacing:'.06em', display:'block', marginBottom:'6px' }}>Notas (opcional)</label>
+            <textarea
+              value={modalIniciativa.notas || ''}
+              onChange={e => setModalIniciativa({ ...modalIniciativa, notas: e.target.value })}
+              placeholder="Contexto, bloqueos, próximos pasos..."
+              style={{ width:'100%', minHeight:'70px', marginBottom:'18px', border:'1px solid var(--line)', borderRadius:'12px', padding:'10px 14px', fontSize:'13px', fontFamily:'inherit', background:'rgba(255,255,255,0.84)', color:'var(--ink-950)', resize:'vertical' }}
+            />
+
+            <button
+              onClick={() => guardarIniciativa(modalIniciativa)}
+              disabled={guardandoIniciativa || !modalIniciativa.nombre?.trim()}
+              style={{ borderRadius:'999px', background: guardandoIniciativa ? 'var(--muted)' : 'linear-gradient(135deg,var(--ink-900),var(--bank-blue))', color:'#fff', padding:'10px 18px', fontSize:'13px', fontWeight:'900', border:'none', boxShadow:'0 12px 28px rgba(0,59,113,0.22)', cursor: guardandoIniciativa ? 'not-allowed' : 'pointer', width:'100%' }}
+            >
+              {guardandoIniciativa ? 'Guardando...' : (modalIniciativa.id ? 'Guardar cambios' : 'Crear iniciativa')}
+            </button>
+          </div>
+        </div>
       )}
     </div>
   );
