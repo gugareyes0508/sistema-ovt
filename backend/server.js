@@ -1291,6 +1291,117 @@ app.delete('/api/claims', verificarToken, async (req, res) => {
 });
 
 // ============================================
+// INICIATIVAS E ISSUES (Control de Labor)
+// ============================================
+
+const INICIATIVAS_ROLES_PERMITIDOS = ['admin', 'dpe'];
+
+// GET /api/iniciativas
+app.get('/api/iniciativas', verificarToken, async (req, res) => {
+  try {
+    if (!INICIATIVAS_ROLES_PERMITIDOS.includes(req.usuario.rol)) {
+      return res.status(403).json({ error: 'Sin permisos' });
+    }
+    const clienteActivoId = req.headers['x-cliente-activo'] || 'bcochile';
+    const snap = await db.collection('iniciativas').where('clienteId', '==', clienteActivoId).get();
+    const iniciativas = [];
+    snap.forEach(doc => iniciativas.push({ id: doc.id, ...doc.data() }));
+    iniciativas.sort((a, b) => (a.fechaCompromiso || '').localeCompare(b.fechaCompromiso || ''));
+    res.json(iniciativas);
+  } catch (err) {
+    console.error('Error GET /api/iniciativas:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/iniciativas — crear
+app.post('/api/iniciativas', verificarToken, async (req, res) => {
+  try {
+    if (!INICIATIVAS_ROLES_PERMITIDOS.includes(req.usuario.rol)) {
+      return res.status(403).json({ error: 'Sin permisos' });
+    }
+    const { nombre, fechaCompromiso, estado, progreso, responsable, tipo, notas } = req.body;
+    if (!nombre) return res.status(400).json({ error: 'El nombre es requerido' });
+
+    const clienteActivoId = req.headers['x-cliente-activo'] || 'bcochile';
+    const ref = await db.collection('iniciativas').add({
+      nombre,
+      tipo: tipo || 'iniciativa',
+      fechaCompromiso: fechaCompromiso || null,
+      estado: estado || 'no_iniciada',
+      progreso: Number.isFinite(progreso) ? progreso : 0,
+      responsable: responsable || '',
+      notas: notas || '',
+      clienteId: clienteActivoId,
+      creadoPor: req.usuario.nombre,
+      creadoEn: new Date()
+    });
+
+    await db.collection('auditoria').add({
+      accion: 'INICIATIVA_CREADA',
+      usuarioNombre: req.usuario.nombre,
+      nombre, clienteId: clienteActivoId,
+      timestamp: new Date()
+    });
+
+    res.json({ id: ref.id });
+  } catch (err) {
+    console.error('Error POST /api/iniciativas:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// PUT /api/iniciativas/:id — editar
+app.put('/api/iniciativas/:id', verificarToken, async (req, res) => {
+  try {
+    if (!INICIATIVAS_ROLES_PERMITIDOS.includes(req.usuario.rol)) {
+      return res.status(403).json({ error: 'Sin permisos' });
+    }
+    const { nombre, fechaCompromiso, estado, progreso, responsable, tipo, notas } = req.body;
+    const ref = db.collection('iniciativas').doc(req.params.id);
+    const doc = await ref.get();
+    if (!doc.exists) return res.status(404).json({ error: 'No encontrada' });
+
+    await ref.update({
+      ...(nombre !== undefined && { nombre }),
+      ...(tipo !== undefined && { tipo }),
+      ...(fechaCompromiso !== undefined && { fechaCompromiso }),
+      ...(estado !== undefined && { estado }),
+      ...(progreso !== undefined && { progreso: Number(progreso) }),
+      ...(responsable !== undefined && { responsable }),
+      ...(notas !== undefined && { notas }),
+      actualizadoPor: req.usuario.nombre,
+      actualizadoEn: new Date()
+    });
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Error PUT /api/iniciativas/:id:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// DELETE /api/iniciativas/:id
+app.delete('/api/iniciativas/:id', verificarToken, async (req, res) => {
+  try {
+    if (!INICIATIVAS_ROLES_PERMITIDOS.includes(req.usuario.rol)) {
+      return res.status(403).json({ error: 'Sin permisos' });
+    }
+    await db.collection('iniciativas').doc(req.params.id).delete();
+    await db.collection('auditoria').add({
+      accion: 'INICIATIVA_ELIMINADA',
+      usuarioNombre: req.usuario.nombre,
+      iniciativaId: req.params.id,
+      timestamp: new Date()
+    });
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Error DELETE /api/iniciativas/:id:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ============================================
 // CLIENTES — CRUD
 // ============================================
 
@@ -1751,6 +1862,47 @@ app.get('/api/alertas/reiterativas', verificarToken, async (req, res) => {
 });
 
 // GET /api/alertas/gestion/:clave — historial completo de gestión de una alerta reiterativa
+// GET /api/alertas/gestion-todas — trae toda la gestión de una vez (evita N lecturas repetidas)
+// GET /api/alertas/asignables — lista liviana de personas a quienes se puede asignar una alerta
+app.get('/api/alertas/asignables', verificarToken, async (req, res) => {
+  try {
+    if (!ALERTAS_ROLES_PERMITIDOS.includes(req.usuario.rol)) {
+      return res.status(403).json({ error: 'Sin permisos' });
+    }
+    const clienteActivoId = req.headers['x-cliente-activo'] || 'bcochile';
+    const snapshot = await db.collection('usuarios')
+      .where('clientesIds', 'array-contains', clienteActivoId)
+      .get();
+    const personas = [];
+    snapshot.forEach(doc => {
+      const d = doc.data();
+      if (!ALERTAS_ROLES_PERMITIDOS.includes(d.rol)) return;
+      personas.push({ usuario: doc.id, nombre: d.nombre, rol: d.rol });
+    });
+    personas.sort((a, b) => a.nombre.localeCompare(b.nombre));
+    res.json(personas);
+  } catch (err) {
+    console.error('Error GET /api/alertas/asignables:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/alertas/gestion-todas', verificarToken, async (req, res) => {
+  try {
+    if (!ALERTAS_ROLES_PERMITIDOS.includes(req.usuario.rol)) {
+      return res.status(403).json({ error: 'Sin permisos' });
+    }
+    const clienteActivoId = req.headers['x-cliente-activo'] || 'bcochile';
+    const snap = await db.collection('alertas_gestion').where('clienteId', '==', clienteActivoId).get();
+    const resultado = {};
+    snap.forEach(doc => { resultado[doc.id] = doc.data(); });
+    res.json(resultado);
+  } catch (err) {
+    console.error('Error GET /api/alertas/gestion-todas:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.get('/api/alertas/gestion/:clave', verificarToken, async (req, res) => {
   try {
     if (!ALERTAS_ROLES_PERMITIDOS.includes(req.usuario.rol)) {
@@ -1771,7 +1923,7 @@ app.post('/api/alertas/gestion', verificarToken, async (req, res) => {
     if (!ALERTAS_ROLES_PERMITIDOS.includes(req.usuario.rol)) {
       return res.status(403).json({ error: 'Sin permisos' });
     }
-    const { host, tipo, grupo, nota, estado } = req.body;
+    const { host, tipo, grupo, nota, estado, asignadoA, asignadoANombre } = req.body;
     if (!host || !tipo) return res.status(400).json({ error: 'host y tipo son requeridos' });
 
     const clienteActivoId = req.headers['x-cliente-activo'] || 'bcochile';
@@ -1790,6 +1942,8 @@ app.post('/api/alertas/gestion', verificarToken, async (req, res) => {
         host, tipo, grupo: grupo || '',
         clienteId: clienteActivoId,
         estado: estado || 'en_gestion',
+        asignadoA: asignadoA || null,
+        asignadoANombre: asignadoANombre || null,
         notas: nuevaNota ? [nuevaNota] : [],
         creadoEn: new Date()
       });
@@ -1799,6 +1953,8 @@ app.post('/api/alertas/gestion', verificarToken, async (req, res) => {
       if (nuevaNota) notas.push(nuevaNota);
       await ref.update({
         estado: estado || data.estado || 'en_gestion',
+        asignadoA: asignadoA !== undefined ? asignadoA : (data.asignadoA || null),
+        asignadoANombre: asignadoANombre !== undefined ? asignadoANombre : (data.asignadoANombre || null),
         notas,
         actualizadoEn: new Date()
       });
@@ -1807,7 +1963,7 @@ app.post('/api/alertas/gestion', verificarToken, async (req, res) => {
     await db.collection('auditoria').add({
       accion: 'ALERTA_GESTION',
       usuarioNombre: req.usuario.nombre,
-      host, tipo, estado: estado || 'en_gestion',
+      host, tipo, estado: estado || 'en_gestion', asignadoANombre: asignadoANombre || null,
       timestamp: new Date()
     });
 

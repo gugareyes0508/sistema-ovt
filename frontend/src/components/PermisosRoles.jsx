@@ -16,6 +16,7 @@ const VISTAS = [
   { id:'proyeccion-nueva', label:'Nueva Proyección ITSM', desc:'Crear proyección de tickets',             grupo:'ITSM' },
   { id:'proyeccion-mis',   label:'Mis Proyecciones ITSM', desc:'Historial de proyecciones ITSM',          grupo:'ITSM' },
   { id:'proyeccion-excel', label:'Cargar Excel ITSM',     desc:'Carga masiva Excel ITSM',                 grupo:'ITSM' },
+  { id:'alertas',          label:'Control de Alertas',    desc:'Ranking, gestión y análisis IA de alertas reiterativas', grupo:'Alertas' },
 ];
 
 const ROLES = [
@@ -26,7 +27,7 @@ const ROLES = [
   { id:'itsm',         label:'itsm',         color:'var(--success)', bg:'#d1fae5' },
 ];
 
-const GRUPOS = ['Admin/DPE','Especialista','ITSM'];
+const GRUPOS = ['Admin/DPE','Especialista','ITSM','Alertas'];
 
 const PERMISOS_DEFAULT = {
   admin:        { dashboard:true, analytics:true, 'ovt-proyectado':true, claim:true, usuarios:true, mantenedor:true, auditoria:true, 'permisos-roles':true, registros:false, resumen:false, 'carga-excel':false, 'proyeccion-nueva':false, 'proyeccion-mis':false, 'proyeccion-excel':false },
