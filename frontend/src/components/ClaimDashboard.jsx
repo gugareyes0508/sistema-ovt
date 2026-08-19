@@ -517,17 +517,38 @@ const ClaimDashboard = ({ token, apiUrl, clienteActivo = '' }) => {
       const h = {};
       headers.forEach((v, i) => { if (v) h[String(v).trim()] = i; });
 
-      const requeridos = ['EMP_NAME','WEEK_ENDING_DATE','HOURS','OVERTIME_IND','COST_SPOT_USD'];
+      const requeridos = ['EMP_NAME','WEEK_ENDING_DATE','HOURS','OVERTIME_IND','COST_SPOT_USD','LEDGER_MONTH_NAME'];
       for (const r of requeridos) {
         if (!(r in h)) throw new Error(`Columna requerida no encontrada: ${r}`);
       }
+
+      const MESES_LEDGER = { January:1, February:2, March:3, April:4, May:5, June:6, July:7, August:8, September:9, October:10, November:11, December:12 };
 
       const porSemana = {};
       for (let i = 1; i < filas.length; i++) {
         const fila = filas[i];
         const fecha = parseFecha(fila[h['WEEK_ENDING_DATE']]);
         if (!fecha) continue;
-        const key = fecha.toISOString().slice(0,10);
+        const fechaKey = fecha.toISOString().slice(0,10);
+
+        // El mes "contable" real (LEDGER_MONTH_NAME) no siempre coincide con el mes
+        // calendario del WEEK_ENDING_DATE — filas de una misma semana pueden quedar
+        // contabilizadas en meses distintos (ajustes de cierre). Se agrupa por el mes
+        // contable para que el total de "julio" cuadre con el reporte oficial de Kyndryl.
+        // OJO: LEDGER_YEAR es el AÑO FISCAL de Kyndryl (ej. 2027), no el año calendario —
+        // por eso el año se calcula desde WEEK_ENDING_DATE, con ajuste solo si el mes
+        // contable cruza el límite diciembre/enero hacia el año calendario siguiente/anterior.
+        const nombreMesLedger = String(fila[h['LEDGER_MONTH_NAME']] || '').trim();
+        const mesSemana = fecha.getMonth() + 1;
+        const mes = MESES_LEDGER[nombreMesLedger] || mesSemana;
+        let anio = fecha.getFullYear();
+        if (mes === 1 && mesSemana === 12) anio += 1;
+        else if (mes === 12 && mesSemana === 1) anio -= 1;
+
+        // Clave compuesta: una misma semana calendario puede generar más de un
+        // "bucket" si sus filas se reparten entre dos meses contables distintos.
+        const key = `${fechaKey}__${anio}-${String(mes).padStart(2,'0')}`;
+
         const persona = String(fila[h['EMP_NAME']] || '').trim();
         const horas = parseFloat(fila[h['HOURS']]) || 0;
         const ot = String(fila[h['OVERTIME_IND']] || '');
@@ -540,10 +561,10 @@ const ClaimDashboard = ({ token, apiUrl, clienteActivo = '' }) => {
 
         if (!porSemana[key]) {
           porSemana[key] = {
-            fecha: key,
+            fecha: fechaKey,
+            claveDoc: key,
             label: fecha.toLocaleDateString('es-CL', { day:'2-digit', month:'short' }),
-            mes: fecha.getMonth() + 1,
-            anio: fecha.getFullYear(),
+            mes, anio,
             base:0, ot:0, sb:0, costo:0,
             personas:{}, wbs:{}, offering:{}, nivel:{}, jobRoles:{}, managers:{}
           };
@@ -569,7 +590,7 @@ const ClaimDashboard = ({ token, apiUrl, clienteActivo = '' }) => {
         if (manager) { if (!s.managers[manager]) s.managers[manager] = { horas:0, costo:0 }; s.managers[manager].horas += horas; s.managers[manager].costo += costo; }
       }
 
-      const nuevasSemanas = Object.values(porSemana).sort((a,b) => a.fecha.localeCompare(b.fecha));
+      const nuevasSemanas = Object.values(porSemana).sort((a,b) => a.claveDoc.localeCompare(b.claveDoc));
       const res = await axios.post(`${apiUrl}/api/claims/upload`, { semanas: nuevasSemanas }, { headers: getHeaders() });
       alert(`✅ ${res.data.message}\nNuevas: ${res.data.nuevas} · Total en archivo: ${res.data.total}`);
       await cargarDatos();
@@ -739,8 +760,53 @@ const ClaimDashboard = ({ token, apiUrl, clienteActivo = '' }) => {
     datasets:[{ data:grupoSBOrdenado.slice(0,6).map(([,v])=>v.horasSB), backgroundColor:COLORES_GRUPO, borderWidth:0 }]
   };
 
-  // Tendencia — todas las semanas
-  const todosSem = [...semanas].sort((a,b) => a.fecha.localeCompare(b.fecha));
+  // Tendencia — todas las semanas. Una misma semana calendario puede existir como
+  // 2 documentos si sus horas se repartieron entre dos meses contables distintos
+  // (ver lógica de carga); acá se fusionan por fecha (incluyendo el detalle anidado
+  // por persona/WBS/grupo) para no duplicar ni perder datos en el gráfico anual.
+  // Copia profunda de un sub-objeto tipo { persona: {horas, costo, ...} } —
+  // IMPORTANTE: una copia superficial ({...obj}) solo clona la "caja" externa,
+  // dejando los valores internos apuntando a los MISMOS objetos que viven en el
+  // estado `semanas`. Sumar sobre esos valores después mutaría permanentemente
+  // el estado real cada vez que la app se vuelve a pintar (bug ya corregido).
+  const copiaProfunda = (obj) => {
+    const copia = {};
+    Object.entries(obj || {}).forEach(([clave, datos]) => { copia[clave] = { ...datos }; });
+    return copia;
+  };
+  const sumarSubobjeto = (destino, origen) => {
+    Object.entries(origen || {}).forEach(([clave, datos]) => {
+      if (!destino[clave]) destino[clave] = { horas: 0, costo: 0, horasOT: 0, horasSB: 0 };
+      destino[clave].horas += datos.horas || 0;
+      destino[clave].costo += datos.costo || 0;
+      destino[clave].horasOT += datos.horasOT || 0;
+      destino[clave].horasSB += datos.horasSB || 0;
+    });
+  };
+  const semanasPorFecha = {};
+  semanas.forEach(s => {
+    if (!semanasPorFecha[s.fecha]) {
+      semanasPorFecha[s.fecha] = {
+        ...s,
+        personas: copiaProfunda(s.personas),
+        wbs: copiaProfunda(s.wbs),
+        offering: copiaProfunda(s.offering),
+        nivel: copiaProfunda(s.nivel),
+        managers: copiaProfunda(s.managers),
+        jobRoles: { ...(s.jobRoles || {}) }
+      };
+    } else {
+      const acc = semanasPorFecha[s.fecha];
+      acc.base += s.base; acc.ot += s.ot; acc.sb += s.sb; acc.costo += s.costo;
+      sumarSubobjeto(acc.personas, s.personas);
+      sumarSubobjeto(acc.wbs, s.wbs);
+      sumarSubobjeto(acc.offering, s.offering);
+      sumarSubobjeto(acc.nivel, s.nivel);
+      sumarSubobjeto(acc.managers, s.managers);
+      Object.entries(s.jobRoles || {}).forEach(([rol, horas]) => { acc.jobRoles[rol] = (acc.jobRoles[rol] || 0) + horas; });
+    }
+  });
+  const todosSem = Object.values(semanasPorFecha).sort((a,b) => a.fecha.localeCompare(b.fecha));
   const chartTendencia = {
     labels: todosSem.map(s => s.label),
     datasets:[
@@ -795,10 +861,14 @@ const ClaimDashboard = ({ token, apiUrl, clienteActivo = '' }) => {
     ]
   };
 
-  // Consolidado mensual — suma todas las semanas dentro de cada mes calendario
+  // Consolidado mensual — suma todas las semanas dentro de cada mes calendario.
+  // IMPORTANTE: usa `semanas` (sin fusionar por fecha), no `todosSem` — porque
+  // `todosSem` fusiona semanas repartidas entre dos meses contables para el
+  // gráfico de Tendencia, y aquí necesitamos justo lo contrario: mantenerlas
+  // separadas para que cada mes sume su costo real (ej. julio = $152.86K).
   const MESES_NOMBRE = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
   const mesesMap = {};
-  todosSem.forEach(s => {
+  semanas.forEach(s => {
     const key = `${s.anio}-${String(s.mes).padStart(2,'0')}`;
     if (!mesesMap[key]) mesesMap[key] = { anio:s.anio, mes:s.mes, horas:0, costo:0, semanas:0 };
     mesesMap[key].horas += (s.base||0)+(s.ot||0)+(s.sb||0);
@@ -953,7 +1023,7 @@ No agregues texto fuera de ese formato.`;
             {cargando ? 'Procesando archivo...' : 'Cargar Export.xlsx semanal'}
           </div>
           <div style={{ fontSize:'12px', fontWeight:'600', color:'var(--muted)' }}>
-            Acumulativo · hoja "Export" requerida · las semanas nuevas se guardan en Firestore
+            Acumulativo · hoja "Export" requerida · cada carga actualiza las semanas con los datos más recientes
           </div>
         </div>
         {ultimaCarga && (
