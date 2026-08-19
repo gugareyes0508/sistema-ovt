@@ -1,6 +1,7 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import axios from 'axios';
 import * as XLSX from 'xlsx';
+import { llamarGroq } from '../utils/groqClient';
 import { Bar, Line, Doughnut } from 'react-chartjs-2';
 import {
   Chart as ChartJS, CategoryScale, LinearScale, BarElement,
@@ -975,26 +976,10 @@ ${statsGruposAnual.slice(1).map(g => `GRUPO: ${g.nombre} | <recomendación de m�
 
 No agregues texto fuera de ese formato.`;
 
-      const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${process.env.REACT_APP_GROQ_API_KEY}`
-        },
-        body: JSON.stringify({
-          model: 'llama-3.1-8b-instant',
-          messages: [{ role: 'user', content: prompt }],
-          temperature: 0.5,
-          max_tokens: 700
-        })
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error('Error en GROQ: ' + (errorData.error?.message || response.statusText));
-      }
-
-      const data = await response.json();
+      const data = await llamarGroq(
+        [{ role: 'user', content: prompt }],
+        { temperature: 0.5, maxTokens: 700 }
+      );
       const texto = data.choices[0].message.content;
 
       // Parsear el formato RESUMEN: / GRUPO: nombre | recomendación

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Bar, Line, Doughnut } from 'react-chartjs-2';
+import { llamarGroq } from '../utils/groqClient';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -203,42 +204,19 @@ REGLAS DE AGRUPACIÓN:
 Responde SOLO con este JSON sin markdown:
 {"grupos":[{"nombre":"string","descripcion":"string","registros":0,"horas":0.0,"porcentaje":0.0,"tendencia":"creciente|estable|decreciente","actividades_frecuentes":["a1","a2","a3"],"recomendacion":"string max 120 chars"}],"resumen_ejecutivo":"string","actividad_mas_costosa":"string","actividad_mas_frecuente":"string"}`;
 
-      // Intentar con llama-3.3-70b, si falla caer a llama-3.1-8b-instant
-      const modelos = ['llama-3.3-70b-versatile', 'llama-3.1-8b-instant'];
       let respuestaTexto = '';
-
-      for (const modelo of modelos) {
-        try {
-          const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${process.env.REACT_APP_GROQ_API_KEY}`
-            },
-            body: JSON.stringify({
-              model: modelo,
-              messages: [
-                { role: 'system', content: systemMsg },
-                { role: 'user', content: userMsg }
-              ],
-              temperature: 0.1,
-              max_tokens: 3000
-            })
-          });
-
-          if (!response.ok) {
-            const errData = await response.json().catch(() => ({}));
-            console.warn(`Modelo ${modelo} falló:`, errData?.error?.message);
-            continue; // probar siguiente modelo
-          }
-
-          const data = await response.json();
-          respuestaTexto = data.choices?.[0]?.message?.content || '';
-          console.log(`✅ Agrupación IA con modelo: ${modelo}`);
-          break;
-        } catch (fetchErr) {
-          console.warn(`Error con modelo ${modelo}:`, fetchErr.message);
-        }
+      try {
+        const data = await llamarGroq(
+          [
+            { role: 'system', content: systemMsg },
+            { role: 'user', content: userMsg }
+          ],
+          { temperature: 0.1, maxTokens: 3000 }
+        );
+        respuestaTexto = data.choices?.[0]?.message?.content || '';
+        console.log(`✅ Agrupación IA con modelo: ${data.model || '(desconocido)'}`);
+      } catch (err) {
+        console.warn('Error llamando a GROQ:', err.message);
       }
 
       if (!respuestaTexto) {
@@ -305,26 +283,10 @@ Genera un análisis en formato DIFERENTE (${intentoNumero > 1 ? 'evita insights 
 Sé conciso, específico y ORIGINAL.`;
 
       // Llamar a GROQ API (compatible con OpenAI)
-      const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${process.env.REACT_APP_GROQ_API_KEY}`
-        },
-        body: JSON.stringify({
-          model: 'llama-3.1-8b-instant',
-          messages: [{ role: 'user', content: prompt }],
-          temperature: 0.7 + (intentoNumero * 0.1), // Aumenta temperatura para respuestas más diversas
-          max_tokens: 1000
-        })
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error('Error en GROQ: ' + (errorData.error?.message || response.statusText));
-      }
-
-      const data = await response.json();
+      const data = await llamarGroq(
+        [{ role: 'user', content: prompt }],
+        { temperature: 0.7 + (intentoNumero * 0.1), maxTokens: 1000 } // Aumenta temperatura para respuestas más diversas
+      );
       const respuestaTexto = data.choices[0].message.content;
       const nuevoId = `insight_${Date.now()}_${intentoNumero}`;
       

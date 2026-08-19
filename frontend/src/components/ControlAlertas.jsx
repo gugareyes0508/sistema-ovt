@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import axios from 'axios';
 import * as XLSX from 'xlsx';
+import { llamarGroq } from '../utils/groqClient';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -392,40 +393,18 @@ REGLAS DE AGRUPACIÓN:
 Responde SOLO con este JSON sin markdown:
 {"grupos":[{"nombre":"string","descripcion":"string","alertas":0,"hosts_afectados":0,"prioridad":"alta|media|baja","top_hosts":["host1","host2"],"recomendacion":"string max 120 chars"}],"resumen_ejecutivo":"string","host_mas_critico":"string","patron_principal":"string"}`;
 
-      const modelos = ['llama-3.3-70b-versatile', 'llama-3.1-8b-instant'];
       let respuestaTexto = '';
-
-      for (const modelo of modelos) {
-        try {
-          const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${process.env.REACT_APP_GROQ_API_KEY}`
-            },
-            body: JSON.stringify({
-              model: modelo,
-              messages: [
-                { role: 'system', content: systemMsg },
-                { role: 'user', content: userMsg }
-              ],
-              temperature: 0.2,
-              max_tokens: 2000
-            })
-          });
-
-          if (!response.ok) {
-            const errData = await response.json().catch(() => ({}));
-            console.warn(`Modelo ${modelo} falló:`, errData?.error?.message);
-            continue;
-          }
-
-          const data = await response.json();
-          respuestaTexto = data.choices?.[0]?.message?.content || '';
-          break;
-        } catch (fetchErr) {
-          console.warn(`Error con modelo ${modelo}:`, fetchErr.message);
-        }
+      try {
+        const data = await llamarGroq(
+          [
+            { role: 'system', content: systemMsg },
+            { role: 'user', content: userMsg }
+          ],
+          { temperature: 0.2, maxTokens: 2000 }
+        );
+        respuestaTexto = data.choices?.[0]?.message?.content || '';
+      } catch (err) {
+        console.warn('Error llamando a GROQ:', err.message);
       }
 
       if (!respuestaTexto) throw new Error('No se pudo obtener respuesta de ningún modelo GROQ disponible.');
