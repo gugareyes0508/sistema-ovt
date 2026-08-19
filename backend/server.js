@@ -1550,11 +1550,11 @@ app.delete('/api/grupos-servicio/:id', verificarToken, async (req, res) => {
 // ============================================
 
 const PERMISOS_DEFAULT = {
-  admin:        { dashboard:true, analytics:true, 'ovt-proyectado':true, claim:true, usuarios:true, mantenedor:true, auditoria:true, registros:false, resumen:false, 'carga-excel':false, 'proyeccion-nueva':false, 'proyeccion-mis':false, 'permisos-roles':true, alertas:true },
-  dpe:          { dashboard:true, analytics:true, 'ovt-proyectado':true, claim:true, usuarios:true, mantenedor:false, auditoria:false, registros:false, resumen:false, 'carga-excel':false, 'proyeccion-nueva':false, 'proyeccion-mis':false, 'permisos-roles':false, alertas:false },
-  teamleader:   { dashboard:true, analytics:true, 'ovt-proyectado':false, claim:false, usuarios:false, mantenedor:false, auditoria:false, registros:false, resumen:false, 'carga-excel':false, 'proyeccion-nueva':false, 'proyeccion-mis':false, 'permisos-roles':false, alertas:false },
-  especialista: { dashboard:false, analytics:false, 'ovt-proyectado':false, claim:false, usuarios:false, mantenedor:false, auditoria:false, registros:true, resumen:true, 'carga-excel':true, 'proyeccion-nueva':false, 'proyeccion-mis':false, 'permisos-roles':false, alertas:true },
-  itsm:         { dashboard:false, analytics:false, 'ovt-proyectado':false, claim:false, usuarios:false, mantenedor:false, auditoria:false, registros:false, resumen:false, 'carga-excel':false, 'proyeccion-nueva':true, 'proyeccion-mis':true, 'permisos-roles':false, alertas:true },
+  admin:        { dashboard:true, analytics:true, 'ovt-proyectado':true, claim:true, usuarios:true, mantenedor:true, auditoria:true, registros:false, resumen:false, 'carga-excel':false, 'proyeccion-nueva':false, 'proyeccion-mis':false, 'permisos-roles':true, alertas:true, equipo:true },
+  dpe:          { dashboard:true, analytics:true, 'ovt-proyectado':true, claim:true, usuarios:true, mantenedor:false, auditoria:false, registros:false, resumen:false, 'carga-excel':false, 'proyeccion-nueva':false, 'proyeccion-mis':false, 'permisos-roles':false, alertas:false, equipo:true },
+  teamleader:   { dashboard:true, analytics:true, 'ovt-proyectado':false, claim:false, usuarios:false, mantenedor:false, auditoria:false, registros:false, resumen:false, 'carga-excel':false, 'proyeccion-nueva':false, 'proyeccion-mis':false, 'permisos-roles':false, alertas:false, equipo:true },
+  especialista: { dashboard:false, analytics:false, 'ovt-proyectado':false, claim:false, usuarios:false, mantenedor:false, auditoria:false, registros:true, resumen:true, 'carga-excel':true, 'proyeccion-nueva':false, 'proyeccion-mis':false, 'permisos-roles':false, alertas:true, equipo:false },
+  itsm:         { dashboard:false, analytics:false, 'ovt-proyectado':false, claim:false, usuarios:false, mantenedor:false, auditoria:false, registros:false, resumen:false, 'carga-excel':false, 'proyeccion-nueva':true, 'proyeccion-mis':true, 'permisos-roles':false, alertas:true, equipo:false },
 };
 
 // GET /api/permisos-roles — cualquier usuario autenticado puede leer
@@ -1985,6 +1985,245 @@ app.post('/api/alertas/gestion', verificarToken, async (req, res) => {
 // ============================================
 // START SERVER
 // ============================================
+
+// ============================================
+// EQUIPO — roster, seguimiento, turnos, skills, CSAT
+// ============================================
+
+const EQUIPO_VER = ['admin', 'dpe', 'teamleader'];
+const EQUIPO_GESTION_ROSTER = ['admin', 'dpe'];
+const EQUIPO_GESTION_OPERATIVA = ['admin', 'dpe', 'teamleader'];
+
+// GET /api/equipo — se arma automáticamente desde Gestión de Usuarios (filtrado por cliente activo)
+app.get('/api/equipo', verificarToken, async (req, res) => {
+  try {
+    if (!EQUIPO_VER.includes(req.usuario.rol)) return res.status(403).json({ error: 'Sin permisos' });
+    const clienteActivoId = req.headers['x-cliente-activo'] || 'bcochile';
+
+    const [snapUsuarios, snapEstados, snapGrupos] = await Promise.all([
+      db.collection('usuarios').where('clientesIds', 'array-contains', clienteActivoId).get(),
+      db.collection('equipo_estado').where('clienteId', '==', clienteActivoId).get(),
+      db.collection('grupos_servicio').where('clienteId', '==', clienteActivoId).get()
+    ]);
+
+    const estadoPorId = {};
+    snapEstados.forEach(doc => { estadoPorId[doc.id] = doc.data().estado; });
+
+    const nombreGrupoPorId = {};
+    snapGrupos.forEach(doc => { nombreGrupoPorId[doc.id] = doc.data().nombre; });
+
+    const personas = [];
+    snapUsuarios.forEach(doc => {
+      const d = doc.data();
+      const idGrupoAsignado = d.gruposPorCliente?.[clienteActivoId] || d.grupoServicioId || '';
+      const grupoLegible = d.departamento || nombreGrupoPorId[idGrupoAsignado] || idGrupoAsignado || '';
+      personas.push({
+        id: doc.id,
+        nombre: d.nombre,
+        cargo: d.rol || '',
+        grupo: grupoLegible,
+        estado: estadoPorId[doc.id] || 'disponible'
+      });
+    });
+    personas.sort((a, b) => (a.nombre || '').localeCompare(b.nombre || ''));
+    res.json(personas);
+  } catch (err) {
+    console.error('Error GET /api/equipo:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// PUT /api/equipo/:id — solo actualiza el estado manual (Disponible/On Call/Vacaciones/etc.)
+// :id es el login de usuario (mismo id que en la colección "usuarios")
+app.put('/api/equipo/:id', verificarToken, async (req, res) => {
+  try {
+    if (!EQUIPO_GESTION_OPERATIVA.includes(req.usuario.rol)) return res.status(403).json({ error: 'Sin permisos' });
+    const { estado } = req.body;
+    if (!estado) return res.status(400).json({ error: 'estado es requerido' });
+    const clienteActivoId = req.headers['x-cliente-activo'] || 'bcochile';
+    await db.collection('equipo_estado').doc(req.params.id).set({
+      estado, clienteId: clienteActivoId, actualizadoPor: req.usuario.nombre, actualizadoEn: new Date()
+    });
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Error PUT /api/equipo/:id:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ---- SEGUIMIENTO (notas por persona) ----
+app.get('/api/equipo/seguimiento-todas', verificarToken, async (req, res) => {
+  try {
+    if (!EQUIPO_VER.includes(req.usuario.rol)) return res.status(403).json({ error: 'Sin permisos' });
+    const clienteActivoId = req.headers['x-cliente-activo'] || 'bcochile';
+    const snap = await db.collection('equipo_seguimiento').where('clienteId', '==', clienteActivoId).get();
+    const resultado = {};
+    snap.forEach(doc => { resultado[doc.id] = doc.data(); });
+    res.json(resultado);
+  } catch (err) {
+    console.error('Error GET /api/equipo/seguimiento-todas:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/equipo/seguimiento', verificarToken, async (req, res) => {
+  try {
+    if (!EQUIPO_GESTION_OPERATIVA.includes(req.usuario.rol)) return res.status(403).json({ error: 'Sin permisos' });
+    const { personaId, nota } = req.body;
+    if (!personaId || !nota) return res.status(400).json({ error: 'personaId y nota son requeridos' });
+    const clienteActivoId = req.headers['x-cliente-activo'] || 'bcochile';
+    const ref = db.collection('equipo_seguimiento').doc(personaId);
+    const doc = await ref.get();
+    const nuevaNota = { texto: nota, autor: req.usuario.nombre, fecha: new Date() };
+    if (!doc.exists) {
+      await ref.set({ personaId, clienteId: clienteActivoId, notas: [nuevaNota] });
+    } else {
+      const notas = Array.isArray(doc.data().notas) ? doc.data().notas : [];
+      notas.push(nuevaNota);
+      await ref.update({ notas });
+    }
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Error POST /api/equipo/seguimiento:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ---- TURNOS / ON CALL ----
+app.get('/api/equipo/turnos', verificarToken, async (req, res) => {
+  try {
+    if (!EQUIPO_VER.includes(req.usuario.rol)) return res.status(403).json({ error: 'Sin permisos' });
+    const clienteActivoId = req.headers['x-cliente-activo'] || 'bcochile';
+    const snap = await db.collection('equipo_turnos').where('clienteId', '==', clienteActivoId).get();
+    const turnos = [];
+    snap.forEach(doc => turnos.push({ id: doc.id, ...doc.data() }));
+    res.json(turnos);
+  } catch (err) {
+    console.error('Error GET /api/equipo/turnos:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/equipo/turnos', verificarToken, async (req, res) => {
+  try {
+    if (!EQUIPO_GESTION_OPERATIVA.includes(req.usuario.rol)) return res.status(403).json({ error: 'Sin permisos' });
+    const { personaId, fecha, tipo } = req.body;
+    if (!personaId || !fecha || !tipo) return res.status(400).json({ error: 'personaId, fecha y tipo son requeridos' });
+    const clienteActivoId = req.headers['x-cliente-activo'] || 'bcochile';
+    const claveTurno = `${personaId}_${fecha}`;
+    await db.collection('equipo_turnos').doc(claveTurno).set({
+      personaId, fecha, tipo, clienteId: clienteActivoId, actualizadoPor: req.usuario.nombre, actualizadoEn: new Date()
+    });
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Error POST /api/equipo/turnos:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete('/api/equipo/turnos/:id', verificarToken, async (req, res) => {
+  try {
+    if (!EQUIPO_GESTION_OPERATIVA.includes(req.usuario.rol)) return res.status(403).json({ error: 'Sin permisos' });
+    await db.collection('equipo_turnos').doc(req.params.id).delete();
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Error DELETE /api/equipo/turnos/:id:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ---- SKILLS (config configurable + ratings por persona) ----
+app.get('/api/equipo/skills-config', verificarToken, async (req, res) => {
+  try {
+    if (!EQUIPO_VER.includes(req.usuario.rol)) return res.status(403).json({ error: 'Sin permisos' });
+    const clienteActivoId = req.headers['x-cliente-activo'] || 'bcochile';
+    const doc = await db.collection('equipo_skills_config').doc(clienteActivoId).get();
+    res.json(doc.exists ? doc.data().skills || [] : ['Linux', 'Oracle', 'Kubernetes', 'Cloud', 'Windows', 'Redes', 'Middleware']);
+  } catch (err) {
+    console.error('Error GET /api/equipo/skills-config:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/equipo/skills-config', verificarToken, async (req, res) => {
+  try {
+    if (!EQUIPO_GESTION_OPERATIVA.includes(req.usuario.rol)) return res.status(403).json({ error: 'Sin permisos' });
+    const { skills } = req.body;
+    if (!Array.isArray(skills)) return res.status(400).json({ error: 'skills debe ser un array' });
+    const clienteActivoId = req.headers['x-cliente-activo'] || 'bcochile';
+    await db.collection('equipo_skills_config').doc(clienteActivoId).set({ skills });
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Error POST /api/equipo/skills-config:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/equipo/skills', verificarToken, async (req, res) => {
+  try {
+    if (!EQUIPO_VER.includes(req.usuario.rol)) return res.status(403).json({ error: 'Sin permisos' });
+    const clienteActivoId = req.headers['x-cliente-activo'] || 'bcochile';
+    const snap = await db.collection('equipo_skills').where('clienteId', '==', clienteActivoId).get();
+    const resultado = {};
+    snap.forEach(doc => { resultado[doc.data().personaId] = doc.data().ratings || {}; });
+    res.json(resultado);
+  } catch (err) {
+    console.error('Error GET /api/equipo/skills:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/equipo/skills', verificarToken, async (req, res) => {
+  try {
+    if (!EQUIPO_GESTION_OPERATIVA.includes(req.usuario.rol)) return res.status(403).json({ error: 'Sin permisos' });
+    const { personaId, skill, rating } = req.body;
+    if (!personaId || !skill) return res.status(400).json({ error: 'personaId y skill son requeridos' });
+    const clienteActivoId = req.headers['x-cliente-activo'] || 'bcochile';
+    const ref = db.collection('equipo_skills').doc(personaId);
+    const doc = await ref.get();
+    const ratings = doc.exists ? (doc.data().ratings || {}) : {};
+    ratings[skill] = Number(rating) || 0;
+    await ref.set({ personaId, clienteId: clienteActivoId, ratings });
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Error POST /api/equipo/skills:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ---- CSAT ----
+app.get('/api/equipo/csat', verificarToken, async (req, res) => {
+  try {
+    if (!EQUIPO_VER.includes(req.usuario.rol)) return res.status(403).json({ error: 'Sin permisos' });
+    const clienteActivoId = req.headers['x-cliente-activo'] || 'bcochile';
+    const snap = await db.collection('equipo_csat').where('clienteId', '==', clienteActivoId).get();
+    let registros = [];
+    snap.forEach(doc => registros.push({ id: doc.id, ...doc.data() }));
+    registros.sort((a, b) => (b.mes || '').localeCompare(a.mes || ''));
+    registros = registros.slice(0, 12);
+    res.json(registros);
+  } catch (err) {
+    console.error('Error GET /api/equipo/csat:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/equipo/csat', verificarToken, async (req, res) => {
+  try {
+    if (!EQUIPO_GESTION_ROSTER.includes(req.usuario.rol)) return res.status(403).json({ error: 'Sin permisos' });
+    const { mes, score, comentario } = req.body;
+    if (!mes || score === undefined) return res.status(400).json({ error: 'mes y score son requeridos' });
+    const clienteActivoId = req.headers['x-cliente-activo'] || 'bcochile';
+    await db.collection('equipo_csat').doc(`${clienteActivoId}_${mes}`).set({
+      mes, score: Number(score), comentario: comentario || '', clienteId: clienteActivoId,
+      registradoPor: req.usuario.nombre, registradoEn: new Date()
+    });
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Error POST /api/equipo/csat:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
 
 app.listen(PORT, async () => {
   console.log('==================================================');
