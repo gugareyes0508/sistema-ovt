@@ -407,6 +407,7 @@ const ClaimDashboard = ({ token, apiUrl, clienteActivo = '' }) => {
   const [filtroAnio, setFiltroAnio] = useState(new Date().getFullYear());
   const [tabAnalitca, setTabAnalitica] = useState('resumen');
   const [grupoAnualSel, setGrupoAnualSel] = useState(null); // grupo elegido para el gráfico anual "Tendencia por grupo"
+  const [vistaTendenciaGrupo, setVistaTendenciaGrupo] = useState('semanal'); // 'semanal' | 'mensual'
   const [iaLoading, setIaLoading] = useState(false);
   const [iaError, setIaError] = useState(null);
   const [iaInsights, setIaInsights] = useState(null);
@@ -861,12 +862,36 @@ const ClaimDashboard = ({ token, apiUrl, clienteActivo = '' }) => {
     ]
   };
 
+  // Vista MENSUAL de la tendencia por grupo. IMPORTANTE: usa `semanas` (sin
+  // fusionar por fecha), no `todosSem` — una semana repartida entre dos meses
+  // contables debe sumar cada porción a SU mes real, igual que el Consolidado
+  // mensual general (ver nota más abajo, mismo motivo).
+  const MESES_NOMBRE = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+  const mesesGrupoMap = {};
+  semanas.forEach(s => {
+    const key = `${s.anio}-${String(s.mes).padStart(2,'0')}`;
+    if (!mesesGrupoMap[key]) mesesGrupoMap[key] = { anio:s.anio, mes:s.mes, horas:0, costo:0 };
+    Object.entries(s.personas||{}).forEach(([emp, datos]) => {
+      if (gruposPorPersonaAnual[emp]?.grupoNombre === grupoAnualActivo) {
+        mesesGrupoMap[key].horas += datos.horas || 0;
+        mesesGrupoMap[key].costo += datos.costo || 0;
+      }
+    });
+  });
+  const mesesGrupoOrdenados = Object.entries(mesesGrupoMap).sort((a,b) => a[0].localeCompare(b[0]));
+  const chartTendenciaGrupoMensual = {
+    labels: mesesGrupoOrdenados.map(([, m]) => `${MESES_NOMBRE[m.mes-1].slice(0,3)} ${m.anio}`),
+    datasets:[
+      { label:'Horas', data:mesesGrupoOrdenados.map(([, m]) => m.horas), borderColor:colorGrupoAnual, backgroundColor:colorGrupoAnual+'12', borderWidth:2, fill:true, tension:0.35, pointRadius:4, pointBackgroundColor:colorGrupoAnual, yAxisID:'y' },
+      { label:'Costo USD', data:mesesGrupoOrdenados.map(([, m]) => m.costo), borderColor:'#1baf7a', backgroundColor:'transparent', borderWidth:2, borderDash:[4,3], fill:false, tension:0.35, pointRadius:4, pointBackgroundColor:'#1baf7a', yAxisID:'y2' }
+    ]
+  };
+
   // Consolidado mensual — suma todas las semanas dentro de cada mes calendario.
   // IMPORTANTE: usa `semanas` (sin fusionar por fecha), no `todosSem` — porque
   // `todosSem` fusiona semanas repartidas entre dos meses contables para el
   // gráfico de Tendencia, y aquí necesitamos justo lo contrario: mantenerlas
   // separadas para que cada mes sume su costo real (ej. julio = $152.86K).
-  const MESES_NOMBRE = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
   const mesesMap = {};
   semanas.forEach(s => {
     const key = `${s.anio}-${String(s.mes).padStart(2,'0')}`;
@@ -1306,8 +1331,26 @@ No agregues texto fuera de ese formato.`;
 
                   {/* Tendencia anual por grupo — mismo rango completo, un grupo a la vez */}
                   <div style={{ border:'1px solid rgba(255,255,255,0.72)', borderRadius:'22px', background:'var(--glass)', boxShadow:'var(--shadow-soft)', backdropFilter:'blur(18px)', padding:'18px 20px', marginTop:'16px' }}>
-                    <div style={{ fontFamily:"'IBM Plex Mono',monospace", fontSize:'9px', fontWeight:'700', color:'var(--muted)', textTransform:'uppercase', letterSpacing:'.09em', marginBottom:'4px' }}>Gráfico</div>
-                    <h4 style={{ margin:'0 0 12px', fontSize:'1rem', fontWeight:'800', color:'var(--ink-950)', letterSpacing:'-.03em' }}>Tendencia anual por grupo — horas y costo</h4>
+                    <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:'4px', flexWrap:'wrap', gap:'8px' }}>
+                      <div>
+                        <div style={{ fontFamily:"'IBM Plex Mono',monospace", fontSize:'9px', fontWeight:'700', color:'var(--muted)', textTransform:'uppercase', letterSpacing:'.09em', marginBottom:'4px' }}>Gráfico</div>
+                        <h4 style={{ margin:'0 0 12px', fontSize:'1rem', fontWeight:'800', color:'var(--ink-950)', letterSpacing:'-.03em' }}>Tendencia {vistaTendenciaGrupo === 'mensual' ? 'mensual' : 'anual'} por grupo — horas y costo</h4>
+                      </div>
+                      <div style={{ display:'flex', gap:'4px', background:'#f3f4f6', borderRadius:'10px', padding:'3px' }}>
+                        <button onClick={() => setVistaTendenciaGrupo('semanal')}
+                          style={{ fontSize:'11px', fontWeight:'700', padding:'5px 12px', borderRadius:'8px', border:'none', cursor:'pointer',
+                            background: vistaTendenciaGrupo==='semanal' ? '#fff' : 'transparent', color: vistaTendenciaGrupo==='semanal' ? 'var(--ink-950)' : 'var(--muted)',
+                            boxShadow: vistaTendenciaGrupo==='semanal' ? '0 1px 3px rgba(0,0,0,0.12)' : 'none' }}>
+                          Semanal
+                        </button>
+                        <button onClick={() => setVistaTendenciaGrupo('mensual')}
+                          style={{ fontSize:'11px', fontWeight:'700', padding:'5px 12px', borderRadius:'8px', border:'none', cursor:'pointer',
+                            background: vistaTendenciaGrupo==='mensual' ? '#fff' : 'transparent', color: vistaTendenciaGrupo==='mensual' ? 'var(--ink-950)' : 'var(--muted)',
+                            boxShadow: vistaTendenciaGrupo==='mensual' ? '0 1px 3px rgba(0,0,0,0.12)' : 'none' }}>
+                          Mensual
+                        </button>
+                      </div>
+                    </div>
                     <div style={{ display:'flex', gap:'6px', flexWrap:'wrap', marginBottom:'14px' }}>
                       {top10GruposAnual.map(([nombre], i) => {
                         const color = nombre === 'Sin grupo asignado' ? COLOR_SIN_GRUPO : COLORES_GRUPO[i % COLORES_GRUPO.length];
@@ -1322,7 +1365,7 @@ No agregues texto fuera de ese formato.`;
                       })}
                     </div>
                     <div style={{ position:'relative', height:'220px', overflow:'hidden' }}>
-                      <Line data={chartTendenciaGrupoAnual} options={chartTendOpts} />
+                      <Line data={vistaTendenciaGrupo === 'mensual' ? chartTendenciaGrupoMensual : chartTendenciaGrupoAnual} options={chartTendOpts} />
                     </div>
                   </div>
 
