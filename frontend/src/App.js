@@ -11,6 +11,7 @@ import Analytics from './components/Analytics';
 import GestionUsuarios from './components/GestionUsuarios';
 import PermisosRoles from './components/PermisosRoles';
 import ControlAlertas from './components/ControlAlertas';
+import EquipoTeam from './components/EquipoTeam';
 import './App.css';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
@@ -959,6 +960,7 @@ function App() {
             {usuario.rol==='dpe' && puedeVer('ovt-proyectado') && <button className={vista==='ovt-proyectado'?'nav-btn active':'nav-btn'} onClick={()=>setVista('ovt-proyectado')}><i className="ti ti-calendar" aria-hidden="true"></i>OVT Proyectado</button>}
             {usuario.rol==='dpe' && puedeVer('claim') && <button className={vista==='claim'?'nav-btn active':'nav-btn'} onClick={()=>setVista('claim')}><i className="ti ti-clock" aria-hidden="true"></i>Control de Labor</button>}
             {usuario.rol==='dpe' && puedeVer('usuarios') && <button className={vista==='usuarios'?'nav-btn active':'nav-btn'} onClick={()=>setVista('usuarios')}><i className="ti ti-users" aria-hidden="true"></i>Usuarios</button>}
+            {puedeVer('equipo') && <button className={vista==='equipo'?'nav-btn active':'nav-btn'} onClick={()=>setVista('equipo')}><i className="ti ti-users-group" aria-hidden="true"></i>Equipo</button>}
           </nav>
         )}
 
@@ -971,6 +973,7 @@ function App() {
               {puedeVer('ovt-proyectado') && <button className={vista==='ovt-proyectado'?'nav-btn active':'nav-btn'} onClick={()=>setVista('ovt-proyectado')}><i className="ti ti-calendar" aria-hidden="true"></i>OVT Proyectado</button>}
               {puedeVer('claim') && <button className={vista==='claim'?'nav-btn active':'nav-btn'} onClick={()=>setVista('claim')}><i className="ti ti-clock" aria-hidden="true"></i>Control de Labor</button>}
               {puedeVer('alertas') && <button className={vista==='alertas'?'nav-btn active':'nav-btn'} onClick={()=>setVista('alertas')}><i className="ti ti-bell" aria-hidden="true"></i>Control de Alertas</button>}
+              {puedeVer('equipo') && <button className={vista==='equipo'?'nav-btn active':'nav-btn'} onClick={()=>setVista('equipo')}><i className="ti ti-users-group" aria-hidden="true"></i>Equipo</button>}
             </nav>
             <div className="sidebar-section">Administración</div>
             <nav className="nav">
@@ -1909,6 +1912,10 @@ function App() {
         {/* Control de Alertas — admin, especialista, itsm */}
         {vista === 'alertas' && (usuario.rol === 'admin' || usuario.rol === 'especialista' || usuario.rol === 'itsm') && (
           <ControlAlertas key={`alertas-${clienteActivo}`} token={token} apiUrl={API_URL} clienteActivo={clienteActivo} usuario={usuario} />
+        )}
+
+        {vista === 'equipo' && (usuario.rol === 'admin' || usuario.rol === 'dpe' || usuario.rol === 'teamleader') && (
+          <EquipoTeam key={`equipo-${clienteActivo}`} token={token} apiUrl={API_URL} clienteActivo={clienteActivo} usuario={usuario} />
         )}
       </main>
 

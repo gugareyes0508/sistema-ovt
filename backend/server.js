@@ -1202,34 +1202,36 @@ app.post('/api/claims/upload', verificarToken, async (req, res) => {
     // Determinar clienteId: DPE usa x-cliente-activo, admin usa 'bcochile' por defecto
     const clienteActivoId = req.headers['x-cliente-activo'] || 'bcochile';
 
-    // Verificar cuáles fechas ya existen PARA ESTE CLIENTE (antes comparaba contra
-    // toda la colección, así que semanas de otros clientes con la misma fecha
-    // calendario se marcaban como "ya cargadas" y se descartaban sin guardarse)
+    // Revisamos cuáles fechas ya existían PARA ESTE CLIENTE — solo para reportar
+    // cuántas son nuevas vs. actualizadas. YA NO se usa para descartar: cada carga
+    // siempre sobrescribe la semana con los datos más recientes del Excel, porque
+    // las horas de una semana suelen terminar de cerrarse/corregirse días después
+    // (timesheets tardíos, ajustes de facturación) y el Export.xlsx más nuevo es
+    // siempre la fuente de verdad más confiable para esa semana.
     const existSnap = await db.collection('claims_semanas').get();
     const existentes = new Set();
     existSnap.forEach(doc => {
       const data = doc.data();
       if ((data.clienteId || 'bcochile') === clienteActivoId) {
-        existentes.add(data.fecha);
+        existentes.add(data.claveDoc || data.fecha);
       }
     });
 
-    const nuevas = semanas.filter(s => !existentes.has(s.fecha));
-    if (nuevas.length === 0) {
-      return res.json({ message: 'Todas las semanas ya estaban cargadas', nuevas: 0, total: semanas.length });
-    }
+    const nuevasCount = semanas.filter(s => !existentes.has(s.claveDoc || s.fecha)).length;
+    const actualizadasCount = semanas.length - nuevasCount;
 
     const batch = db.batch();
-    nuevas.forEach(sem => {
-      // ID compuesto por cliente + fecha: evita que dos clientes con la misma
-      // semana calendario (ej. ambos cierran el 2026-03-20) compartan el mismo
-      // documento y se pisen los datos entre sí.
-      const ref = db.collection('claims_semanas').doc(`${clienteActivoId}_${sem.fecha}`);
+    semanas.forEach(sem => {
+      // ID compuesto por cliente + clave (fecha + mes contable real): una misma
+      // semana calendario puede repartirse entre dos meses contables (LEDGER_MONTH_NAME),
+      // así que la clave incluye ambos para no pisar datos de un mes con otro.
+      const idDoc = sem.claveDoc || sem.fecha;
+      const ref = db.collection('claims_semanas').doc(`${clienteActivoId}_${idDoc}`);
       batch.set(ref, {
         ...sem,
         clienteId: clienteActivoId,
         creadoPor: req.usuario.nombre,
-        creadoEn: new Date()
+        actualizadoEn: new Date()
       });
     });
     await batch.commit();
@@ -1237,12 +1239,18 @@ app.post('/api/claims/upload', verificarToken, async (req, res) => {
     await db.collection('auditoria').add({
       accion: 'CLAIMS_UPLOAD',
       usuarioNombre: req.usuario.nombre,
-      semanasNuevas: nuevas.length,
+      semanasNuevas: nuevasCount,
+      semanasActualizadas: actualizadasCount,
       semanasTotales: semanas.length,
       timestamp: new Date()
     });
 
-    res.json({ message: 'Carga exitosa', nuevas: nuevas.length, total: semanas.length });
+    res.json({
+      message: `Carga exitosa: ${nuevasCount} semanas nuevas, ${actualizadasCount} actualizadas con los datos más recientes`,
+      nuevas: nuevasCount,
+      actualizadas: actualizadasCount,
+      total: semanas.length
+    });
   } catch (err) {
     console.error('Error POST /api/claims/upload:', err);
     res.status(500).json({ error: err.message });
