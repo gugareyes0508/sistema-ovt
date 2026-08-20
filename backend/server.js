@@ -2430,17 +2430,18 @@ app.get('/api/gobierno/monitoreo/:id/pendientes', verificarToken, async (req, re
 // ============================================
 // El Excel de inventario (hoja "INFRAESTRUCTURA") ya viene parseado y
 // agregado desde el frontend (SheetJS): filtrado por revision_fact en
-// ("VM SO","AP"), con distribuciones, buckets de obsolescencia, hostnames
-// (para calcular altas/bajas) y el detalle de equipos con parche pendiente.
-// El cálculo de altas/bajas vs. la carga anterior se hace acá, en el
-// servidor, comparando la lista de hostnames de esta carga contra la más
-// reciente ya guardada.
+// ("VM SO","AP"). Se guardan 3 segmentos por carga — "general" (todo el
+// universo), "vmSo" y "ap" — cada uno con sus propios totales,
+// distribuciones, buckets de obsolescencia, hostnames (para altas/bajas) y
+// detalle de equipos con parche pendiente, porque VM SO y AP tienen
+// objetivos de cumplimiento distintos y no deben mezclarse.
+const SEGMENTOS_INVENTARIO = ['general', 'vmSo', 'ap'];
 
 app.post('/api/gobierno/inventario/upload', verificarToken, async (req, res) => {
   try {
     if (!GOBIERNO_ROLES.includes(req.usuario.rol)) return res.status(403).json({ error: 'Sin permisos' });
-    const { total, vmSo, ap, parchado, eol, distribuciones, hostnames, equiposParchePendiente } = req.body;
-    if (typeof total !== 'number' || !Array.isArray(hostnames)) {
+    const { segmentos } = req.body;
+    if (!segmentos || typeof segmentos.general?.total !== 'number' || !Array.isArray(segmentos.general?.hostnames)) {
       return res.status(400).json({ error: 'Datos de inventario incompletos' });
     }
     const clienteActivoId = req.headers['x-cliente-activo'] || 'bcochile';
@@ -2455,28 +2456,38 @@ app.post('/api/gobierno/inventario/upload', verificarToken, async (req, res) => 
       if (!anterior || f > (anterior.fecha?.toDate?.() || new Date(anterior.fecha))) anterior = d;
     });
 
-    let cambios = { altas: null, bajas: null, neto: null };
-    if (anterior && Array.isArray(anterior.hostnames)) {
-      const setAnterior = new Set(anterior.hostnames);
-      const setActual = new Set(hostnames);
-      const altas = hostnames.filter(h => !setAnterior.has(h)).length;
-      const bajas = anterior.hostnames.filter(h => !setActual.has(h)).length;
-      cambios = { altas, bajas, neto: altas - bajas };
+    // Calcular altas/bajas por segmento, comparando hostnames contra la carga anterior
+    const segmentosGuardar = {};
+    const cambiosPorSegmento = {};
+    for (const seg of SEGMENTOS_INVENTARIO) {
+      const datos = segmentos[seg] || { total: 0, hostnames: [] };
+      const hostnames = Array.isArray(datos.hostnames) ? datos.hostnames : [];
+      let cambios = { altas: null, bajas: null, neto: null };
+      const anteriorSeg = anterior?.segmentos?.[seg];
+      if (anteriorSeg && Array.isArray(anteriorSeg.hostnames)) {
+        const setAnterior = new Set(anteriorSeg.hostnames);
+        const setActual = new Set(hostnames);
+        const altas = hostnames.filter(h => !setAnterior.has(h)).length;
+        const bajas = anteriorSeg.hostnames.filter(h => !setActual.has(h)).length;
+        cambios = { altas, bajas, neto: altas - bajas };
+      }
+      cambiosPorSegmento[seg] = cambios;
+      segmentosGuardar[seg] = {
+        total: datos.total || 0,
+        parchado: datos.parchado || {},
+        eol: datos.eol || {},
+        distribuciones: datos.distribuciones || {},
+        cambios,
+        hostnames,
+        equiposParchePendiente: Array.isArray(datos.equiposParchePendiente) ? datos.equiposParchePendiente : []
+      };
     }
 
     const docRef = db.collection('gobierno_inventario').doc(`${clienteActivoId}_${fecha.getTime()}`);
     await docRef.set({
       clienteId: clienteActivoId,
       fecha,
-      total,
-      vmSo: vmSo || 0,
-      ap: ap || 0,
-      parchado: parchado || {},
-      eol: eol || {},
-      distribuciones: distribuciones || {},
-      cambios,
-      hostnames,
-      equiposParchePendiente: Array.isArray(equiposParchePendiente) ? equiposParchePendiente : [],
+      segmentos: segmentosGuardar,
       cargadoPor: req.usuario.nombre,
       cargadoEn: new Date()
     });
@@ -2486,10 +2497,10 @@ app.post('/api/gobierno/inventario/upload', verificarToken, async (req, res) => 
       usuarioNombre: req.usuario.nombre,
       clienteId: clienteActivoId,
       timestamp: new Date(),
-      detalles: `Inventario cargado: ${total} equipos (${cambios.altas ?? '—'} altas, ${cambios.bajas ?? '—'} bajas)`
+      detalles: `Inventario cargado: ${segmentosGuardar.general.total} equipos (general), ${segmentosGuardar.vmSo.total} VM SO, ${segmentosGuardar.ap.total} AP`
     });
 
-    res.json({ success: true, id: docRef.id, cambios });
+    res.json({ success: true, id: docRef.id, cambios: cambiosPorSegmento });
   } catch (err) {
     console.error('Error POST /api/gobierno/inventario/upload:', err);
     res.status(500).json({ error: err.message });
@@ -2497,7 +2508,7 @@ app.post('/api/gobierno/inventario/upload', verificarToken, async (req, res) => 
 });
 
 // GET /api/gobierno/inventario — histórico de cargas, sin hostnames ni el
-// detalle de parche pendiente (para que la lista sea liviana).
+// detalle de parche pendiente de cada segmento (para que la lista sea liviana).
 app.get('/api/gobierno/inventario', verificarToken, async (req, res) => {
   try {
     if (!GOBIERNO_ROLES.includes(req.usuario.rol)) return res.status(403).json({ error: 'Sin permisos' });
@@ -2507,19 +2518,19 @@ app.get('/api/gobierno/inventario', verificarToken, async (req, res) => {
     const cargas = [];
     snap.forEach(doc => {
       const d = doc.data();
-      cargas.push({
-        id: doc.id,
-        fecha: d.fecha,
-        total: d.total,
-        vmSo: d.vmSo,
-        ap: d.ap,
-        parchado: d.parchado,
-        eol: d.eol,
-        distribuciones: d.distribuciones,
-        cambios: d.cambios,
-        totalParchePendiente: (d.equiposParchePendiente || []).length,
-        cargadoPor: d.cargadoPor || ''
-      });
+      const segmentosLigeros = {};
+      for (const seg of SEGMENTOS_INVENTARIO) {
+        const s = d.segmentos?.[seg] || {};
+        segmentosLigeros[seg] = {
+          total: s.total || 0,
+          parchado: s.parchado || {},
+          eol: s.eol || {},
+          distribuciones: s.distribuciones || {},
+          cambios: s.cambios || { altas: null, bajas: null, neto: null },
+          totalParchePendiente: (s.equiposParchePendiente || []).length
+        };
+      }
+      cargas.push({ id: doc.id, fecha: d.fecha, cargadoPor: d.cargadoPor || '', segmentos: segmentosLigeros });
     });
 
     cargas.sort((a, b) => {
@@ -2535,14 +2546,16 @@ app.get('/api/gobierno/inventario', verificarToken, async (req, res) => {
   }
 });
 
-// GET /api/gobierno/inventario/:id/parche-pendiente — detalle de equipos
-// con "Parchado = NO - Sin Parche Vigente" de una carga puntual.
+// GET /api/gobierno/inventario/:id/parche-pendiente?segmento=general|vmSo|ap
+// Detalle de equipos con "Parchado = NO - Sin Parche Vigente" de una carga
+// puntual, filtrado al segmento pedido.
 app.get('/api/gobierno/inventario/:id/parche-pendiente', verificarToken, async (req, res) => {
   try {
     if (!GOBIERNO_ROLES.includes(req.usuario.rol)) return res.status(403).json({ error: 'Sin permisos' });
+    const segmento = SEGMENTOS_INVENTARIO.includes(req.query.segmento) ? req.query.segmento : 'general';
     const doc = await db.collection('gobierno_inventario').doc(req.params.id).get();
     if (!doc.exists) return res.status(404).json({ error: 'Carga no encontrada' });
-    res.json(doc.data().equiposParchePendiente || []);
+    res.json(doc.data().segmentos?.[segmento]?.equiposParchePendiente || []);
   } catch (err) {
     console.error('Error GET /api/gobierno/inventario/:id/parche-pendiente:', err);
     res.status(500).json({ error: err.message });

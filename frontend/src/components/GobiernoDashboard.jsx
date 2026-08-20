@@ -98,6 +98,7 @@ export default function GobiernoDashboard({ token, apiUrl, clienteActivo }) {
   const [mensajeInv, setMensajeInv] = useState(null);
   const [parcheModal, setParcheModal] = useState(null); // { fecha, lista }
   const [cargandoParcheId, setCargandoParcheId] = useState(null);
+  const [segmentoInv, setSegmentoInv] = useState('general'); // 'general' | 'vmSo' | 'ap'
 
   const cargarDatos = useCallback(async () => {
     setCargando(true);
@@ -269,7 +270,56 @@ export default function GobiernoDashboard({ token, apiUrl, clienteActivo }) {
   // Hoja "INFRAESTRUCTURA": headers en la fila 1 (sin filas de título como
   // en Monitoreo). El universo administrado se define por
   // revision_fact ∈ ("VM SO","AP") — ese filtro ES la definición de
-  // "administrado" (no se cruza con otras columnas).
+  // "administrado" (no se cruza con otras columnas). VM SO y AP tienen
+  // objetivos de cumplimiento distintos, así que se agregan por separado
+  // además del total general.
+  const agregarSegmentoInventario = (filas) => {
+    const total = filas.length;
+
+    const aplicable = filas.filter(r => r['Parchado'] && r['Parchado'] !== 'NO APLICA');
+    const ok = aplicable.filter(r => r['Parchado'] === 'SI');
+    const parchado = { aplicable: aplicable.length, ok: ok.length, pct: aplicable.length ? +(100 * ok.length / aplicable.length).toFixed(1) : null };
+
+    const ahora = new Date();
+    const eol = { critico: 0, alto: 0, medio: 0, bajo: 0, sinDato: 0 };
+    filas.forEach(r => {
+      const efectiva = r['EOS Extendido SO'] || r['EOS SO'];
+      if (!efectiva || !(efectiva instanceof Date) || isNaN(efectiva.getTime())) { eol.sinDato++; return; }
+      const dias = Math.floor((efectiva - ahora) / (1000 * 60 * 60 * 24));
+      if (dias < 0) eol.critico++;
+      else if (dias <= 30) eol.alto++;
+      else if (dias <= 180) eol.medio++;
+      else eol.bajo++;
+    });
+
+    const distribucionDe = (campo, top) => {
+      const conteo = {};
+      filas.forEach(r => { const v = r[campo] || 'Sin dato'; conteo[v] = (conteo[v] || 0) + 1; });
+      let entradas = Object.entries(conteo).sort((a, b) => b[1] - a[1]);
+      if (top && entradas.length > top) {
+        const resto = entradas.slice(top).reduce((s, [, v]) => s + v, 0);
+        entradas = entradas.slice(0, top).concat([['Otros', resto]]);
+      }
+      return entradas.map(([label, valor]) => ({ label, valor }));
+    };
+
+    const distribuciones = {
+      entorno: distribucionDe('Ambiente'),
+      nube: distribucionDe('Ubicación'),
+      familiaSo: distribucionDe('Familia SO'),
+      kpe: distribucionDe('KPE'),
+      obsolescenciaSo: distribucionDe('Estado Obsolescencia SO'),
+      sistemaOperativo: distribucionDe('Sistema operativo', 8)
+    };
+
+    const hostnames = filas.map(r => String(r['Hostname'] || '')).filter(Boolean);
+    const equiposParchePendiente = filas
+      .filter(r => r['Parchado'] === 'NO - Sin Parche Vigente')
+      .map(r => ({ hostname: r['Hostname'] || '', ambiente: r['Ambiente'] || '', ubicacion: r['Ubicación'] || '', sistemaOperativo: r['Sistema operativo'] || '' }));
+
+    return { total, parchado, eol, distribuciones, hostnames, equiposParchePendiente };
+  };
+
   const procesarExcelInventario = async (file) => {
     setSubiendoInv(true);
     setMensajeInv(null);
@@ -284,60 +334,18 @@ export default function GobiernoDashboard({ token, apiUrl, clienteActivo }) {
       const universo = filas.filter(r => r['revision_fact'] === 'VM SO' || r['revision_fact'] === 'AP');
       if (universo.length === 0) throw new Error('No se encontraron equipos con revision_fact "VM SO" o "AP"');
 
-      const total = universo.length;
-      const vmSo = universo.filter(r => r['revision_fact'] === 'VM SO').length;
-      const ap = universo.filter(r => r['revision_fact'] === 'AP').length;
-
-      // Parchado: % OK sobre el universo aplicable (excluye "NO APLICA")
-      const aplicable = universo.filter(r => r['Parchado'] && r['Parchado'] !== 'NO APLICA');
-      const ok = aplicable.filter(r => r['Parchado'] === 'SI');
-      const parchado = { aplicable: aplicable.length, ok: ok.length, pct: aplicable.length ? +(100 * ok.length / aplicable.length).toFixed(1) : null };
-
-      // Obsolescencia EOL/EOS por fecha real: EOS Extendido SO si existe, si no EOS SO
-      const ahora = new Date();
-      const eol = { critico: 0, alto: 0, medio: 0, bajo: 0, sinDato: 0 };
-      universo.forEach(r => {
-        const efectiva = r['EOS Extendido SO'] || r['EOS SO'];
-        if (!efectiva || !(efectiva instanceof Date) || isNaN(efectiva.getTime())) { eol.sinDato++; return; }
-        const dias = Math.floor((efectiva - ahora) / (1000 * 60 * 60 * 24));
-        if (dias < 0) eol.critico++;
-        else if (dias <= 30) eol.alto++;
-        else if (dias <= 180) eol.medio++;
-        else eol.bajo++;
-      });
-
-      const distribucionDe = (campo, top) => {
-        const conteo = {};
-        universo.forEach(r => { const v = r[campo] || 'Sin dato'; conteo[v] = (conteo[v] || 0) + 1; });
-        let entradas = Object.entries(conteo).sort((a, b) => b[1] - a[1]);
-        if (top && entradas.length > top) {
-          const resto = entradas.slice(top).reduce((s, [, v]) => s + v, 0);
-          entradas = entradas.slice(0, top).concat([['Otros', resto]]);
-        }
-        return entradas.map(([label, valor]) => ({ label, valor }));
+      const segmentos = {
+        general: agregarSegmentoInventario(universo),
+        vmSo: agregarSegmentoInventario(universo.filter(r => r['revision_fact'] === 'VM SO')),
+        ap: agregarSegmentoInventario(universo.filter(r => r['revision_fact'] === 'AP'))
       };
 
-      const distribuciones = {
-        entorno: distribucionDe('Ambiente'),
-        nube: distribucionDe('Ubicación'),
-        familiaSo: distribucionDe('Familia SO'),
-        kpe: distribucionDe('KPE'),
-        sistemaOperativo: distribucionDe('Sistema operativo', 8)
-      };
-
-      const hostnames = universo.map(r => String(r['Hostname'] || '')).filter(Boolean);
-      const equiposParchePendiente = universo
-        .filter(r => r['Parchado'] === 'NO - Sin Parche Vigente')
-        .map(r => ({ hostname: r['Hostname'] || '', ambiente: r['Ambiente'] || '', ubicacion: r['Ubicación'] || '', sistemaOperativo: r['Sistema operativo'] || '' }));
-
-      const resp = await axios.post(`${apiUrl}/api/gobierno/inventario/upload`, {
-        total, vmSo, ap, parchado, eol, distribuciones, hostnames, equiposParchePendiente
-      }, { headers });
+      const resp = await axios.post(`${apiUrl}/api/gobierno/inventario/upload`, { segmentos }, { headers });
 
       if (resp.data.success) {
-        const c = resp.data.cambios || {};
+        const c = resp.data.cambios?.general || {};
         const cambiosTxto = c.altas !== null && c.altas !== undefined ? ` (${c.altas} altas, ${c.bajas} bajas)` : '';
-        setMensajeInv({ tipo: 'success', texto: `Carga registrada: ${total} equipos${cambiosTxto}.` });
+        setMensajeInv({ tipo: 'success', texto: `Carga registrada: ${segmentos.general.total} equipos${cambiosTxto}.` });
         cargarInventario();
       }
     } catch (err) {
@@ -347,10 +355,10 @@ export default function GobiernoDashboard({ token, apiUrl, clienteActivo }) {
     }
   };
 
-  const verParchePendiente = async (carga) => {
+  const verParchePendiente = async (carga, segmento) => {
     setCargandoParcheId(carga.id);
     try {
-      const res = await axios.get(`${apiUrl}/api/gobierno/inventario/${carga.id}/parche-pendiente`, { headers });
+      const res = await axios.get(`${apiUrl}/api/gobierno/inventario/${carga.id}/parche-pendiente`, { headers, params: { segmento } });
       setParcheModal({ fecha: carga.fecha, lista: res.data });
     } catch (err) {
       setMensajeInv({ tipo: 'error', texto: 'Error cargando el detalle: ' + (err.response?.data?.error || err.message) });
@@ -410,6 +418,9 @@ export default function GobiernoDashboard({ token, apiUrl, clienteActivo }) {
   }, [historicoAscendente]);
 
   const ultimaCargaInv = cargasInv[0] || null;
+  // Datos del segmento elegido (general/vmSo/ap) dentro de la última carga —
+  // todo lo que se muestra en pantalla se deriva de este objeto.
+  const segActualInv = ultimaCargaInv?.segmentos?.[segmentoInv] || null;
   const historicoAscendenteInv = useMemo(() => [...cargasInv].reverse(), [cargasInv]);
 
   const dataTendenciaInv = useMemo(() => {
@@ -418,7 +429,7 @@ export default function GobiernoDashboard({ token, apiUrl, clienteActivo }) {
       labels,
       datasets: [{
         label: 'Total equipos',
-        data: historicoAscendenteInv.map(c => c.total ?? null),
+        data: historicoAscendenteInv.map(c => c.segmentos?.[segmentoInv]?.total ?? null),
         borderColor: '#003b71',
         backgroundColor: 'rgba(0,59,113,0.08)',
         fill: true,
@@ -429,16 +440,28 @@ export default function GobiernoDashboard({ token, apiUrl, clienteActivo }) {
       }]
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [historicoAscendenteInv]);
+  }, [historicoAscendenteInv, segmentoInv]);
 
   const dataEolInv = useMemo(() => {
-    const e = ultimaCargaInv?.eol || {};
+    const e = segActualInv?.eol || {};
     return {
       labels: ['Crítico (vencido)', 'Alto (≤30 días)', 'Medio (30-180 días)', 'Bajo (>180 días)', 'Sin dato'],
       valores: [e.critico || 0, e.alto || 0, e.medio || 0, e.bajo || 0, e.sinDato || 0],
       colores: ['#d73b47', '#f0a11a', '#eda100', '#20a66a', '#b4b2a9']
     };
-  }, [ultimaCargaInv]);
+  }, [segActualInv]);
+
+  const dataObsSoInv = useMemo(() => {
+    const entradas = segActualInv?.distribuciones?.obsolescenciaSo || [];
+    const colorPorEtiqueta = { VIGENTE: '#20a66a', EXTENDIDO: '#f0a11a', OBSOLETO: '#d73b47', 'Sin dato': '#b4b2a9' };
+    return {
+      labels: entradas.map(e => e.label),
+      valores: entradas.map(e => e.valor),
+      colores: entradas.map(e => colorPorEtiqueta[e.label] || '#7f77dd')
+    };
+  }, [segActualInv]);
+
+  const nombreSegmento = { general: 'Vista general', vmSo: 'VM SO', ap: 'AP' };
 
   // KPIs de resumen (pestaña Panel)
   const itemsEstado = items.filter(i => i.tipo === 'estado');
@@ -803,53 +826,73 @@ export default function GobiernoDashboard({ token, apiUrl, clienteActivo }) {
             </div>
           ) : (
             <>
+              {/* Selector de segmento: VM SO y AP tienen objetivos distintos */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
+                <div style={{ fontSize: '13px', fontWeight: '800', color: 'var(--ink-950)' }}>{nombreSegmento[segmentoInv]}</div>
+                <div style={{ display: 'flex', gap: 6, background: 'rgba(255,255,255,0.9)', border: '1px solid var(--line)', borderRadius: '999px', padding: 4 }}>
+                  {['general', 'vmSo', 'ap'].map(seg => (
+                    <button
+                      key={seg}
+                      onClick={() => setSegmentoInv(seg)}
+                      style={{
+                        padding: '7px 16px', borderRadius: '999px', fontSize: '11px', fontWeight: '800', border: 'none', cursor: 'pointer',
+                        background: segmentoInv === seg ? 'linear-gradient(135deg,var(--ink-900),var(--bank-blue))' : 'transparent',
+                        color: segmentoInv === seg ? '#fff' : 'var(--muted)'
+                      }}
+                    >
+                      {nombreSegmento[seg]}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               {/* KPIs principales */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 10, marginBottom: 18 }}>
                 <div style={{ background: 'var(--glass)', border: '1px solid rgba(255,255,255,0.72)', borderRadius: '16px', padding: '14px', boxShadow: 'var(--shadow-soft)' }}>
-                  <div style={{ fontSize: '9px', fontWeight: '800', color: 'var(--muted)', letterSpacing: '.03em', marginBottom: 6 }}>TOTAL UNIVERSO</div>
-                  <div style={{ fontSize: '22px', fontWeight: '800', color: 'var(--ink-950)', fontFamily: "'IBM Plex Mono',monospace" }}>{ultimaCargaInv.total?.toLocaleString('es-CL')}</div>
-                </div>
-                <div style={{ background: 'var(--glass)', border: '1px solid rgba(255,255,255,0.72)', borderRadius: '16px', padding: '14px', boxShadow: 'var(--shadow-soft)' }}>
-                  <div style={{ fontSize: '9px', fontWeight: '800', color: 'var(--muted)', letterSpacing: '.03em', marginBottom: 6 }}>VM SO / AP</div>
-                  <div style={{ fontSize: '22px', fontWeight: '800', color: 'var(--ink-950)', fontFamily: "'IBM Plex Mono',monospace" }}>
-                    {ultimaCargaInv.vmSo?.toLocaleString('es-CL')} <span style={{ fontSize: 13, color: 'var(--muted)' }}>/ {ultimaCargaInv.ap?.toLocaleString('es-CL')}</span>
+                  <div style={{ fontSize: '9px', fontWeight: '800', color: 'var(--muted)', letterSpacing: '.03em', marginBottom: 6 }}>
+                    {segmentoInv === 'general' ? 'TOTAL UNIVERSO' : `TOTAL ${nombreSegmento[segmentoInv]}`}
                   </div>
+                  <div style={{ fontSize: '22px', fontWeight: '800', color: 'var(--ink-950)', fontFamily: "'IBM Plex Mono',monospace" }}>{segActualInv?.total?.toLocaleString('es-CL')}</div>
                 </div>
-                <div style={{ background: 'rgba(32,166,106,0.05)', border: '1px solid rgba(32,166,106,0.25)', borderRadius: '16px', padding: '14px' }}>
-                  <div style={{ fontSize: '9px', fontWeight: '800', color: 'var(--muted)', letterSpacing: '.03em', marginBottom: 6 }}>Q ADMINISTRADO</div>
-                  <div style={{ fontSize: '22px', fontWeight: '800', color: '#116642', fontFamily: "'IBM Plex Mono',monospace" }}>100%</div>
-                </div>
+                {segmentoInv === 'general' && (
+                  <div style={{ background: 'var(--glass)', border: '1px solid rgba(255,255,255,0.72)', borderRadius: '16px', padding: '14px', boxShadow: 'var(--shadow-soft)' }}>
+                    <div style={{ fontSize: '9px', fontWeight: '800', color: 'var(--muted)', letterSpacing: '.03em', marginBottom: 6 }}>VM SO / AP</div>
+                    <div style={{ fontSize: '22px', fontWeight: '800', color: 'var(--ink-950)', fontFamily: "'IBM Plex Mono',monospace" }}>
+                      {ultimaCargaInv.segmentos.vmSo?.total?.toLocaleString('es-CL')} <span style={{ fontSize: 13, color: 'var(--muted)' }}>/ {ultimaCargaInv.segmentos.ap?.total?.toLocaleString('es-CL')}</span>
+                    </div>
+                  </div>
+                )}
                 <div style={{ background: 'rgba(32,166,106,0.05)', border: '1px solid rgba(32,166,106,0.25)', borderRadius: '16px', padding: '14px' }}>
                   <div style={{ fontSize: '9px', fontWeight: '800', color: 'var(--muted)', letterSpacing: '.03em', marginBottom: 6 }}>PARCHADO OK</div>
                   <div style={{ fontSize: '22px', fontWeight: '800', color: '#116642', fontFamily: "'IBM Plex Mono',monospace" }}>
-                    {ultimaCargaInv.parchado?.pct != null ? `${ultimaCargaInv.parchado.pct}%` : '—'}
+                    {segActualInv?.parchado?.pct != null ? `${segActualInv.parchado.pct}%` : '—'}
                   </div>
                   <div style={{ fontSize: '10px', color: 'var(--muted)', fontWeight: '700' }}>
-                    {ultimaCargaInv.parchado?.ok ?? 0} de {ultimaCargaInv.parchado?.aplicable ?? 0} aplicables
+                    {segActualInv?.parchado?.ok ?? 0} de {segActualInv?.parchado?.aplicable ?? 0} aplicables
                   </div>
                 </div>
                 <div style={{ background: 'rgba(215,59,71,0.05)', border: '1px solid rgba(215,59,71,0.22)', borderRadius: '16px', padding: '14px' }}>
                   <div style={{ fontSize: '9px', fontWeight: '800', color: 'var(--muted)', letterSpacing: '.03em', marginBottom: 6 }}>EOL CRÍTICO + ALTO</div>
                   <div style={{ fontSize: '22px', fontWeight: '800', color: '#a61e2b', fontFamily: "'IBM Plex Mono',monospace" }}>
-                    {((ultimaCargaInv.eol?.critico || 0) + (ultimaCargaInv.eol?.alto || 0)).toLocaleString('es-CL')}
+                    {((segActualInv?.eol?.critico || 0) + (segActualInv?.eol?.alto || 0)).toLocaleString('es-CL')}
                   </div>
                 </div>
                 <div style={{ background: 'var(--glass)', border: '1px solid rgba(255,255,255,0.72)', borderRadius: '16px', padding: '14px', boxShadow: 'var(--shadow-soft)' }}>
                   <div style={{ fontSize: '9px', fontWeight: '800', color: 'var(--muted)', letterSpacing: '.03em', marginBottom: 8 }}>VS. CARGA ANTERIOR</div>
-                  {ultimaCargaInv.cambios?.altas === null || ultimaCargaInv.cambios?.altas === undefined ? (
+                  {segActualInv?.cambios?.altas === null || segActualInv?.cambios?.altas === undefined ? (
                     <div style={{ fontSize: '11px', color: 'var(--muted)', fontWeight: '700' }}>Sin comparación disponible</div>
                   ) : (
                     <div style={{ display: 'flex', gap: 10 }}>
-                      <div><div style={{ fontSize: 15, fontWeight: 800, color: '#116642', fontFamily: "'IBM Plex Mono',monospace" }}>+{ultimaCargaInv.cambios.altas}</div><div style={{ fontSize: 8, color: 'var(--muted)', fontWeight: 700 }}>altas</div></div>
-                      <div><div style={{ fontSize: 15, fontWeight: 800, color: '#a61e2b', fontFamily: "'IBM Plex Mono',monospace" }}>-{ultimaCargaInv.cambios.bajas}</div><div style={{ fontSize: 8, color: 'var(--muted)', fontWeight: 700 }}>bajas</div></div>
-                      <div><div style={{ fontSize: 15, fontWeight: 800, color: 'var(--ink-950)', fontFamily: "'IBM Plex Mono',monospace" }}>{ultimaCargaInv.cambios.neto >= 0 ? '+' : ''}{ultimaCargaInv.cambios.neto}</div><div style={{ fontSize: 8, color: 'var(--muted)', fontWeight: 700 }}>neto</div></div>
+                      <div><div style={{ fontSize: 15, fontWeight: 800, color: '#116642', fontFamily: "'IBM Plex Mono',monospace" }}>+{segActualInv.cambios.altas}</div><div style={{ fontSize: 8, color: 'var(--muted)', fontWeight: 700 }}>altas</div></div>
+                      <div><div style={{ fontSize: 15, fontWeight: 800, color: '#a61e2b', fontFamily: "'IBM Plex Mono',monospace" }}>-{segActualInv.cambios.bajas}</div><div style={{ fontSize: 8, color: 'var(--muted)', fontWeight: 700 }}>bajas</div></div>
+                      <div><div style={{ fontSize: 15, fontWeight: 800, color: 'var(--ink-950)', fontFamily: "'IBM Plex Mono',monospace" }}>{segActualInv.cambios.neto >= 0 ? '+' : ''}{segActualInv.cambios.neto}</div><div style={{ fontSize: 8, color: 'var(--muted)', fontWeight: 700 }}>neto</div></div>
                     </div>
                   )}
                 </div>
               </div>
 
-              {/* Obsolescencia + Parchado + Top parche pendiente */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1.1fr 1fr 1.2fr', gap: 10, marginBottom: 18 }}>
+              {/* Obsolescencia EOL/EOS + Estado Obsolescencia SO + Parchado + Top parche pendiente */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 10, marginBottom: 18 }}>
                 <div style={{ background: 'var(--glass)', border: '1px solid rgba(255,255,255,0.72)', borderRadius: '16px', padding: '16px', boxShadow: 'var(--shadow-soft)' }}>
                   <p style={{ fontWeight: '800', fontSize: '12px', color: 'var(--ink-950)', margin: '0 0 2px' }}>Obsolescencia EOL/EOS</p>
                   <p style={{ fontSize: '10px', color: 'var(--muted)', margin: '0 0 10px' }}>por fecha real (EOS SO / EOS Extendido SO)</p>
@@ -874,41 +917,64 @@ export default function GobiernoDashboard({ token, apiUrl, clienteActivo }) {
                   </div>
                 </div>
 
+                <div style={{ background: 'var(--glass)', border: '1px solid rgba(255,255,255,0.72)', borderRadius: '16px', padding: '16px', boxShadow: 'var(--shadow-soft)' }}>
+                  <p style={{ fontWeight: '800', fontSize: '12px', color: 'var(--ink-950)', margin: '0 0 2px' }}>Estado Obsolescencia SO</p>
+                  <p style={{ fontSize: '10px', color: 'var(--muted)', margin: '0 0 10px' }}>campo "Estado Obsolescencia SO"</p>
+                  <div style={{ position: 'relative', height: '120px' }}>
+                    <Doughnut
+                      data={{ labels: dataObsSoInv.labels, datasets: [{ data: dataObsSoInv.valores, backgroundColor: dataObsSoInv.colores, borderColor: '#fff', borderWidth: 2 }] }}
+                      options={{ responsive: true, maintainAspectRatio: false, cutout: '65%', plugins: { legend: { display: false } } }}
+                    />
+                  </div>
+                  <div style={{ marginTop: 8 }}>
+                    {dataObsSoInv.labels.map((lab, i) => {
+                      const total = dataObsSoInv.valores.reduce((a, b) => a + b, 0) || 1;
+                      return (
+                        <div key={lab} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 10, color: 'var(--ink-800)', marginBottom: 3 }}>
+                          <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                            <span style={{ width: 7, height: 7, borderRadius: 2, background: dataObsSoInv.colores[i], display: 'inline-block' }}></span>{lab}
+                          </span>
+                          <span style={{ fontWeight: 800 }}>{dataObsSoInv.valores[i]} <span style={{ color: 'var(--muted)', fontWeight: 600 }}>({(100 * dataObsSoInv.valores[i] / total).toFixed(1)}%)</span></span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
                 <div style={{ background: 'var(--glass)', border: '1px solid rgba(255,255,255,0.72)', borderRadius: '16px', padding: '16px', boxShadow: 'var(--shadow-soft)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
                   <p style={{ fontWeight: '800', fontSize: '12px', color: 'var(--ink-950)', alignSelf: 'flex-start', margin: '0 0 10px' }}>Cumplimiento Parches</p>
                   <div style={{ position: 'relative', width: 150, height: 90 }}>
                     <Doughnut
-                      data={{ datasets: [{ data: [ultimaCargaInv.parchado?.pct || 0, 100 - (ultimaCargaInv.parchado?.pct || 0)], backgroundColor: ['#20a66a', 'var(--paper-100)'], borderWidth: 0 }] }}
+                      data={{ datasets: [{ data: [segActualInv?.parchado?.pct || 0, 100 - (segActualInv?.parchado?.pct || 0)], backgroundColor: ['#20a66a', 'var(--paper-100)'], borderWidth: 0 }] }}
                       options={{ responsive: true, maintainAspectRatio: false, circumference: 180, rotation: 270, cutout: '75%', plugins: { legend: { display: false }, tooltip: { enabled: false } } }}
                     />
                   </div>
                   <div style={{ fontSize: 20, fontWeight: 800, color: '#116642', fontFamily: "'IBM Plex Mono',monospace", marginTop: -38 }}>
-                    {ultimaCargaInv.parchado?.pct != null ? `${ultimaCargaInv.parchado.pct}%` : '—'}
+                    {segActualInv?.parchado?.pct != null ? `${segActualInv.parchado.pct}%` : '—'}
                   </div>
                   <div style={{ fontSize: 9, color: 'var(--muted)', fontWeight: 700, marginTop: 14 }}>
-                    {ultimaCargaInv.parchado?.ok ?? 0} de {ultimaCargaInv.parchado?.aplicable ?? 0} aplicables
+                    {segActualInv?.parchado?.ok ?? 0} de {segActualInv?.parchado?.aplicable ?? 0} aplicables
                   </div>
                 </div>
 
                 <div style={{ background: 'var(--glass)', border: '1px solid rgba(255,255,255,0.72)', borderRadius: '16px', padding: '16px', boxShadow: 'var(--shadow-soft)' }}>
                   <p style={{ fontWeight: '800', fontSize: '12px', color: 'var(--ink-950)', margin: '0 0 2px' }}>Top equipos con parche pendiente</p>
-                  <p style={{ fontSize: '10px', color: 'var(--muted)', margin: '0 0 10px' }}>{ultimaCargaInv.totalParchePendiente} equipos "sin parche vigente"</p>
-                  <button className="btn-editar" onClick={() => verParchePendiente(ultimaCargaInv)} disabled={cargandoParcheId === ultimaCargaInv.id}>
+                  <p style={{ fontSize: '10px', color: 'var(--muted)', margin: '0 0 10px' }}>{segActualInv?.totalParchePendiente ?? 0} equipos "sin parche vigente" en {nombreSegmento[segmentoInv]}</p>
+                  <button className="btn-editar" onClick={() => verParchePendiente(ultimaCargaInv, segmentoInv)} disabled={cargandoParcheId === ultimaCargaInv.id}>
                     {cargandoParcheId === ultimaCargaInv.id ? 'Cargando...' : 'Ver listado completo'}
                   </button>
                 </div>
               </div>
 
               {/* Distribuciones */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, minmax(0,1fr))', gap: 10, marginBottom: 18 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0,1fr))', gap: 10, marginBottom: 10 }}>
                 {[
                   ['Entorno', 'entorno'],
                   ['Nube', 'nube'],
                   ['Familia de S.O.', 'familiaSo'],
-                  ['KPE', 'kpe'],
-                  ['Sistema Operativo', 'sistemaOperativo']
+                  ['KPE', 'kpe']
                 ].map(([titulo, clave]) => {
-                  const datos = ultimaCargaInv.distribuciones?.[clave] || [];
+                  const datos = segActualInv?.distribuciones?.[clave] || [];
                   const total = datos.reduce((s, d) => s + d.valor, 0) || 1;
                   return (
                     <div key={clave} style={{ background: 'var(--glass)', border: '1px solid rgba(255,255,255,0.72)', borderRadius: '16px', padding: '14px', boxShadow: 'var(--shadow-soft)' }}>
@@ -926,10 +992,29 @@ export default function GobiernoDashboard({ token, apiUrl, clienteActivo }) {
                 })}
               </div>
 
+              {/* Sistema Operativo: tarjeta ancha, sin truncar nombres */}
+              <div style={{ background: 'var(--glass)', border: '1px solid rgba(255,255,255,0.72)', borderRadius: '16px', padding: '16px', boxShadow: 'var(--shadow-soft)', marginBottom: 18 }}>
+                <p style={{ fontWeight: '800', fontSize: '12px', color: 'var(--ink-950)', margin: '0 0 10px' }}>Sistema Operativo</p>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '6px 24px' }}>
+                  {(segActualInv?.distribuciones?.sistemaOperativo || []).map((d, i) => {
+                    const total = (segActualInv?.distribuciones?.sistemaOperativo || []).reduce((s, x) => s + x.valor, 0) || 1;
+                    return (
+                      <div key={d.label} style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', fontSize: 11, color: 'var(--ink-800)', gap: 10, padding: '4px 0', borderBottom: '1px solid rgba(18,52,78,0.06)' }}>
+                        <span style={{ display: 'flex', alignItems: 'flex-start', gap: 6 }}>
+                          <span style={{ width: 8, height: 8, borderRadius: 2, background: PALETA_DIST[i % PALETA_DIST.length], display: 'inline-block', flexShrink: 0, marginTop: 4 }}></span>
+                          <span style={{ lineHeight: 1.35 }}>{d.label}</span>
+                        </span>
+                        <span style={{ fontWeight: 800, whiteSpace: 'nowrap', flexShrink: 0 }}>{d.valor} <span style={{ color: 'var(--muted)', fontWeight: 600 }}>({(100 * d.valor / total).toFixed(1)}%)</span></span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
               {/* Tendencia */}
               <div style={{ background: 'var(--glass)', border: '1px solid rgba(255,255,255,0.72)', borderRadius: '22px', padding: '18px', boxShadow: 'var(--shadow-soft)', marginBottom: '18px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-                  <p style={{ fontWeight: '800', fontSize: '13px', color: 'var(--ink-950)', margin: 0 }}>Evolución del universo total</p>
+                  <p style={{ fontWeight: '800', fontSize: '13px', color: 'var(--ink-950)', margin: 0 }}>Evolución del total · {nombreSegmento[segmentoInv]}</p>
                   <span style={{ fontSize: '10px', color: 'var(--muted)', fontWeight: '700' }}>
                     {cargasInv.length} {cargasInv.length === 1 ? 'carga' : 'cargas'} en el histórico
                   </span>
@@ -959,7 +1044,7 @@ export default function GobiernoDashboard({ token, apiUrl, clienteActivo }) {
 
               {/* Histórico de cargas */}
               <div style={{ background: 'var(--glass)', border: '1px solid rgba(255,255,255,0.72)', borderRadius: '22px', padding: '16px 18px', boxShadow: 'var(--shadow-soft)' }}>
-                <p style={{ fontWeight: '800', fontSize: '13px', color: 'var(--ink-950)', margin: '0 0 10px' }}>Histórico de cargas</p>
+                <p style={{ fontWeight: '800', fontSize: '13px', color: 'var(--ink-950)', margin: '0 0 10px' }}>Histórico de cargas · {nombreSegmento[segmentoInv]}</p>
                 <div className="tabla-responsive">
                   <table className="tabla">
                     <thead>
@@ -973,24 +1058,27 @@ export default function GobiernoDashboard({ token, apiUrl, clienteActivo }) {
                       </tr>
                     </thead>
                     <tbody>
-                      {cargasInv.map((c, i) => (
-                        <tr key={c.id} style={i === 0 ? { background: 'rgba(32,166,106,0.05)' } : undefined}>
-                          <td style={{ fontWeight: '700' }}>
-                            {fmtFecha(c.fecha)}{i === 0 && <span style={{ color: '#20a66a', fontSize: '10px', fontWeight: '800', marginLeft: 6 }}>· actual</span>}
-                          </td>
-                          <td style={{ fontWeight: '800', color: 'var(--ink-950)', fontFamily: "'IBM Plex Mono',monospace" }}>{c.total?.toLocaleString('es-CL')}</td>
-                          <td style={{ color: 'var(--muted)' }}>
-                            {c.cambios?.altas != null ? `+${c.cambios.altas} / -${c.cambios.bajas}` : '—'}
-                          </td>
-                          <td style={{ color: 'var(--muted)' }}>{c.parchado?.pct != null ? `${c.parchado.pct}%` : '—'}</td>
-                          <td style={{ color: 'var(--muted)' }}>{c.cargadoPor}</td>
-                          <td className="acciones">
-                            <button className="btn-editar" onClick={() => verParchePendiente(c)} disabled={cargandoParcheId === c.id}>
-                              {cargandoParcheId === c.id ? 'Cargando...' : 'Ver parches'}
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
+                      {cargasInv.map((c, i) => {
+                        const s = c.segmentos?.[segmentoInv] || {};
+                        return (
+                          <tr key={c.id} style={i === 0 ? { background: 'rgba(32,166,106,0.05)' } : undefined}>
+                            <td style={{ fontWeight: '700' }}>
+                              {fmtFecha(c.fecha)}{i === 0 && <span style={{ color: '#20a66a', fontSize: '10px', fontWeight: '800', marginLeft: 6 }}>· actual</span>}
+                            </td>
+                            <td style={{ fontWeight: '800', color: 'var(--ink-950)', fontFamily: "'IBM Plex Mono',monospace" }}>{s.total?.toLocaleString('es-CL')}</td>
+                            <td style={{ color: 'var(--muted)' }}>
+                              {s.cambios?.altas != null ? `+${s.cambios.altas} / -${s.cambios.bajas}` : '—'}
+                            </td>
+                            <td style={{ color: 'var(--muted)' }}>{s.parchado?.pct != null ? `${s.parchado.pct}%` : '—'}</td>
+                            <td style={{ color: 'var(--muted)' }}>{c.cargadoPor}</td>
+                            <td className="acciones">
+                              <button className="btn-editar" onClick={() => verParchePendiente(c, segmentoInv)} disabled={cargandoParcheId === c.id}>
+                                {cargandoParcheId === c.id ? 'Cargando...' : 'Ver parches'}
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
