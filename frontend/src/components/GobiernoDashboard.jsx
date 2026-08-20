@@ -294,7 +294,11 @@ export default function GobiernoDashboard({ token, apiUrl, clienteActivo }) {
 
     const distribucionDe = (campo, top) => {
       const conteo = {};
-      filas.forEach(r => { const v = r[campo] || 'Sin dato'; conteo[v] = (conteo[v] || 0) + 1; });
+      filas.forEach(r => {
+        let v = r[campo];
+        v = (v === undefined || v === null || v === '') ? 'Sin dato' : String(v).trim().toUpperCase();
+        conteo[v] = (conteo[v] || 0) + 1;
+      });
       let entradas = Object.entries(conteo).sort((a, b) => b[1] - a[1]);
       if (top && entradas.length > top) {
         const resto = entradas.slice(top).reduce((s, [, v]) => s + v, 0);
@@ -309,6 +313,7 @@ export default function GobiernoDashboard({ token, apiUrl, clienteActivo }) {
       familiaSo: distribucionDe('Familia SO'),
       kpe: distribucionDe('KPE'),
       obsolescenciaSo: distribucionDe('Estado Obsolescencia SO'),
+      hardening: distribucionDe('Hardening'),
       sistemaOperativo: distribucionDe('Sistema operativo', 8)
     };
 
@@ -442,13 +447,32 @@ export default function GobiernoDashboard({ token, apiUrl, clienteActivo }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [historicoAscendenteInv, segmentoInv]);
 
+  const dataEolInv = useMemo(() => {
+    const e = segActualInv?.eol || {};
+    return {
+      labels: ['Crítico (vencido)', 'Alto (≤30 días)', 'Medio (30-180 días)', 'Bajo (>180 días)', 'Sin dato'],
+      valores: [e.critico || 0, e.alto || 0, e.medio || 0, e.bajo || 0, e.sinDato || 0],
+      colores: ['#d73b47', '#f0a11a', '#eda100', '#20a66a', '#b4b2a9']
+    };
+  }, [segActualInv]);
+
   const dataObsSoInv = useMemo(() => {
     const entradas = segActualInv?.distribuciones?.obsolescenciaSo || [];
-    const colorPorEtiqueta = { VIGENTE: '#20a66a', EXTENDIDO: '#f0a11a', OBSOLETO: '#d73b47', 'Sin dato': '#b4b2a9' };
+    const colorPorEtiqueta = { VIGENTE: '#20a66a', EXTENDIDO: '#f0a11a', OBSOLETO: '#d73b47', 'SIN DATO': '#b4b2a9' };
     return {
       labels: entradas.map(e => e.label),
       valores: entradas.map(e => e.valor),
       colores: entradas.map(e => colorPorEtiqueta[e.label] || '#7f77dd')
+    };
+  }, [segActualInv]);
+
+  const dataHardeningInv = useMemo(() => {
+    const entradas = segActualInv?.distribuciones?.hardening || [];
+    const colorPorEtiqueta = { SI: '#20a66a', 'NO APLICA': '#b4b2a9', 'NO - FAR': '#f0a11a', 'NO - SIN LINEAMIENTO': '#d73b47', 'SIN DATO': '#7f77dd' };
+    return {
+      labels: entradas.map(e => e.label),
+      valores: entradas.map(e => e.valor),
+      colores: entradas.map(e => colorPorEtiqueta[e.label] || '#003b71')
     };
   }, [segActualInv]);
 
@@ -882,8 +906,32 @@ export default function GobiernoDashboard({ token, apiUrl, clienteActivo }) {
                 </div>
               </div>
 
-              {/* Obsolescencia EOL/EOS + Estado Obsolescencia SO + Parchado + Top parche pendiente */}
+              {/* Obsolescencia EOL/EOS + Estado Obsolescencia SO + Hardening + Parchado + Top parche pendiente */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 10, marginBottom: 18 }}>
+                <div style={{ background: 'var(--glass)', border: '1px solid rgba(255,255,255,0.72)', borderRadius: '16px', padding: '16px', boxShadow: 'var(--shadow-soft)' }}>
+                  <p style={{ fontWeight: '800', fontSize: '12px', color: 'var(--ink-950)', margin: '0 0 2px' }}>Obsolescencia EOL/EOS</p>
+                  <p style={{ fontSize: '10px', color: 'var(--muted)', margin: '0 0 10px' }}>por fecha real (EOS SO / EOS Extendido SO)</p>
+                  <div style={{ position: 'relative', height: '120px' }}>
+                    <Doughnut
+                      data={{ labels: dataEolInv.labels, datasets: [{ data: dataEolInv.valores, backgroundColor: dataEolInv.colores, borderColor: '#fff', borderWidth: 2 }] }}
+                      options={{ responsive: true, maintainAspectRatio: false, cutout: '65%', plugins: { legend: { display: false } } }}
+                    />
+                  </div>
+                  <div style={{ marginTop: 8 }}>
+                    {dataEolInv.labels.map((lab, i) => {
+                      const total = dataEolInv.valores.reduce((a, b) => a + b, 0) || 1;
+                      return (
+                        <div key={lab} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 10, color: 'var(--ink-800)', marginBottom: 3 }}>
+                          <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                            <span style={{ width: 7, height: 7, borderRadius: 2, background: dataEolInv.colores[i], display: 'inline-block' }}></span>{lab}
+                          </span>
+                          <span style={{ fontWeight: 800 }}>{dataEolInv.valores[i]} <span style={{ color: 'var(--muted)', fontWeight: 600 }}>({(100 * dataEolInv.valores[i] / total).toFixed(1)}%)</span></span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
                 <div style={{ background: 'var(--glass)', border: '1px solid rgba(255,255,255,0.72)', borderRadius: '16px', padding: '16px', boxShadow: 'var(--shadow-soft)' }}>
                   <p style={{ fontWeight: '800', fontSize: '12px', color: 'var(--ink-950)', margin: '0 0 2px' }}>Estado Obsolescencia SO</p>
                   <p style={{ fontSize: '10px', color: 'var(--muted)', margin: '0 0 10px' }}>campo "Estado Obsolescencia SO"</p>
@@ -902,6 +950,30 @@ export default function GobiernoDashboard({ token, apiUrl, clienteActivo }) {
                             <span style={{ width: 7, height: 7, borderRadius: 2, background: dataObsSoInv.colores[i], display: 'inline-block' }}></span>{lab}
                           </span>
                           <span style={{ fontWeight: 800 }}>{dataObsSoInv.valores[i]} <span style={{ color: 'var(--muted)', fontWeight: 600 }}>({(100 * dataObsSoInv.valores[i] / total).toFixed(1)}%)</span></span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div style={{ background: 'var(--glass)', border: '1px solid rgba(255,255,255,0.72)', borderRadius: '16px', padding: '16px', boxShadow: 'var(--shadow-soft)' }}>
+                  <p style={{ fontWeight: '800', fontSize: '12px', color: 'var(--ink-950)', margin: '0 0 2px' }}>Hardening</p>
+                  <p style={{ fontSize: '10px', color: 'var(--muted)', margin: '0 0 10px' }}>campo "Hardening"</p>
+                  <div style={{ position: 'relative', height: '120px' }}>
+                    <Doughnut
+                      data={{ labels: dataHardeningInv.labels, datasets: [{ data: dataHardeningInv.valores, backgroundColor: dataHardeningInv.colores, borderColor: '#fff', borderWidth: 2 }] }}
+                      options={{ responsive: true, maintainAspectRatio: false, cutout: '65%', plugins: { legend: { display: false } } }}
+                    />
+                  </div>
+                  <div style={{ marginTop: 8 }}>
+                    {dataHardeningInv.labels.map((lab, i) => {
+                      const total = dataHardeningInv.valores.reduce((a, b) => a + b, 0) || 1;
+                      return (
+                        <div key={lab} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 10, color: 'var(--ink-800)', marginBottom: 3 }}>
+                          <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                            <span style={{ width: 7, height: 7, borderRadius: 2, background: dataHardeningInv.colores[i], display: 'inline-block' }}></span>{lab}
+                          </span>
+                          <span style={{ fontWeight: 800 }}>{dataHardeningInv.valores[i]} <span style={{ color: 'var(--muted)', fontWeight: 600 }}>({(100 * dataHardeningInv.valores[i] / total).toFixed(1)}%)</span></span>
                         </div>
                       );
                     })}
