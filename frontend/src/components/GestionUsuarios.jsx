@@ -24,6 +24,7 @@ const VISTAS_OVERRIDE = [
   { id:'proyeccion-excel', label:'Cargar Excel ITSM' },
   { id:'alertas',          label:'Control de Alertas' },
   { id:'equipo',           label:'Equipo' },
+  { id:'gobierno',         label:'Gobierno' },
 ];
 
 const Badge = ({ text, color='var(--muted)' }) => (

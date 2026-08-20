@@ -1558,11 +1558,11 @@ app.delete('/api/grupos-servicio/:id', verificarToken, async (req, res) => {
 // ============================================
 
 const PERMISOS_DEFAULT = {
-  admin:        { dashboard:true, analytics:true, 'ovt-proyectado':true, claim:true, usuarios:true, mantenedor:true, auditoria:true, registros:false, resumen:false, 'carga-excel':false, 'proyeccion-nueva':false, 'proyeccion-mis':false, 'permisos-roles':true, alertas:true, equipo:true },
-  dpe:          { dashboard:true, analytics:true, 'ovt-proyectado':true, claim:true, usuarios:true, mantenedor:false, auditoria:false, registros:false, resumen:false, 'carga-excel':false, 'proyeccion-nueva':false, 'proyeccion-mis':false, 'permisos-roles':false, alertas:false, equipo:true },
-  teamleader:   { dashboard:true, analytics:true, 'ovt-proyectado':false, claim:false, usuarios:false, mantenedor:false, auditoria:false, registros:false, resumen:false, 'carga-excel':false, 'proyeccion-nueva':false, 'proyeccion-mis':false, 'permisos-roles':false, alertas:false, equipo:true },
-  especialista: { dashboard:false, analytics:false, 'ovt-proyectado':false, claim:false, usuarios:false, mantenedor:false, auditoria:false, registros:true, resumen:true, 'carga-excel':true, 'proyeccion-nueva':false, 'proyeccion-mis':false, 'permisos-roles':false, alertas:true, equipo:false },
-  itsm:         { dashboard:false, analytics:false, 'ovt-proyectado':false, claim:false, usuarios:false, mantenedor:false, auditoria:false, registros:false, resumen:false, 'carga-excel':false, 'proyeccion-nueva':true, 'proyeccion-mis':true, 'permisos-roles':false, alertas:true, equipo:false },
+  admin:        { dashboard:true, analytics:true, 'ovt-proyectado':true, claim:true, usuarios:true, mantenedor:true, auditoria:true, registros:false, resumen:false, 'carga-excel':false, 'proyeccion-nueva':false, 'proyeccion-mis':false, 'permisos-roles':true, alertas:true, equipo:true, gobierno:true },
+  dpe:          { dashboard:true, analytics:true, 'ovt-proyectado':true, claim:true, usuarios:true, mantenedor:false, auditoria:false, registros:false, resumen:false, 'carga-excel':false, 'proyeccion-nueva':false, 'proyeccion-mis':false, 'permisos-roles':false, alertas:false, equipo:true, gobierno:false },
+  teamleader:   { dashboard:true, analytics:true, 'ovt-proyectado':false, claim:false, usuarios:false, mantenedor:false, auditoria:false, registros:false, resumen:false, 'carga-excel':false, 'proyeccion-nueva':false, 'proyeccion-mis':false, 'permisos-roles':false, alertas:false, equipo:true, gobierno:false },
+  especialista: { dashboard:false, analytics:false, 'ovt-proyectado':false, claim:false, usuarios:false, mantenedor:false, auditoria:false, registros:true, resumen:true, 'carga-excel':true, 'proyeccion-nueva':false, 'proyeccion-mis':false, 'permisos-roles':false, alertas:true, equipo:false, gobierno:false },
+  itsm:         { dashboard:false, analytics:false, 'ovt-proyectado':false, claim:false, usuarios:false, mantenedor:false, auditoria:false, registros:false, resumen:false, 'carga-excel':false, 'proyeccion-nueva':true, 'proyeccion-mis':true, 'permisos-roles':false, alertas:true, equipo:false, gobierno:false },
 };
 
 // GET /api/permisos-roles — cualquier usuario autenticado puede leer
@@ -2229,6 +2229,104 @@ app.post('/api/equipo/csat', verificarToken, async (req, res) => {
     res.json({ success: true });
   } catch (err) {
     console.error('Error POST /api/equipo/csat:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ============================================
+// GOBIERNO DE CUENTA — tablero solo para admin
+// ============================================
+
+const GOBIERNO_ROLES = ['admin'];
+
+const GOBIERNO_ITEMS_FIJOS = [
+  { id: 'reporte-monitoreo',        nombre: 'Reporte Monitoreo',                              categoria: 'Operación',       tipo: 'estado' },
+  { id: 'reporte-incidentes',       nombre: 'Reporte Incidentes - Cambios - Requerimientos',   categoria: 'Operación',       tipo: 'estado' },
+  { id: 'health-checking',          nombre: 'Health Checking',                                 categoria: 'Operación',       tipo: 'estado' },
+  { id: 'backlog-tickets',          nombre: 'Backlog de Tickets',                              categoria: 'Operación',       tipo: 'estado' },
+  { id: 'reporte-sla',              nombre: 'Reporte SLA mensual',                             categoria: 'Cumplimiento',    tipo: 'estado' },
+  { id: 'reporte-ovt',              nombre: 'Reporte de OVT',                                  categoria: 'Cumplimiento',    tipo: 'estado' },
+  { id: 'nivel-riesgos',            nombre: 'Nivel de riesgos (Cartas de riesgo)',             categoria: 'Cumplimiento',    tipo: 'estado' },
+  { id: 'inventario',               nombre: 'Inventario',                                      categoria: 'Infraestructura', tipo: 'estado' },
+  { id: 'nivel-eol',                nombre: 'Nivel de EOL',                                    categoria: 'Infraestructura', tipo: 'estado' },
+  { id: 'pct-fuera-soporte',        nombre: '% de servidores que quedarán fuera de soporte',   categoria: 'Infraestructura', tipo: 'kpi', unidadDefault: '%' },
+  { id: 'evolucion-eventos-dpp',    nombre: 'Evolución de Eventos (DPP)',                      categoria: 'Infraestructura', tipo: 'estado' },
+  { id: 'reporte-respaldo',         nombre: 'Reporte de Respaldo (efectividad)',               categoria: 'Continuidad',     tipo: 'kpi', unidadDefault: '%' },
+  { id: 'pct-revalida',             nombre: '% de Revalida',                                   categoria: 'Continuidad',     tipo: 'kpi', unidadDefault: '%' },
+  { id: 'roadmap-automatizacion',   nombre: 'Roadmap Automatización',                          categoria: 'Estrategia',      tipo: 'estado' },
+];
+
+// GET /api/gobierno — trae los 14 ítems del cliente activo; si es la primera
+// vez, los siembra automáticamente en estado "sin_datos" para que el admin
+// solo tenga que completarlos, sin crear nada desde cero.
+app.get('/api/gobierno', verificarToken, async (req, res) => {
+  try {
+    if (!GOBIERNO_ROLES.includes(req.usuario.rol)) return res.status(403).json({ error: 'Sin permisos' });
+    const clienteActivoId = req.headers['x-cliente-activo'] || 'bcochile';
+
+    const snap = await db.collection('gobierno_items').where('clienteId', '==', clienteActivoId).get();
+    const existentes = {};
+    snap.forEach(doc => { existentes[doc.id] = { id: doc.id, ...doc.data() }; });
+
+    const faltantes = GOBIERNO_ITEMS_FIJOS.filter(f => !existentes[`${clienteActivoId}_${f.id}`]);
+    if (faltantes.length > 0) {
+      const batch = db.batch();
+      faltantes.forEach(f => {
+        const ref = db.collection('gobierno_items').doc(`${clienteActivoId}_${f.id}`);
+        const base = {
+          itemId: f.id, nombre: f.nombre, categoria: f.categoria, tipo: f.tipo,
+          clienteId: clienteActivoId, responsable: '', frecuencia: 'mensual', link: '', notas: [],
+          creadoEn: new Date()
+        };
+        if (f.tipo === 'kpi') { base.valorActual = null; base.unidad = f.unidadDefault || '%'; }
+        else { base.estado = 'sin_datos'; }
+        batch.set(ref, base);
+        existentes[`${clienteActivoId}_${f.id}`] = { id: `${clienteActivoId}_${f.id}`, ...base };
+      });
+      await batch.commit();
+    }
+
+    const orden = GOBIERNO_ITEMS_FIJOS.map(f => `${clienteActivoId}_${f.id}`);
+    const items = orden.map(id => existentes[id]).filter(Boolean);
+    res.json(items);
+  } catch (err) {
+    console.error('Error GET /api/gobierno:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// PUT /api/gobierno/:id — actualiza un ítem (estado/valor/responsable/frecuencia/link)
+// y opcionalmente agrega una nota nueva al historial.
+app.put('/api/gobierno/:id', verificarToken, async (req, res) => {
+  try {
+    if (!GOBIERNO_ROLES.includes(req.usuario.rol)) return res.status(403).json({ error: 'Sin permisos' });
+    const { estado, valorActual, unidad, responsable, frecuencia, link, nota } = req.body;
+    const ref = db.collection('gobierno_items').doc(req.params.id);
+    const doc = await ref.get();
+    if (!doc.exists) return res.status(404).json({ error: 'Ítem no encontrado' });
+
+    const cambios = {
+      ...(estado !== undefined && { estado }),
+      ...(valorActual !== undefined && { valorActual: valorActual === null ? null : Number(valorActual) }),
+      ...(unidad !== undefined && { unidad }),
+      ...(responsable !== undefined && { responsable }),
+      ...(frecuencia !== undefined && { frecuencia }),
+      ...(link !== undefined && { link }),
+      actualizadoPor: req.usuario.nombre,
+      actualizadoEn: new Date()
+    };
+
+    if (nota && nota.trim()) {
+      const data = doc.data();
+      const notas = Array.isArray(data.notas) ? data.notas : [];
+      notas.push({ texto: nota.trim(), autor: req.usuario.nombre, fecha: new Date() });
+      cambios.notas = notas;
+    }
+
+    await ref.update(cambios);
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Error PUT /api/gobierno/:id:', err);
     res.status(500).json({ error: err.message });
   }
 });

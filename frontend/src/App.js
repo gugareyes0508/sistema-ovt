@@ -12,6 +12,7 @@ import GestionUsuarios from './components/GestionUsuarios';
 import PermisosRoles from './components/PermisosRoles';
 import ControlAlertas from './components/ControlAlertas';
 import EquipoTeam from './components/EquipoTeam';
+import GobiernoDashboard from './components/GobiernoDashboard';
 import './App.css';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
@@ -978,6 +979,7 @@ function App() {
               {puedeVer('claim') && <button className={vista==='claim'?'nav-btn active':'nav-btn'} onClick={()=>setVista('claim')}><i className="ti ti-clock" aria-hidden="true"></i>Control de Labor</button>}
               {puedeVer('alertas') && <button className={vista==='alertas'?'nav-btn active':'nav-btn'} onClick={()=>setVista('alertas')}><i className="ti ti-bell" aria-hidden="true"></i>Control de Alertas</button>}
               {puedeVer('equipo') && <button className={vista==='equipo'?'nav-btn active':'nav-btn'} onClick={()=>setVista('equipo')}><i className="ti ti-users-group" aria-hidden="true"></i>Equipo</button>}
+              {puedeVer('gobierno') && <button className={vista==='gobierno'?'nav-btn active':'nav-btn'} onClick={()=>setVista('gobierno')}><i className="ti ti-shield-check" aria-hidden="true"></i>Gobierno</button>}
             </nav>
             <div className="sidebar-section">Administración</div>
             <nav className="nav">
@@ -1920,6 +1922,10 @@ function App() {
 
         {vista === 'equipo' && (usuario.rol === 'admin' || usuario.rol === 'dpe' || usuario.rol === 'teamleader') && (
           <EquipoTeam key={`equipo-${clienteActivo}`} token={token} apiUrl={API_URL} clienteActivo={clienteActivo} usuario={usuario} />
+        )}
+
+        {vista === 'gobierno' && usuario.rol === 'admin' && (
+          <GobiernoDashboard key={`gobierno-${clienteActivo}`} token={token} apiUrl={API_URL} clienteActivo={clienteActivo} />
         )}
       </main>
 

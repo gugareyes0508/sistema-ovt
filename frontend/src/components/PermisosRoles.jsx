@@ -18,6 +18,7 @@ const VISTAS = [
   { id:'proyeccion-excel', label:'Cargar Excel ITSM',     desc:'Carga masiva Excel ITSM',                 grupo:'ITSM' },
   { id:'alertas',          label:'Control de Alertas',    desc:'Ranking, gestión y análisis IA de alertas reiterativas', grupo:'Alertas' },
   { id:'equipo',           label:'Equipo',                desc:'Roster, turnos, skills, seguimiento y CSAT del equipo', grupo:'Equipo' },
+  { id:'gobierno',         label:'Gobierno',              desc:'Tablero de reportes y KPIs de gobierno de cuenta (solo admin)', grupo:'Gobierno' },
 ];
 
 const ROLES = [
@@ -28,7 +29,7 @@ const ROLES = [
   { id:'itsm',         label:'itsm',         color:'var(--success)', bg:'#d1fae5' },
 ];
 
-const GRUPOS = ['Admin/DPE','Especialista','ITSM','Alertas','Equipo'];
+const GRUPOS = ['Admin/DPE','Especialista','ITSM','Alertas','Equipo','Gobierno'];
 
 const PERMISOS_DEFAULT = {
   admin:        { dashboard:true, analytics:true, 'ovt-proyectado':true, claim:true, usuarios:true, mantenedor:true, auditoria:true, 'permisos-roles':true, registros:false, resumen:false, 'carga-excel':false, 'proyeccion-nueva':false, 'proyeccion-mis':false, 'proyeccion-excel':false },
