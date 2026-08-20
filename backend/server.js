@@ -2425,6 +2425,130 @@ app.get('/api/gobierno/monitoreo/:id/pendientes', verificarToken, async (req, re
   }
 });
 
+// ============================================
+// GOBIERNO — INVENTARIO SEMANAL (universo VM SO + AP, histórico real)
+// ============================================
+// El Excel de inventario (hoja "INFRAESTRUCTURA") ya viene parseado y
+// agregado desde el frontend (SheetJS): filtrado por revision_fact en
+// ("VM SO","AP"), con distribuciones, buckets de obsolescencia, hostnames
+// (para calcular altas/bajas) y el detalle de equipos con parche pendiente.
+// El cálculo de altas/bajas vs. la carga anterior se hace acá, en el
+// servidor, comparando la lista de hostnames de esta carga contra la más
+// reciente ya guardada.
+
+app.post('/api/gobierno/inventario/upload', verificarToken, async (req, res) => {
+  try {
+    if (!GOBIERNO_ROLES.includes(req.usuario.rol)) return res.status(403).json({ error: 'Sin permisos' });
+    const { total, vmSo, ap, parchado, eol, distribuciones, hostnames, equiposParchePendiente } = req.body;
+    if (typeof total !== 'number' || !Array.isArray(hostnames)) {
+      return res.status(400).json({ error: 'Datos de inventario incompletos' });
+    }
+    const clienteActivoId = req.headers['x-cliente-activo'] || 'bcochile';
+    const fecha = new Date();
+
+    // Buscar la carga anterior más reciente de este cliente para comparar
+    const snapPrev = await db.collection('gobierno_inventario').where('clienteId', '==', clienteActivoId).get();
+    let anterior = null;
+    snapPrev.forEach(doc => {
+      const d = doc.data();
+      const f = d.fecha?.toDate?.() || new Date(d.fecha);
+      if (!anterior || f > (anterior.fecha?.toDate?.() || new Date(anterior.fecha))) anterior = d;
+    });
+
+    let cambios = { altas: null, bajas: null, neto: null };
+    if (anterior && Array.isArray(anterior.hostnames)) {
+      const setAnterior = new Set(anterior.hostnames);
+      const setActual = new Set(hostnames);
+      const altas = hostnames.filter(h => !setAnterior.has(h)).length;
+      const bajas = anterior.hostnames.filter(h => !setActual.has(h)).length;
+      cambios = { altas, bajas, neto: altas - bajas };
+    }
+
+    const docRef = db.collection('gobierno_inventario').doc(`${clienteActivoId}_${fecha.getTime()}`);
+    await docRef.set({
+      clienteId: clienteActivoId,
+      fecha,
+      total,
+      vmSo: vmSo || 0,
+      ap: ap || 0,
+      parchado: parchado || {},
+      eol: eol || {},
+      distribuciones: distribuciones || {},
+      cambios,
+      hostnames,
+      equiposParchePendiente: Array.isArray(equiposParchePendiente) ? equiposParchePendiente : [],
+      cargadoPor: req.usuario.nombre,
+      cargadoEn: new Date()
+    });
+
+    await db.collection('auditoria').add({
+      accion: 'GOBIERNO_INVENTARIO_UPLOAD',
+      usuarioNombre: req.usuario.nombre,
+      clienteId: clienteActivoId,
+      timestamp: new Date(),
+      detalles: `Inventario cargado: ${total} equipos (${cambios.altas ?? '—'} altas, ${cambios.bajas ?? '—'} bajas)`
+    });
+
+    res.json({ success: true, id: docRef.id, cambios });
+  } catch (err) {
+    console.error('Error POST /api/gobierno/inventario/upload:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/gobierno/inventario — histórico de cargas, sin hostnames ni el
+// detalle de parche pendiente (para que la lista sea liviana).
+app.get('/api/gobierno/inventario', verificarToken, async (req, res) => {
+  try {
+    if (!GOBIERNO_ROLES.includes(req.usuario.rol)) return res.status(403).json({ error: 'Sin permisos' });
+    const clienteActivoId = req.headers['x-cliente-activo'] || 'bcochile';
+
+    const snap = await db.collection('gobierno_inventario').where('clienteId', '==', clienteActivoId).get();
+    const cargas = [];
+    snap.forEach(doc => {
+      const d = doc.data();
+      cargas.push({
+        id: doc.id,
+        fecha: d.fecha,
+        total: d.total,
+        vmSo: d.vmSo,
+        ap: d.ap,
+        parchado: d.parchado,
+        eol: d.eol,
+        distribuciones: d.distribuciones,
+        cambios: d.cambios,
+        totalParchePendiente: (d.equiposParchePendiente || []).length,
+        cargadoPor: d.cargadoPor || ''
+      });
+    });
+
+    cargas.sort((a, b) => {
+      const fa = a.fecha?.toDate?.() || new Date(a.fecha);
+      const fb = b.fecha?.toDate?.() || new Date(b.fecha);
+      return fb - fa;
+    });
+
+    res.json(cargas.slice(0, 52));
+  } catch (err) {
+    console.error('Error GET /api/gobierno/inventario:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/gobierno/inventario/:id/parche-pendiente — detalle de equipos
+// con "Parchado = NO - Sin Parche Vigente" de una carga puntual.
+app.get('/api/gobierno/inventario/:id/parche-pendiente', verificarToken, async (req, res) => {
+  try {
+    if (!GOBIERNO_ROLES.includes(req.usuario.rol)) return res.status(403).json({ error: 'Sin permisos' });
+    const doc = await db.collection('gobierno_inventario').doc(req.params.id).get();
+    if (!doc.exists) return res.status(404).json({ error: 'Carga no encontrada' });
+    res.json(doc.data().equiposParchePendiente || []);
+  } catch (err) {
+    console.error('Error GET /api/gobierno/inventario/:id/parche-pendiente:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.listen(PORT, async () => {
   console.log('==================================================');
   console.log('✓ SERVIDOR OVT V2 INICIADO CORRECTAMENTE');
