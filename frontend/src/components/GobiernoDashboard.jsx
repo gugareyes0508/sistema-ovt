@@ -315,7 +315,15 @@ export default function GobiernoDashboard({ token, apiUrl, clienteActivo }) {
       kpe: distribucionDe('KPE'),
       obsolescenciaSo: distribucionDe('Estado Obsolescencia SO'),
       hardening: distribucionDe('Hardening'),
-      sistemaOperativo: distribucionDe('Sistema operativo', 8)
+      sistemaOperativo: distribucionDe('Sistema operativo', 8),
+      deepSecurity: distribucionDe('Deep Security'),
+      politicaDeepSecurity: distribucionDe('Política Deep Security'),
+      edr: distribucionDe('EDR'),
+      dmz: distribucionDe('DMZ'),
+      tenable: distribucionDe('Tenable'),
+      qradar: distribucionDe('Qradar'),
+      cyberArk: distribucionDe('Cyber-ARK'),
+      darktrace: distribucionDe('Darktrace')
     };
 
     const hostnames = filas.map(r => String(r['Hostname'] || '')).filter(Boolean);
@@ -329,7 +337,7 @@ export default function GobiernoDashboard({ token, apiUrl, clienteActivo }) {
   // Columnas mínimas que se guardan por equipo para poder "Recalcular" una
   // carga después (por ejemplo si se agrega un indicador nuevo) sin tener
   // que volver a subir el Excel original.
-  const COLUMNAS_BASE_INVENTARIO = ['revision_fact', 'Hostname', 'Parchado', 'EOS Extendido SO', 'EOS SO', 'Ambiente', 'Ubicación', 'Familia SO', 'KPE', 'Estado Obsolescencia SO', 'Hardening', 'Sistema operativo'];
+  const COLUMNAS_BASE_INVENTARIO = ['revision_fact', 'Hostname', 'Parchado', 'EOS Extendido SO', 'EOS SO', 'Ambiente', 'Ubicación', 'Familia SO', 'KPE', 'Estado Obsolescencia SO', 'Hardening', 'Sistema operativo', 'Deep Security', 'Política Deep Security', 'EDR', 'DMZ', 'Tenable', 'Qradar', 'Cyber-ARK', 'Darktrace'];
   const filaBaseDe = (r) => {
     const out = {};
     COLUMNAS_BASE_INVENTARIO.forEach(c => { out[c] = r[c] ?? ''; });
@@ -1096,6 +1104,39 @@ export default function GobiernoDashboard({ token, apiUrl, clienteActivo }) {
                           <span style={{ lineHeight: 1.35 }}>{d.label}</span>
                         </span>
                         <span style={{ fontWeight: 800, whiteSpace: 'nowrap', flexShrink: 0 }}>{d.valor} <span style={{ color: 'var(--muted)', fontWeight: 600 }}>({(100 * d.valor / total).toFixed(1)}%)</span></span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Agentes de seguridad */}
+              <div style={{ marginBottom: 8 }}>
+                <p style={{ fontWeight: '800', fontSize: '11px', color: 'var(--muted)', letterSpacing: '.04em', textTransform: 'uppercase', margin: '0 0 8px' }}>Agentes de seguridad</p>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0,1fr))', gap: 10, marginBottom: 18 }}>
+                  {[
+                    ['Deep Security', 'deepSecurity'],
+                    ['Política Deep Security', 'politicaDeepSecurity'],
+                    ['EDR', 'edr'],
+                    ['DMZ', 'dmz'],
+                    ['Tenable', 'tenable'],
+                    ['Qradar', 'qradar'],
+                    ['Cyber-ARK', 'cyberArk'],
+                    ['Darktrace', 'darktrace']
+                  ].map(([titulo, clave]) => {
+                    const datos = segActualInv?.distribuciones?.[clave] || [];
+                    const total = datos.reduce((s, d) => s + d.valor, 0) || 1;
+                    return (
+                      <div key={clave} style={{ background: 'var(--glass)', border: '1px solid rgba(255,255,255,0.72)', borderRadius: '16px', padding: '14px', boxShadow: 'var(--shadow-soft)' }}>
+                        <p style={{ fontWeight: '800', fontSize: '11px', color: 'var(--ink-950)', margin: '0 0 8px' }}>{titulo}</p>
+                        {datos.map((d, i) => (
+                          <div key={d.label} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 9, color: 'var(--ink-800)', marginBottom: 4 }}>
+                            <span style={{ display: 'flex', alignItems: 'center', gap: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 90 }}>
+                              <span style={{ width: 6, height: 6, borderRadius: 2, background: PALETA_DIST[i % PALETA_DIST.length], display: 'inline-block', flexShrink: 0 }}></span>{d.label}
+                            </span>
+                            <span style={{ fontWeight: 800, whiteSpace: 'nowrap' }}>{d.valor} <span style={{ color: 'var(--muted)', fontWeight: 600 }}>({(100 * d.valor / total).toFixed(1)}%)</span></span>
+                          </div>
+                        ))}
                       </div>
                     );
                   })}
