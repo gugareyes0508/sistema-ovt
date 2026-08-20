@@ -99,6 +99,7 @@ export default function GobiernoDashboard({ token, apiUrl, clienteActivo }) {
   const [parcheModal, setParcheModal] = useState(null); // { fecha, lista }
   const [cargandoParcheId, setCargandoParcheId] = useState(null);
   const [segmentoInv, setSegmentoInv] = useState('general'); // 'general' | 'vmSo' | 'ap'
+  const [recalculandoId, setRecalculandoId] = useState(null);
 
   const cargarDatos = useCallback(async () => {
     setCargando(true);
@@ -325,6 +326,16 @@ export default function GobiernoDashboard({ token, apiUrl, clienteActivo }) {
     return { total, parchado, eol, distribuciones, hostnames, equiposParchePendiente };
   };
 
+  // Columnas mínimas que se guardan por equipo para poder "Recalcular" una
+  // carga después (por ejemplo si se agrega un indicador nuevo) sin tener
+  // que volver a subir el Excel original.
+  const COLUMNAS_BASE_INVENTARIO = ['revision_fact', 'Hostname', 'Parchado', 'EOS Extendido SO', 'EOS SO', 'Ambiente', 'Ubicación', 'Familia SO', 'KPE', 'Estado Obsolescencia SO', 'Hardening', 'Sistema operativo'];
+  const filaBaseDe = (r) => {
+    const out = {};
+    COLUMNAS_BASE_INVENTARIO.forEach(c => { out[c] = r[c] ?? ''; });
+    return out;
+  };
+
   const procesarExcelInventario = async (file) => {
     setSubiendoInv(true);
     setMensajeInv(null);
@@ -344,8 +355,9 @@ export default function GobiernoDashboard({ token, apiUrl, clienteActivo }) {
         vmSo: agregarSegmentoInventario(universo.filter(r => r['revision_fact'] === 'VM SO')),
         ap: agregarSegmentoInventario(universo.filter(r => r['revision_fact'] === 'AP'))
       };
+      const filasBase = universo.map(filaBaseDe);
 
-      const resp = await axios.post(`${apiUrl}/api/gobierno/inventario/upload`, { segmentos }, { headers });
+      const resp = await axios.post(`${apiUrl}/api/gobierno/inventario/upload`, { segmentos, filasBase }, { headers });
 
       if (resp.data.success) {
         const c = resp.data.cambios?.general || {};
@@ -357,6 +369,46 @@ export default function GobiernoDashboard({ token, apiUrl, clienteActivo }) {
       setMensajeInv({ tipo: 'error', texto: 'Error procesando el archivo: ' + (err.response?.data?.error || err.message) });
     } finally {
       setSubiendoInv(false);
+    }
+  };
+
+  // Trae las filas crudas guardadas de una carga y vuelve a correr la misma
+  // agregación (sin necesidad del Excel original) — útil cuando se agrega
+  // un indicador/gráfico nuevo y las cargas viejas no lo tienen todavía.
+  const recalcularCarga = async (carga) => {
+    setRecalculandoId(carga.id);
+    setMensajeInv(null);
+    try {
+      const res = await axios.get(`${apiUrl}/api/gobierno/inventario/${carga.id}/filas-base`, { headers });
+      const filasBase = res.data || [];
+      if (filasBase.length === 0) {
+        setMensajeInv({ tipo: 'error', texto: 'Esta carga no tiene filas base guardadas (es de antes de esta función) — hay que volver a subir el Excel.' });
+        return;
+      }
+      // Las fechas viajan como texto ISO por JSON; se reconvierten a Date
+      // para que el cálculo de EOL/EOS funcione igual que en la carga original.
+      const filas = filasBase.map(r => ({
+        ...r,
+        'EOS Extendido SO': r['EOS Extendido SO'] ? new Date(r['EOS Extendido SO']) : '',
+        'EOS SO': r['EOS SO'] ? new Date(r['EOS SO']) : ''
+      }));
+
+      const nuevoGeneral = agregarSegmentoInventario(filas);
+      const nuevoVmSo = agregarSegmentoInventario(filas.filter(r => r['revision_fact'] === 'VM SO'));
+      const nuevoAp = agregarSegmentoInventario(filas.filter(r => r['revision_fact'] === 'AP'));
+
+      const soloAgregados = (s) => ({ total: s.total, parchado: s.parchado, eol: s.eol, distribuciones: s.distribuciones, equiposParchePendiente: s.equiposParchePendiente });
+
+      await axios.put(`${apiUrl}/api/gobierno/inventario/${carga.id}/recalcular`, {
+        segmentos: { general: soloAgregados(nuevoGeneral), vmSo: soloAgregados(nuevoVmSo), ap: soloAgregados(nuevoAp) }
+      }, { headers });
+
+      setMensajeInv({ tipo: 'success', texto: `Carga del ${fmtFecha(carga.fecha)} recalculada correctamente.` });
+      cargarInventario();
+    } catch (err) {
+      setMensajeInv({ tipo: 'error', texto: 'Error recalculando: ' + (err.response?.data?.error || err.message) });
+    } finally {
+      setRecalculandoId(null);
     }
   };
 
@@ -1113,6 +1165,9 @@ export default function GobiernoDashboard({ token, apiUrl, clienteActivo }) {
                             <td className="acciones">
                               <button className="btn-editar" onClick={() => verParchePendiente(c, segmentoInv)} disabled={cargandoParcheId === c.id}>
                                 {cargandoParcheId === c.id ? 'Cargando...' : 'Ver parches'}
+                              </button>
+                              <button className="btn-editar" onClick={() => recalcularCarga(c)} disabled={recalculandoId === c.id} title="Vuelve a calcular los indicadores usando las filas guardadas de esta carga, sin subir el Excel de nuevo">
+                                {recalculandoId === c.id ? 'Recalculando...' : 'Recalcular'}
                               </button>
                             </td>
                           </tr>

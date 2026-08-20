@@ -2440,7 +2440,7 @@ const SEGMENTOS_INVENTARIO = ['general', 'vmSo', 'ap'];
 app.post('/api/gobierno/inventario/upload', verificarToken, async (req, res) => {
   try {
     if (!GOBIERNO_ROLES.includes(req.usuario.rol)) return res.status(403).json({ error: 'Sin permisos' });
-    const { segmentos } = req.body;
+    const { segmentos, filasBase } = req.body;
     if (!segmentos || typeof segmentos.general?.total !== 'number' || !Array.isArray(segmentos.general?.hostnames)) {
       return res.status(400).json({ error: 'Datos de inventario incompletos' });
     }
@@ -2488,6 +2488,10 @@ app.post('/api/gobierno/inventario/upload', verificarToken, async (req, res) => 
       clienteId: clienteActivoId,
       fecha,
       segmentos: segmentosGuardar,
+      // Filas crudas del universo (solo las columnas usadas para agregar),
+      // guardadas para poder "Recalcular" esta carga si más adelante se
+      // agrega un indicador/distribución nuevo, sin tener que resubir el Excel.
+      filasBase: Array.isArray(filasBase) ? filasBase : [],
       cargadoPor: req.usuario.nombre,
       cargadoEn: new Date()
     });
@@ -2503,6 +2507,65 @@ app.post('/api/gobierno/inventario/upload', verificarToken, async (req, res) => 
     res.json({ success: true, id: docRef.id, cambios: cambiosPorSegmento });
   } catch (err) {
     console.error('Error POST /api/gobierno/inventario/upload:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/gobierno/inventario/:id/filas-base — filas crudas guardadas de
+// una carga, para poder recalcular sin volver a subir el Excel.
+app.get('/api/gobierno/inventario/:id/filas-base', verificarToken, async (req, res) => {
+  try {
+    if (!GOBIERNO_ROLES.includes(req.usuario.rol)) return res.status(403).json({ error: 'Sin permisos' });
+    const doc = await db.collection('gobierno_inventario').doc(req.params.id).get();
+    if (!doc.exists) return res.status(404).json({ error: 'Carga no encontrada' });
+    res.json(doc.data().filasBase || []);
+  } catch (err) {
+    console.error('Error GET /api/gobierno/inventario/:id/filas-base:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// PUT /api/gobierno/inventario/:id/recalcular — actualiza los agregados
+// derivados (parchado/eol/distribuciones/equiposParchePendiente/total) de
+// una carga ya guardada, sin tocar hostnames ni cambios (que dependen del
+// universo de equipos, no de qué indicadores se calculan sobre ellos).
+app.put('/api/gobierno/inventario/:id/recalcular', verificarToken, async (req, res) => {
+  try {
+    if (!GOBIERNO_ROLES.includes(req.usuario.rol)) return res.status(403).json({ error: 'Sin permisos' });
+    const { segmentos } = req.body;
+    if (!segmentos) return res.status(400).json({ error: 'Faltan los segmentos recalculados' });
+
+    const docRef = db.collection('gobierno_inventario').doc(req.params.id);
+    const doc = await docRef.get();
+    if (!doc.exists) return res.status(404).json({ error: 'Carga no encontrada' });
+
+    const actual = doc.data();
+    const segmentosActualizados = { ...actual.segmentos };
+    for (const seg of SEGMENTOS_INVENTARIO) {
+      const nuevo = segmentos[seg];
+      if (!nuevo) continue;
+      segmentosActualizados[seg] = {
+        ...segmentosActualizados[seg],
+        total: nuevo.total ?? segmentosActualizados[seg]?.total ?? 0,
+        parchado: nuevo.parchado || segmentosActualizados[seg]?.parchado || {},
+        eol: nuevo.eol || segmentosActualizados[seg]?.eol || {},
+        distribuciones: nuevo.distribuciones || segmentosActualizados[seg]?.distribuciones || {},
+        equiposParchePendiente: Array.isArray(nuevo.equiposParchePendiente) ? nuevo.equiposParchePendiente : (segmentosActualizados[seg]?.equiposParchePendiente || [])
+      };
+    }
+
+    await docRef.update({ segmentos: segmentosActualizados, recalculadoEn: new Date(), recalculadoPor: req.usuario.nombre });
+
+    await db.collection('auditoria').add({
+      accion: 'GOBIERNO_INVENTARIO_RECALCULAR',
+      usuarioNombre: req.usuario.nombre,
+      timestamp: new Date(),
+      detalles: `Carga de inventario ${req.params.id} recalculada`
+    });
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Error PUT /api/gobierno/inventario/:id/recalcular:', err);
     res.status(500).json({ error: err.message });
   }
 });
