@@ -2331,6 +2331,100 @@ app.put('/api/gobierno/:id', verificarToken, async (req, res) => {
   }
 });
 
+// ============================================
+// GOBIERNO — MONITOREO SEMANAL (histórico real desde Excel Jenkins/Zabbix)
+// ============================================
+
+// POST /api/gobierno/monitoreo/upload — recibe el reporte ya parseado en el
+// frontend (SheetJS lee el .xlsx que sube el usuario) y lo guarda como una
+// carga nueva. Cada carga queda fija en el tiempo — no se sobrescribe nada,
+// así se arma el histórico real para la tendencia.
+app.post('/api/gobierno/monitoreo/upload', verificarToken, async (req, res) => {
+  try {
+    if (!GOBIERNO_ROLES.includes(req.usuario.rol)) return res.status(403).json({ error: 'Sin permisos' });
+    const { fechaGenerado, indicadores, distribucion, pendientes } = req.body;
+    if (!Array.isArray(indicadores) || indicadores.length === 0) {
+      return res.status(400).json({ error: 'No se encontraron indicadores en el archivo' });
+    }
+    const clienteActivoId = req.headers['x-cliente-activo'] || 'bcochile';
+    const fecha = fechaGenerado ? new Date(fechaGenerado) : new Date();
+    if (isNaN(fecha.getTime())) return res.status(400).json({ error: 'Fecha de reporte inválida' });
+
+    const docRef = db.collection('gobierno_monitoreo').doc(`${clienteActivoId}_${fecha.getTime()}`);
+    await docRef.set({
+      clienteId: clienteActivoId,
+      fecha,
+      indicadores,
+      distribucion: Array.isArray(distribucion) ? distribucion : [],
+      pendientes: Array.isArray(pendientes) ? pendientes : [],
+      cargadoPor: req.usuario.nombre,
+      cargadoEn: new Date()
+    });
+
+    await db.collection('auditoria').add({
+      accion: 'GOBIERNO_MONITOREO_UPLOAD',
+      usuarioNombre: req.usuario.nombre,
+      clienteId: clienteActivoId,
+      timestamp: new Date(),
+      detalles: `Reporte de monitoreo cargado: ${indicadores.length} indicadores, ${(pendientes || []).length} equipos pendientes`
+    });
+
+    res.json({ success: true, id: docRef.id });
+  } catch (err) {
+    console.error('Error POST /api/gobierno/monitoreo/upload:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/gobierno/monitoreo — histórico de cargas del cliente activo, más
+// reciente primero. No incluye el detalle de "pendientes" (puede ser largo);
+// para eso está el endpoint de abajo. Alcanza para la tabla y la tendencia.
+app.get('/api/gobierno/monitoreo', verificarToken, async (req, res) => {
+  try {
+    if (!GOBIERNO_ROLES.includes(req.usuario.rol)) return res.status(403).json({ error: 'Sin permisos' });
+    const clienteActivoId = req.headers['x-cliente-activo'] || 'bcochile';
+
+    const snap = await db.collection('gobierno_monitoreo').where('clienteId', '==', clienteActivoId).get();
+    const cargas = [];
+    snap.forEach(doc => {
+      const d = doc.data();
+      cargas.push({
+        id: doc.id,
+        fecha: d.fecha,
+        indicadores: d.indicadores || [],
+        distribucion: d.distribucion || [],
+        totalPendientes: (d.pendientes || []).length,
+        cargadoPor: d.cargadoPor || ''
+      });
+    });
+
+    cargas.sort((a, b) => {
+      const fa = a.fecha?.toDate?.() || new Date(a.fecha);
+      const fb = b.fecha?.toDate?.() || new Date(b.fecha);
+      return fb - fa;
+    });
+
+    res.json(cargas.slice(0, 52));
+  } catch (err) {
+    console.error('Error GET /api/gobierno/monitoreo:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/gobierno/monitoreo/:id/pendientes — detalle de los equipos con
+// problema de una carga puntual (hostname, IP, motivo, etc.)
+app.get('/api/gobierno/monitoreo/:id/pendientes', verificarToken, async (req, res) => {
+  try {
+    if (!GOBIERNO_ROLES.includes(req.usuario.rol)) return res.status(403).json({ error: 'Sin permisos' });
+    const doc = await db.collection('gobierno_monitoreo').doc(req.params.id).get();
+    if (!doc.exists) return res.status(404).json({ error: 'Carga no encontrada' });
+    res.json(doc.data().pendientes || []);
+  } catch (err) {
+    console.error('Error GET /api/gobierno/monitoreo/:id/pendientes:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.listen(PORT, async () => {
   console.log('==================================================');
   console.log('✓ SERVIDOR OVT V2 INICIADO CORRECTAMENTE');
