@@ -246,6 +246,21 @@ export default function GobiernoDashboard({ token, apiUrl, clienteActivo }) {
   const ultimaCarga = cargas[0] || null;
   const historicoAscendente = useMemo(() => [...cargas].reverse(), [cargas]);
 
+  // Indicadores de la última carga, separados entre los que cumplen objetivo
+  // y los que no, para la vista ejecutiva (Resumen general / Requieren atención)
+  const indicadoresConObjetivo = useMemo(
+    () => (ultimaCarga?.indicadores || []).filter(i => i.objetivo && i.objetivo !== '-'),
+    [ultimaCarga]
+  );
+  const indicadoresFallando = useMemo(
+    () => indicadoresConObjetivo.filter(i => !i.cumple),
+    [indicadoresConObjetivo]
+  );
+  const indicadoresOk = useMemo(
+    () => (ultimaCarga?.indicadores || []).filter(i => !indicadoresFallando.includes(i)),
+    [ultimaCarga, indicadoresFallando]
+  );
+
   const buscarIndicador = (indicadores, patron) =>
     (indicadores || []).find(i => patron.test(i.nombre || ''));
 
@@ -407,45 +422,115 @@ export default function GobiernoDashboard({ token, apiUrl, clienteActivo }) {
             </div>
           ) : (
             <>
-              {/* KPIs de la última carga */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 10, marginBottom: 18 }}>
-                {ultimaCarga.indicadores.map((ind, i) => (
-                  <div key={i} style={{ background: 'var(--glass)', border: '1px solid rgba(255,255,255,0.72)', borderRadius: '16px', padding: '12px', boxShadow: 'var(--shadow-soft)' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
-                      <i className={`ti ${iconoIndicador(ind.nombre)}`} aria-hidden="true" style={{ fontSize: '13px', color: 'var(--muted)' }}></i>
-                      <span style={{ fontSize: '9px', fontWeight: '800', color: 'var(--muted)', letterSpacing: '.03em', textTransform: 'uppercase' }}>{ind.nombre}</span>
-                    </div>
-                    <div style={{ fontSize: '20px', fontWeight: '800', color: 'var(--ink-950)', fontFamily: "'IBM Plex Mono',monospace" }}>
-                      {formatearValorIndicador(ind.valor, ind.objetivo)}
-                    </div>
-                    {ind.objetivo && ind.objetivo !== '-' && (
-                      <div style={{ fontSize: '10px', fontWeight: '700', color: ind.cumple ? 'var(--muted)' : '#a61e2b' }}>
-                        objetivo {ind.objetivo}
-                      </div>
-                    )}
-                  </div>
-                ))}
+              {/* Encabezado resumen: estado general de un vistazo */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 18, flexWrap: 'wrap' }}>
+                <div>
+                  <div style={{ fontSize: '13px', fontWeight: '800', color: 'var(--ink-950)' }}>Estado de infraestructura</div>
+                  <div style={{ fontSize: '11px', color: 'var(--muted)', fontWeight: '600' }}>Última carga: {fmtFechaHora(ultimaCarga.fecha)} · {ultimaCarga.cargadoPor}</div>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                  {indicadoresFallando.length > 0 ? (
+                    <span style={{ background: 'rgba(240,161,26,0.15)', color: '#8a5a06', fontSize: '11px', fontWeight: '800', padding: '7px 14px', borderRadius: '999px' }}>
+                      {indicadoresFallando.length} de {indicadoresConObjetivo.length} indicadores fuera de objetivo
+                    </span>
+                  ) : (
+                    <span style={{ background: 'rgba(32,166,106,0.14)', color: '#116642', fontSize: '11px', fontWeight: '800', padding: '7px 14px', borderRadius: '999px' }}>
+                      Todos los indicadores en objetivo
+                    </span>
+                  )}
+                  <span style={{
+                    background: ultimaCarga.totalPendientes > 0 ? 'rgba(215,59,71,0.1)' : 'rgba(32,166,106,0.14)',
+                    color: ultimaCarga.totalPendientes > 0 ? '#a61e2b' : '#116642',
+                    fontSize: '11px', fontWeight: '800', padding: '7px 14px', borderRadius: '999px'
+                  }}>
+                    {ultimaCarga.totalPendientes} equipos por revisar
+                  </span>
+                </div>
               </div>
+
+              {/* Resumen general (indicadores OK) */}
+              <div style={{ fontSize: '10px', fontWeight: '800', color: 'var(--muted)', letterSpacing: '.04em', textTransform: 'uppercase', marginBottom: 8 }}>
+                Resumen general
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 10, marginBottom: 20 }}>
+                {indicadoresOk.map((ind, i) => {
+                  const tieneObjetivo = ind.objetivo && ind.objetivo !== '-';
+                  return (
+                    <div key={i} style={{
+                      background: tieneObjetivo ? 'rgba(32,166,106,0.05)' : 'var(--glass)',
+                      border: tieneObjetivo ? '1px solid rgba(32,166,106,0.25)' : '1px solid rgba(255,255,255,0.72)',
+                      borderRadius: '16px', padding: '14px', boxShadow: 'var(--shadow-soft)'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+                        <i className={`ti ${iconoIndicador(ind.nombre)}`} aria-hidden="true" style={{ fontSize: '13px', color: tieneObjetivo ? '#20a66a' : 'var(--muted)' }}></i>
+                        <span style={{ fontSize: '9px', fontWeight: '800', color: 'var(--muted)', letterSpacing: '.02em', textTransform: 'uppercase' }}>{ind.nombre}</span>
+                      </div>
+                      <div style={{ fontSize: '22px', fontWeight: '800', color: tieneObjetivo ? '#116642' : 'var(--ink-950)', fontFamily: "'IBM Plex Mono',monospace" }}>
+                        {formatearValorIndicador(ind.valor, ind.objetivo)}
+                      </div>
+                      {tieneObjetivo && (
+                        <div style={{ fontSize: '10px', fontWeight: '700', color: '#20a66a' }}>{ind.objetivo} objetivo</div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Requieren atención (indicadores fuera de objetivo) */}
+              {indicadoresFallando.length > 0 && (
+                <>
+                  <div style={{ fontSize: '10px', fontWeight: '800', color: '#a61e2b', letterSpacing: '.04em', textTransform: 'uppercase', marginBottom: 8 }}>
+                    Requieren atención
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 10, marginBottom: 20 }}>
+                    {indicadoresFallando.map((ind, i) => (
+                      <div key={i} style={{ background: 'rgba(215,59,71,0.06)', border: '1px solid rgba(215,59,71,0.22)', borderRadius: '16px', padding: '14px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+                          <i className={`ti ${iconoIndicador(ind.nombre)}`} aria-hidden="true" style={{ fontSize: '13px', color: '#a61e2b' }}></i>
+                          <span style={{ fontSize: '9px', fontWeight: '800', color: 'var(--muted)', letterSpacing: '.02em', textTransform: 'uppercase' }}>{ind.nombre}</span>
+                        </div>
+                        <div style={{ fontSize: '22px', fontWeight: '800', color: '#a61e2b', fontFamily: "'IBM Plex Mono',monospace" }}>
+                          {formatearValorIndicador(ind.valor, ind.objetivo)}
+                        </div>
+                        <div style={{ fontSize: '10px', fontWeight: '700', color: '#a61e2b' }}>objetivo {ind.objetivo}</div>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
 
               {/* Tendencia */}
               <div style={{ background: 'var(--glass)', border: '1px solid rgba(255,255,255,0.72)', borderRadius: '22px', padding: '18px', boxShadow: 'var(--shadow-soft)', marginBottom: '18px' }}>
-                <p style={{ fontWeight: '800', fontSize: '13px', color: 'var(--ink-950)', margin: '0 0 12px' }}>
-                  Tendencia de cobertura · histórico real ({cargas.length} {cargas.length === 1 ? 'carga' : 'cargas'})
-                </p>
-                <div style={{ position: 'relative', height: '220px' }}>
-                  <Line
-                    data={dataTendencia}
-                    options={{
-                      responsive: true,
-                      maintainAspectRatio: false,
-                      plugins: { legend: { display: false } },
-                      scales: {
-                        y: { beginAtZero: false, ticks: { callback: v => `${v}%` } },
-                        x: { grid: { display: false } }
-                      }
-                    }}
-                  />
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                  <p style={{ fontWeight: '800', fontSize: '13px', color: 'var(--ink-950)', margin: 0 }}>Tendencia de cobertura</p>
+                  <span style={{ fontSize: '10px', color: 'var(--muted)', fontWeight: '700' }}>
+                    {cargas.length} {cargas.length === 1 ? 'carga' : 'cargas'} en el histórico
+                  </span>
                 </div>
+                {cargas.length < 2 ? (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '14px 0' }}>
+                    <div style={{ width: 10, height: 10, borderRadius: '50%', background: '#20a66a', flexShrink: 0 }}></div>
+                    <div style={{ flex: 1, height: 1, background: 'var(--line)' }}></div>
+                    <div style={{ fontSize: '11px', color: 'var(--muted)', fontWeight: '700', whiteSpace: 'nowrap' }}>
+                      Se necesitan al menos 2 cargas para trazar la tendencia
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ position: 'relative', height: '220px' }}>
+                    <Line
+                      data={dataTendencia}
+                      options={{
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: { legend: { display: false } },
+                        scales: {
+                          y: { beginAtZero: false, ticks: { callback: v => `${v}%` } },
+                          x: { grid: { display: false } }
+                        }
+                      }}
+                    />
+                  </div>
+                )}
               </div>
 
               {/* Histórico de cargas */}
@@ -466,11 +551,11 @@ export default function GobiernoDashboard({ token, apiUrl, clienteActivo }) {
                       {cargas.map((c, i) => {
                         const cobertura = buscarIndicador(c.indicadores, /cobertura/i);
                         return (
-                          <tr key={c.id}>
+                          <tr key={c.id} style={i === 0 ? { background: 'rgba(32,166,106,0.05)' } : undefined}>
                             <td style={{ fontWeight: '700' }}>
                               {fmtFecha(c.fecha)}{i === 0 && <span style={{ color: '#20a66a', fontSize: '10px', fontWeight: '800', marginLeft: 6 }}>· actual</span>}
                             </td>
-                            <td style={{ fontWeight: '800', color: '#116642' }}>
+                            <td style={{ fontWeight: '800', color: '#116642', fontFamily: "'IBM Plex Mono',monospace" }}>
                               {cobertura ? formatearValorIndicador(cobertura.valor, cobertura.objetivo) : '—'}
                             </td>
                             <td style={{ color: 'var(--muted)' }}>{c.totalPendientes} equipos</td>
