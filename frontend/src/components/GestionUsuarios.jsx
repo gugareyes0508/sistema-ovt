@@ -5,6 +5,27 @@ const ROLES = ['admin','dpe','teamleader','itsm','especialista'];
 const EMPRESAS = ['Kyndryl','Incosec','Biznet','Otra'];
 const ROL_COLORS = { admin:'var(--danger)', dpe:'var(--bank-blue)', teamleader:'#7c3aed', itsm:'var(--success)', especialista:'#d97706', coordinador:'#7c3aed' };
 
+// Mismas vistas que en Permisos de Roles — acá se usan para las excepciones
+// puntuales POR USUARIO, que van encima del permiso general de su rol.
+const VISTAS_OVERRIDE = [
+  { id:'dashboard',        label:'Dashboard' },
+  { id:'analytics',        label:'Analytics' },
+  { id:'ovt-proyectado',   label:'OVT Proyectado' },
+  { id:'claim',            label:'Control de Labor' },
+  { id:'usuarios',         label:'Gestión de Usuarios' },
+  { id:'mantenedor',       label:'Mantenedor' },
+  { id:'auditoria',        label:'Auditoría' },
+  { id:'permisos-roles',   label:'Permisos de Roles' },
+  { id:'registros',        label:'Registrar Cambio/Alerta' },
+  { id:'resumen',          label:'Mi Resumen' },
+  { id:'carga-excel',      label:'Cargar Excel' },
+  { id:'proyeccion-nueva', label:'Nueva Proyección ITSM' },
+  { id:'proyeccion-mis',   label:'Mis Proyecciones ITSM' },
+  { id:'proyeccion-excel', label:'Cargar Excel ITSM' },
+  { id:'alertas',          label:'Control de Alertas' },
+  { id:'equipo',           label:'Equipo' },
+];
+
 const Badge = ({ text, color='var(--muted)' }) => (
   <span style={{ display:'inline-block', padding:'2px 8px', borderRadius:'16px', fontSize:'11px', fontWeight:'600',
     background:`${color}18`, color, border:`1px solid ${color}40`, whiteSpace:'nowrap' }}>{text}</span>
@@ -110,7 +131,7 @@ const GestionUsuarios = ({ token, apiUrl, rolUsuario = 'admin' }) => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
     setModalUser({
       abierto: true, modo: 'crear',
-      datos: { usuario:'', nombre:'', rol:'especialista', empresa:'Kyndryl', contrasena:'', departamento:'', clientesIds:[], gruposPorCliente:{}, haceOVT:true }
+      datos: { usuario:'', nombre:'', rol:'especialista', empresa:'Kyndryl', contrasena:'', departamento:'', clientesIds:[], gruposPorCliente:{}, haceOVT:true, permisosOverride:{} }
     });
   };
 
@@ -123,7 +144,7 @@ const GestionUsuarios = ({ token, apiUrl, rolUsuario = 'admin' }) => {
       : (u.grupoServicioId ? { [(u.clientesIds||['bcochile'])[0]]: u.grupoServicioId } : {});
     setModalUser({
       abierto: true, modo: 'editar',
-      datos: { ...u, contrasena:'', gruposPorCliente: gruposPorClienteInicial }
+      datos: { ...u, contrasena:'', gruposPorCliente: gruposPorClienteInicial, permisosOverride: u.permisosOverride || {} }
     });
   };
 
@@ -140,7 +161,8 @@ const GestionUsuarios = ({ token, apiUrl, rolUsuario = 'admin' }) => {
       } else {
         const payload = { usuario: datos.usuario, nombre: datos.nombre, rol: datos.rol,
           empresa: datos.empresa, departamento: datos.departamento,
-          clientesIds: datos.clientesIds, gruposPorCliente: datos.gruposPorCliente || {}, haceOVT: datos.haceOVT };
+          clientesIds: datos.clientesIds, gruposPorCliente: datos.gruposPorCliente || {}, haceOVT: datos.haceOVT,
+          permisosOverride: datos.permisosOverride || {} };
         await axios.post(`${apiUrl}/api/admin/editar-usuario`, payload, { headers });
         if (datos.contrasena) {
           await axios.post(`${apiUrl}/api/admin/resetear-contrasena`, { usuario: datos.usuario, contraseñaNueva: datos.contrasena }, { headers });
@@ -441,6 +463,53 @@ const GestionUsuarios = ({ token, apiUrl, rolUsuario = 'admin' }) => {
                       </select>
                     </div>
                   ))}
+                </div>
+              </div>
+            )}
+
+            {/* Excepciones de permisos por usuario (encima del permiso de su rol).
+                Solo en modo editar — la asignación por cuenta (clientesIds/grupos)
+                de arriba no se toca para nada, esto es una capa aparte. */}
+            {modalUser.modo === 'editar' && (
+              <div style={{ marginBottom:'20px' }}>
+                <label style={{ display:'block', fontSize:'12px', fontWeight:'600', color:'var(--muted)', marginBottom:'5px' }}>
+                  Excepciones individuales de acceso (opcional)
+                </label>
+                <p style={{ fontSize:'11px', color:'var(--muted)', margin:'0 0 8px' }}>
+                  Por defecto usa el permiso de su rol ({modalUser.datos.rol}). Solo marca aquí las pestañas donde este usuario en particular debe tener acceso distinto al resto de su rol.
+                </p>
+                <div style={{ maxHeight:'220px', overflowY:'auto', border:'1px solid var(--line)', borderRadius:'14px', padding:'10px 12px' }}>
+                  {VISTAS_OVERRIDE.map(v => {
+                    const valor = modalUser.datos.permisosOverride?.[v.id]; // undefined | true | false
+                    const setValor = (nuevo) => setModalUser(p => {
+                      const overrides = { ...(p.datos.permisosOverride || {}) };
+                      if (nuevo === undefined) delete overrides[v.id];
+                      else overrides[v.id] = nuevo;
+                      return { ...p, datos: { ...p.datos, permisosOverride: overrides } };
+                    });
+                    return (
+                      <div key={v.id} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'6px 0', borderBottom:'1px solid var(--paper-100)' }}>
+                        <span style={{ fontSize:'12px', color:'var(--ink-800)' }}>{v.label}</span>
+                        <div style={{ display:'flex', gap:'4px' }}>
+                          <button type="button" onClick={() => setValor(undefined)}
+                            style={{ fontSize:'10px', padding:'3px 8px', borderRadius:'8px', border:'1px solid var(--line)', cursor:'pointer',
+                              background: valor === undefined ? 'var(--ink-800)' : 'transparent', color: valor === undefined ? '#fff' : 'var(--muted)' }}>
+                            Según rol
+                          </button>
+                          <button type="button" onClick={() => setValor(true)}
+                            style={{ fontSize:'10px', padding:'3px 8px', borderRadius:'8px', border:'1px solid var(--success)', cursor:'pointer',
+                              background: valor === true ? 'var(--success)' : 'transparent', color: valor === true ? '#fff' : 'var(--success)' }}>
+                            Permitir
+                          </button>
+                          <button type="button" onClick={() => setValor(false)}
+                            style={{ fontSize:'10px', padding:'3px 8px', borderRadius:'8px', border:'1px solid var(--danger)', cursor:'pointer',
+                              background: valor === false ? 'var(--danger)' : 'transparent', color: valor === false ? '#fff' : 'var(--danger)' }}>
+                            Bloquear
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             )}

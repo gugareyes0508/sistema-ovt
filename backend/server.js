@@ -257,7 +257,8 @@ app.post('/api/auth/login', async (req, res) => {
         clientesIds: user.clientesIds || ['bcochile'],
         gruposPorCliente: user.gruposPorCliente || {},
         grupoServicioId: user.grupoServicioId || '', // legacy, mantener por compatibilidad
-        departamento: user.departamento || ''
+        departamento: user.departamento || '',
+        permisosOverride: user.permisosOverride || {} // excepciones puntuales de este usuario, encima del permiso de su rol
       }
     });
   } catch (err) {
@@ -308,7 +309,8 @@ app.get('/api/admin/listar-usuarios', verificarToken, async (req, res) => {
         clientesIds: clientesUsuario,
         gruposPorCliente: d.gruposPorCliente || (d.grupoServicioId ? { [clientesUsuario[0]]: d.grupoServicioId } : {}),
         grupoServicioId: d.grupoServicioId || '', // legacy, mantener por compatibilidad
-        haceOVT: d.haceOVT !== false
+        haceOVT: d.haceOVT !== false,
+        permisosOverride: d.permisosOverride || {}
       });
     });
     usuariosList.sort((a, b) => a.nombre.localeCompare(b.nombre));
@@ -486,7 +488,7 @@ app.post('/api/admin/editar-usuario', verificarToken, async (req, res) => {
     const esDpe = req.usuario.rol === 'dpe';
     if (!esAdmin && !esDpe) return res.status(403).json({ error: 'No tienes permisos para editar usuarios' });
 
-    const { usuario, empresa, nombre, departamento, haceOVT, grupoServicioId, gruposPorCliente, clientesIds, rol } = req.body;
+    const { usuario, empresa, nombre, departamento, haceOVT, grupoServicioId, gruposPorCliente, clientesIds, rol, permisosOverride } = req.body;
     if (!usuario) return res.status(400).json({ error: 'Usuario requerido' });
 
     const userRef = db.collection('usuarios').doc(usuario);
@@ -510,6 +512,12 @@ app.post('/api/admin/editar-usuario', verificarToken, async (req, res) => {
     if (haceOVT !== undefined) cambios.haceOVT = Boolean(haceOVT);
     if (clientesIds !== undefined && Array.isArray(clientesIds)) cambios.clientesIds = clientesIds;
     if (rol !== undefined) cambios.rol = rol;
+    // permisosOverride: excepciones puntuales por usuario, encima del permiso
+    // de su rol. Se reemplaza entero (el frontend manda siempre el mapa
+    // completo actualizado, igual que gruposPorCliente). No afecta clientesIds.
+    if (permisosOverride !== undefined && typeof permisosOverride === 'object') {
+      cambios.permisosOverride = permisosOverride;
+    }
 
     // gruposPorCliente: mapa completo {clienteId: grupoId}. Se reemplaza entero
     // (el frontend siempre manda el mapa completo actualizado, no un parche).

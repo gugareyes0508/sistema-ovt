@@ -835,10 +835,14 @@ function App() {
   // VISTA: APLICACIÓN PRINCIPAL
   // ============================================
   // Helper: ¿puede este usuario ver esta vista?
-  // Admin siempre puede. Para el resto usa permisos de Firestore si están cargados.
+  // Admin siempre puede. Si el usuario tiene una excepción individual definida
+  // (permisosOverride) esa manda por sobre el permiso general de su rol —
+  // esto NO afecta la asignación por cuenta (clientesIds), es una capa aparte.
   const puedeVer = (vista) => {
     if (!usuario?.rol) return false;
     if (usuario.rol === 'admin') return true;
+    const override = usuario.permisosOverride?.[vista];
+    if (override !== undefined) return !!override;
     if (!permisos) return true; // fallback: no restricción si no se cargaron permisos
     return !!permisos[usuario.rol]?.[vista];
   };
