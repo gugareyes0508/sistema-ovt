@@ -2625,6 +2625,60 @@ app.get('/api/gobierno/inventario/:id/parche-pendiente', verificarToken, async (
   }
 });
 
+// ============================================
+// GOBIERNO — SLA MENSUAL (archivo rodante: cada carga reemplaza a la anterior)
+// ============================================
+// A diferencia de Monitoreo/Inventario, este Excel ya trae embebidos los
+// últimos 7 meses (hojas "Req" e "incidentes"), así que no hace falta
+// acumular histórico de cargas — cada carga nueva reemplaza por completo a
+// la anterior. Se guarda un único documento por cliente.
+
+app.post('/api/gobierno/sla/upload', verificarToken, async (req, res) => {
+  try {
+    if (!GOBIERNO_ROLES.includes(req.usuario.rol)) return res.status(403).json({ error: 'Sin permisos' });
+    const { meses, requerimientos, incidentes } = req.body;
+    if (!Array.isArray(meses) || !Array.isArray(requerimientos) || !Array.isArray(incidentes)) {
+      return res.status(400).json({ error: 'Datos de SLA incompletos' });
+    }
+    const clienteActivoId = req.headers['x-cliente-activo'] || 'bcochile';
+
+    await db.collection('gobierno_sla').doc(clienteActivoId).set({
+      clienteId: clienteActivoId,
+      meses,
+      requerimientos,
+      incidentes,
+      cargadoPor: req.usuario.nombre,
+      cargadoEn: new Date()
+    });
+
+    await db.collection('auditoria').add({
+      accion: 'GOBIERNO_SLA_UPLOAD',
+      usuarioNombre: req.usuario.nombre,
+      clienteId: clienteActivoId,
+      timestamp: new Date(),
+      detalles: `SLA mensual cargado: ${requerimientos.length} niveles Req, ${incidentes.length} niveles Incidentes`
+    });
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Error POST /api/gobierno/sla/upload:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/gobierno/sla', verificarToken, async (req, res) => {
+  try {
+    if (!GOBIERNO_ROLES.includes(req.usuario.rol)) return res.status(403).json({ error: 'Sin permisos' });
+    const clienteActivoId = req.headers['x-cliente-activo'] || 'bcochile';
+    const doc = await db.collection('gobierno_sla').doc(clienteActivoId).get();
+    if (!doc.exists) return res.json(null);
+    res.json(doc.data());
+  } catch (err) {
+    console.error('Error GET /api/gobierno/sla:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.listen(PORT, async () => {
   console.log('==================================================');
   console.log('✓ SERVIDOR OVT V2 INICIADO CORRECTAMENTE');

@@ -7,15 +7,16 @@ import {
   LinearScale,
   PointElement,
   LineElement,
+  BarElement,
   ArcElement,
   Title,
   Tooltip,
   Legend,
   Filler
 } from 'chart.js';
-import { Line, Doughnut } from 'react-chartjs-2';
+import { Line, Doughnut, Bar } from 'react-chartjs-2';
 
-ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, ArcElement, Title, Tooltip, Legend, Filler);
+ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, BarElement, ArcElement, Title, Tooltip, Legend, Filler);
 
 const PALETA_DIST = ['#003b71', '#20a66a', '#f0a11a', '#d73b47', '#7f77dd', '#56d9d9', '#8a5a06', '#b4b2a9'];
 
@@ -70,7 +71,7 @@ export default function GobiernoDashboard({ token, apiUrl, clienteActivo }) {
   const headers = buildHeaders(token, clienteActivo);
   const fileRef = useRef(null);
 
-  const [subTab, setSubTab] = useState('panel'); // 'panel' | 'monitoreo' | 'config'
+  const [subTab, setSubTab] = useState('panel'); // 'panel' | 'monitoreo' | 'inventario' | 'sla' | 'config'
 
   const [items, setItems] = useState([]);
   const [cargando, setCargando] = useState(true);
@@ -100,6 +101,14 @@ export default function GobiernoDashboard({ token, apiUrl, clienteActivo }) {
   const [cargandoParcheId, setCargandoParcheId] = useState(null);
   const [segmentoInv, setSegmentoInv] = useState('general'); // 'general' | 'vmSo' | 'ap'
   const [recalculandoId, setRecalculandoId] = useState(null);
+
+  // ============ SLA MENSUAL (archivo rodante, sin histórico acumulado) ============
+  const fileSlaRef = useRef(null);
+  const [datosSla, setDatosSla] = useState(null);
+  const [cargandoSla, setCargandoSla] = useState(true);
+  const [errorSla, setErrorSla] = useState(null);
+  const [subiendoSla, setSubiendoSla] = useState(false);
+  const [mensajeSla, setMensajeSla] = useState(null);
 
   const cargarDatos = useCallback(async () => {
     setCargando(true);
@@ -146,6 +155,22 @@ export default function GobiernoDashboard({ token, apiUrl, clienteActivo }) {
   useEffect(() => { cargarDatos(); }, [cargarDatos]);
   useEffect(() => { cargarMonitoreo(); }, [cargarMonitoreo]);
   useEffect(() => { cargarInventario(); }, [cargarInventario]);
+
+  const cargarSla = useCallback(async () => {
+    setCargandoSla(true);
+    setErrorSla(null);
+    try {
+      const res = await axios.get(`${apiUrl}/api/gobierno/sla`, { headers });
+      setDatosSla(res.data);
+    } catch (err) {
+      setErrorSla('Error cargando el SLA mensual: ' + (err.response?.data?.error || err.message));
+    } finally {
+      setCargandoSla(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [apiUrl, clienteActivo]);
+
+  useEffect(() => { cargarSla(); }, [cargarSla]);
 
   const abrirEditar = (item) => {
     setModalItem({ ...item });
@@ -420,6 +445,68 @@ export default function GobiernoDashboard({ token, apiUrl, clienteActivo }) {
     }
   };
 
+  // ============ PARSEO DEL EXCEL DE SLA MENSUAL ============
+  // Hojas "Req" e "incidentes": estructura fija de 3 filas por nivel
+  // (fila de check ✅/❌, fila de % decimal, fila de fracción "(x/y)"),
+  // con los meses ya embebidos como columnas (archivo rodante).
+  const MESES_ES = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+  const parsearHojaSla = (hoja) => {
+    const filas = XLSX.utils.sheet_to_json(hoja, { header: 1, defval: '' });
+    if (filas.length === 0) return { meses: [], niveles: [] };
+    const headerRow = filas[0];
+    const meses = headerRow.slice(3).map(c => {
+      if (c instanceof Date) return `${MESES_ES[c.getMonth()]}-${c.getFullYear()}`;
+      return String(c);
+    });
+    const niveles = [];
+    for (let i = 1; i < filas.length; i += 3) {
+      const filaCheck = filas[i] || [];
+      const filaPct = filas[i + 1] || [];
+      const filaFrac = filas[i + 2] || [];
+      const nombre = filaCheck[1];
+      if (!nombre) continue;
+      const objetivo = filaCheck[2] || '';
+      const porMes = meses.map((mes, idx) => {
+        const col = 3 + idx;
+        const pctRaw = filaPct[col];
+        return {
+          mes,
+          cumple: filaCheck[col] === '✅',
+          pct: typeof pctRaw === 'number' ? +(pctRaw * 100).toFixed(1) : null,
+          fraccion: String(filaFrac[col] || '')
+        };
+      });
+      niveles.push({ nombre, objetivo, porMes });
+    }
+    return { meses, niveles };
+  };
+
+  const procesarExcelSla = async (file) => {
+    setSubiendoSla(true);
+    setMensajeSla(null);
+    try {
+      const buffer = await file.arrayBuffer();
+      const wb = XLSX.read(buffer, { type: 'array', cellDates: true });
+
+      const hojaReq = wb.Sheets['Req'];
+      const hojaInc = wb.Sheets['incidentes'];
+      if (!hojaReq || !hojaInc) throw new Error('El archivo debe tener las hojas "Req" e "incidentes"');
+
+      const { meses, niveles: requerimientos } = parsearHojaSla(hojaReq);
+      const { niveles: incidentes } = parsearHojaSla(hojaInc);
+      if (requerimientos.length === 0 || incidentes.length === 0) throw new Error('No se encontraron niveles de SLA en el archivo');
+
+      await axios.post(`${apiUrl}/api/gobierno/sla/upload`, { meses, requerimientos, incidentes }, { headers });
+
+      setMensajeSla({ tipo: 'success', texto: `SLA mensual actualizado: ${requerimientos.length} niveles de Requerimientos, ${incidentes.length} de Incidentes.` });
+      cargarSla();
+    } catch (err) {
+      setMensajeSla({ tipo: 'error', texto: 'Error procesando el archivo: ' + (err.response?.data?.error || err.message) });
+    } finally {
+      setSubiendoSla(false);
+    }
+  };
+
   const verParchePendiente = async (carga, segmento) => {
     setCargandoParcheId(carga.id);
     try {
@@ -538,6 +625,66 @@ export default function GobiernoDashboard({ token, apiUrl, clienteActivo }) {
 
   const nombreSegmento = { general: 'Vista general', vmSo: 'VM SO', ap: 'AP' };
 
+  // ============ CÓMPUTOS DERIVADOS DE SLA MENSUAL ============
+  const parseFraccion = (f) => {
+    const m = /(\d+)\s*\/\s*(\d+)/.exec(String(f || ''));
+    return m ? { num: parseInt(m[1], 10), den: parseInt(m[2], 10) } : { num: 0, den: 0 };
+  };
+
+  // Suma num/den de todos los niveles para un mes puntual (índice de mes)
+  const globalPorMes = (niveles, idxMes) => {
+    let num = 0, den = 0;
+    niveles.forEach(n => {
+      const { num: a, den: b } = parseFraccion(n.porMes[idxMes]?.fraccion);
+      num += a; den += b;
+    });
+    return { num, den, pct: den ? +(100 * num / den).toFixed(1) : null };
+  };
+
+  const slaMeses = useMemo(() => datosSla?.meses || [], [datosSla]);
+  const slaReq = useMemo(() => datosSla?.requerimientos || [], [datosSla]);
+  const slaInc = useMemo(() => datosSla?.incidentes || [], [datosSla]);
+  const idxUltimoMes = slaMeses.length - 1;
+
+  const globalReqUltimo = useMemo(() => globalPorMes(slaReq, idxUltimoMes),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [slaReq, idxUltimoMes]);
+  const globalIncUltimo = useMemo(() => globalPorMes(slaInc, idxUltimoMes),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [slaInc, idxUltimoMes]);
+  const globalTotalUltimo = useMemo(() => ({
+    num: globalReqUltimo.num + globalIncUltimo.num,
+    den: globalReqUltimo.den + globalIncUltimo.den,
+    pct: (globalReqUltimo.den + globalIncUltimo.den) ? +(100 * (globalReqUltimo.num + globalIncUltimo.num) / (globalReqUltimo.den + globalIncUltimo.den)).toFixed(1) : null
+  }), [globalReqUltimo, globalIncUltimo]);
+
+  const nivelesCumplidosUltimo = useMemo(() => {
+    const todos = [...slaReq, ...slaInc];
+    const cumplidos = todos.filter(n => n.porMes[idxUltimoMes]?.cumple).length;
+    return { cumplidos, total: todos.length };
+  }, [slaReq, slaInc, idxUltimoMes]);
+
+  const dataEvolucionSla = useMemo(() => ({
+    labels: slaMeses,
+    datasets: [
+      { label: 'Requerimientos', data: slaMeses.map((_, i) => globalPorMes(slaReq, i).pct), borderColor: '#003b71', backgroundColor: 'transparent', tension: 0.3, pointRadius: 3, spanGaps: true },
+      { label: 'Incidentes', data: slaMeses.map((_, i) => globalPorMes(slaInc, i).pct), borderColor: '#20a66a', backgroundColor: 'transparent', tension: 0.3, pointRadius: 3, spanGaps: true }
+    ]
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }), [slaMeses, slaReq, slaInc]);
+
+  const dataCumplimientoNivel = useMemo(() => {
+    const n = Math.max(slaReq.length, slaInc.length);
+    const labels = Array.from({ length: n }, (_, i) => slaReq[i]?.nombre?.split('/')[1]?.trim() || slaInc[i]?.nombre?.split('/')[1]?.trim() || `Nivel ${i + 1}`);
+    return {
+      labels,
+      datasets: [
+        { label: 'Requerimientos', data: slaReq.map(n2 => n2.porMes[idxUltimoMes]?.pct ?? null), backgroundColor: '#003b71' },
+        { label: 'Incidentes', data: slaInc.map(n2 => n2.porMes[idxUltimoMes]?.pct ?? null), backgroundColor: '#20a66a' }
+      ]
+    };
+  }, [slaReq, slaInc, idxUltimoMes]);
+
   // KPIs de resumen (pestaña Panel)
   const itemsEstado = items.filter(i => i.tipo === 'estado');
   const alDia = itemsEstado.filter(i => i.estado === 'al_dia').length;
@@ -581,6 +728,14 @@ export default function GobiernoDashboard({ token, apiUrl, clienteActivo }) {
             background: subTab === 'inventario' ? 'linear-gradient(135deg,var(--ink-900),var(--bank-blue))' : 'rgba(255,255,255,0.72)',
             color: subTab === 'inventario' ? '#fff' : 'var(--ink-800)' }}>
           <i className="ti ti-server-2" aria-hidden="true" style={{ marginRight: 4 }}></i>Inventario
+        </button>
+        <button
+          onClick={() => setSubTab('sla')}
+          style={{ padding: '9px 16px', borderRadius: '999px', fontSize: '12px', fontWeight: '800', cursor: 'pointer',
+            border: subTab === 'sla' ? 'none' : '1px solid var(--line)',
+            background: subTab === 'sla' ? 'linear-gradient(135deg,var(--ink-900),var(--bank-blue))' : 'rgba(255,255,255,0.72)',
+            color: subTab === 'sla' ? '#fff' : 'var(--ink-800)' }}>
+          <i className="ti ti-clock-check" aria-hidden="true" style={{ marginRight: 4 }}></i>SLA Mensual
         </button>
         <button
           onClick={() => setSubTab('config')}
@@ -1216,6 +1371,191 @@ export default function GobiernoDashboard({ token, apiUrl, clienteActivo }) {
                       })}
                     </tbody>
                   </table>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* ============ SLA MENSUAL ============ */}
+      {subTab === 'sla' && (
+        <div>
+          {errorSla && (
+            <div style={{ background: 'rgba(215,59,71,0.08)', border: '1px solid rgba(215,59,71,0.24)', borderRadius: '14px', padding: '10px 16px', color: '#a61e2b', fontSize: '13px', fontWeight: '600', marginBottom: '18px' }}>
+              {errorSla}
+            </div>
+          )}
+
+          {/* CARGA DE EXCEL */}
+          <div
+            style={{ border: '1px solid rgba(255,255,255,0.72)', borderRadius: '22px', background: 'var(--glass)', boxShadow: 'var(--shadow-soft)', padding: '18px 22px', marginBottom: '18px', display: 'flex', alignItems: 'center', gap: '16px', cursor: 'pointer', flexWrap: 'wrap' }}
+            onClick={() => fileSlaRef.current?.click()}
+          >
+            <div style={{ width: '42px', height: '42px', borderRadius: '14px', background: 'linear-gradient(135deg,var(--ink-900),var(--bank-blue))', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <i className="ti ti-clock-check" aria-hidden="true" style={{ fontSize: '18px', color: '#fff' }}></i>
+            </div>
+            <div style={{ flex: 1, minWidth: '200px' }}>
+              <div style={{ fontWeight: '800', fontSize: '13px', color: 'var(--ink-950)', marginBottom: '2px' }}>
+                {subiendoSla ? 'Procesando archivo...' : 'Cargar SLA mensual (Excel rodante)'}
+              </div>
+              <div style={{ fontSize: '12px', fontWeight: '600', color: 'var(--muted)' }}>
+                Hojas "Req" + "incidentes" · trae los últimos meses embebidos · cada carga reemplaza a la anterior
+              </div>
+            </div>
+            {datosSla && (
+              <div style={{ fontSize: '11px', fontFamily: "'IBM Plex Mono',monospace", color: 'var(--muted)', textAlign: 'right', flexShrink: 0 }}>
+                Última carga:<br />{fmtFechaHora(datosSla.cargadoEn)}
+              </div>
+            )}
+            <button
+              disabled={subiendoSla}
+              onClick={(e) => { e.stopPropagation(); fileSlaRef.current?.click(); }}
+              style={{ padding: '10px 18px', background: subiendoSla ? 'var(--muted)' : 'linear-gradient(135deg,var(--ink-900),var(--bank-blue))', color: '#fff', border: 'none', borderRadius: '999px', fontWeight: '900', fontSize: '12px', cursor: subiendoSla ? 'not-allowed' : 'pointer', whiteSpace: 'nowrap', flexShrink: 0 }}
+            >
+              {subiendoSla ? 'Cargando...' : 'Seleccionar archivo'}
+            </button>
+            <input
+              ref={fileSlaRef}
+              type="file"
+              accept=".xlsx,.xls"
+              style={{ display: 'none' }}
+              onChange={(e) => { if (e.target.files[0]) procesarExcelSla(e.target.files[0]); e.target.value = ''; }}
+            />
+          </div>
+
+          {mensajeSla && (
+            <div style={{
+              background: mensajeSla.tipo === 'error' ? 'rgba(215,59,71,0.08)' : 'rgba(32,166,106,0.1)',
+              border: `1px solid ${mensajeSla.tipo === 'error' ? 'rgba(215,59,71,0.24)' : 'rgba(32,166,106,0.24)'}`,
+              borderRadius: '14px', padding: '10px 16px', fontSize: '13px', fontWeight: '600', marginBottom: '18px',
+              color: mensajeSla.tipo === 'error' ? '#a61e2b' : '#116642'
+            }}>
+              {mensajeSla.texto}
+            </div>
+          )}
+
+          {cargandoSla ? (
+            <p style={{ textAlign: 'center', color: 'var(--muted)', padding: '30px', fontWeight: '600' }}>Cargando...</p>
+          ) : !datosSla ? (
+            <div style={{ background: 'var(--glass)', border: '1px dashed rgba(255,255,255,0.72)', borderRadius: '22px', padding: '30px', textAlign: 'center', color: 'var(--muted)', fontSize: '13px' }}>
+              Todavía no hay ningún SLA cargado. Sube el Excel para ver el reporte.
+            </div>
+          ) : (
+            <>
+              {/* KPIs principales */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 10, marginBottom: 18 }}>
+                <div style={{ background: 'rgba(32,166,106,0.05)', border: '1px solid rgba(32,166,106,0.25)', borderRadius: '16px', padding: '14px' }}>
+                  <div style={{ fontSize: '9px', fontWeight: '800', color: 'var(--muted)', letterSpacing: '.03em', marginBottom: 6 }}>SLA GLOBAL REQUERIMIENTOS</div>
+                  <div style={{ fontSize: '22px', fontWeight: '800', color: '#116642', fontFamily: "'IBM Plex Mono',monospace" }}>{globalReqUltimo.pct != null ? `${globalReqUltimo.pct}%` : '—'}</div>
+                  <div style={{ fontSize: '9px', color: 'var(--muted)', fontWeight: '700' }}>{globalReqUltimo.num}/{globalReqUltimo.den} · {slaMeses[idxUltimoMes]}</div>
+                </div>
+                <div style={{ background: 'rgba(32,166,106,0.05)', border: '1px solid rgba(32,166,106,0.25)', borderRadius: '16px', padding: '14px' }}>
+                  <div style={{ fontSize: '9px', fontWeight: '800', color: 'var(--muted)', letterSpacing: '.03em', marginBottom: 6 }}>SLA GLOBAL INCIDENTES</div>
+                  <div style={{ fontSize: '22px', fontWeight: '800', color: '#116642', fontFamily: "'IBM Plex Mono',monospace" }}>{globalIncUltimo.pct != null ? `${globalIncUltimo.pct}%` : '—'}</div>
+                  <div style={{ fontSize: '9px', color: 'var(--muted)', fontWeight: '700' }}>{globalIncUltimo.num}/{globalIncUltimo.den} · {slaMeses[idxUltimoMes]}</div>
+                </div>
+                <div style={{ background: 'rgba(0,59,113,0.05)', border: '1px solid rgba(0,59,113,0.2)', borderRadius: '16px', padding: '14px' }}>
+                  <div style={{ fontSize: '9px', fontWeight: '800', color: 'var(--muted)', letterSpacing: '.03em', marginBottom: 6 }}>CUMPLIMIENTO GLOBAL</div>
+                  <div style={{ fontSize: '22px', fontWeight: '800', color: '#003b71', fontFamily: "'IBM Plex Mono',monospace" }}>{globalTotalUltimo.pct != null ? `${globalTotalUltimo.pct}%` : '—'}</div>
+                  <div style={{ fontSize: '9px', color: 'var(--muted)', fontWeight: '700' }}>{globalTotalUltimo.num}/{globalTotalUltimo.den} evaluados</div>
+                </div>
+                <div style={{ background: 'var(--glass)', border: '1px solid rgba(255,255,255,0.72)', borderRadius: '16px', padding: '14px', boxShadow: 'var(--shadow-soft)' }}>
+                  <div style={{ fontSize: '9px', fontWeight: '800', color: 'var(--muted)', letterSpacing: '.03em', marginBottom: 6 }}>NIVELES CUMPLIDOS</div>
+                  <div style={{ fontSize: '22px', fontWeight: '800', color: 'var(--ink-950)', fontFamily: "'IBM Plex Mono',monospace" }}>
+                    {nivelesCumplidosUltimo.cumplidos} <span style={{ fontSize: 13, color: 'var(--muted)' }}>/ {nivelesCumplidosUltimo.total}</span>
+                  </div>
+                  <div style={{ fontSize: '9px', color: 'var(--muted)', fontWeight: '700' }}>{slaReq.length} Req + {slaInc.length} Incidentes</div>
+                </div>
+              </div>
+
+              {/* Tablas SLA por nivel */}
+              {[['SLA — Requerimientos', slaReq], ['SLA — Incidentes', slaInc]].map(([titulo, niveles]) => (
+                <div key={titulo} style={{ background: 'var(--glass)', border: '1px solid rgba(255,255,255,0.72)', borderRadius: '16px', padding: '16px', boxShadow: 'var(--shadow-soft)', marginBottom: 14 }}>
+                  <p style={{ fontWeight: '800', fontSize: '13px', color: 'var(--ink-950)', margin: '0 0 12px' }}>{titulo}</p>
+                  <div className="tabla-responsive">
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '10px', whiteSpace: 'nowrap' }}>
+                      <thead>
+                        <tr>
+                          <th style={{ textAlign: 'left', color: 'var(--muted)', fontWeight: 800, padding: '5px 8px 5px 0' }}>Nivel</th>
+                          <th style={{ textAlign: 'left', color: 'var(--muted)', fontWeight: 800, padding: '5px 8px' }}>Objetivo</th>
+                          <th style={{ textAlign: 'center', color: 'var(--muted)', fontWeight: 800, padding: '5px 8px' }}>SLA</th>
+                          {slaMeses.map(m => <th key={m} style={{ textAlign: 'center', color: 'var(--muted)', fontWeight: 800, padding: '5px 8px' }}>{m}</th>)}
+                          <th style={{ textAlign: 'center', color: 'var(--muted)', fontWeight: 800, padding: '5px 8px' }}>Tendencia</th>
+                          <th style={{ textAlign: 'center', color: 'var(--muted)', fontWeight: 800, padding: '5px 0 5px 8px' }}>Estado {slaMeses[idxUltimoMes]}</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {niveles.map(n => {
+                          const ultima = n.porMes[idxUltimoMes];
+                          const valores = n.porMes.map(m => m.pct).filter(v => v != null);
+                          const min = Math.min(...valores), max = Math.max(...valores);
+                          const pts = n.porMes.map((m, i) => {
+                            const x = (i / (n.porMes.length - 1 || 1)) * 100;
+                            const y = m.pct == null ? 11 : 20 - ((m.pct - min) / ((max - min) || 1)) * 18;
+                            return `${x},${y}`;
+                          }).join(' ');
+                          return (
+                            <tr key={n.nombre}>
+                              <td style={{ padding: '6px 8px 6px 0', fontWeight: 700, color: 'var(--ink-800)', borderTop: '1px solid rgba(18,52,78,0.06)' }}>{n.nombre}</td>
+                              <td style={{ padding: '6px 8px', color: 'var(--muted)', borderTop: '1px solid rgba(18,52,78,0.06)' }}>{n.objetivo}</td>
+                              <td style={{ padding: '6px 8px', textAlign: 'center', fontWeight: 800, color: 'var(--ink-950)', borderTop: '1px solid rgba(18,52,78,0.06)' }}>{ultima?.pct != null ? `${ultima.pct}%` : '—'}</td>
+                              {n.porMes.map((m, i) => (
+                                <td key={i} style={{ padding: '6px 8px', textAlign: 'center', fontWeight: 700, color: m.pct == null ? 'var(--muted)' : (m.cumple ? '#116642' : '#a61e2b'), borderTop: '1px solid rgba(18,52,78,0.06)' }}>
+                                  <div>{m.pct != null ? `${m.pct}%` : '—'}</div>
+                                  <div style={{ fontSize: 8, color: 'var(--muted)', fontWeight: 600 }}>({m.fraccion})</div>
+                                </td>
+                              ))}
+                              <td style={{ padding: '6px 8px', borderTop: '1px solid rgba(18,52,78,0.06)' }}>
+                                <svg viewBox="0 0 100 22" style={{ width: 70, height: 20 }}>
+                                  <polyline points={pts} fill="none" stroke="#003b71" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                                </svg>
+                              </td>
+                              <td style={{ padding: '6px 0 6px 8px', textAlign: 'center', borderTop: '1px solid rgba(18,52,78,0.06)' }}>
+                                <span style={{
+                                  background: ultima?.cumple ? 'rgba(32,166,106,0.14)' : 'rgba(215,59,71,0.12)',
+                                  color: ultima?.cumple ? '#116642' : '#a61e2b',
+                                  fontSize: 9, fontWeight: 800, padding: '3px 10px', borderRadius: 999
+                                }}>
+                                  {ultima?.cumple ? 'Cumplido' : 'Incumplido'}
+                                </span>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              ))}
+
+              {/* Gráficos */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 10 }}>
+                <div style={{ background: 'var(--glass)', border: '1px solid rgba(255,255,255,0.72)', borderRadius: '16px', padding: '16px', boxShadow: 'var(--shadow-soft)' }}>
+                  <p style={{ fontWeight: '800', fontSize: '12px', color: 'var(--ink-950)', margin: '0 0 10px' }}>Evolución SLA Global</p>
+                  <div style={{ position: 'relative', height: '180px' }}>
+                    <Line
+                      data={dataEvolucionSla}
+                      options={{
+                        responsive: true, maintainAspectRatio: false,
+                        plugins: { legend: { position: 'bottom', labels: { boxWidth: 8, font: { size: 10 } } } },
+                        scales: { y: { min: 90, max: 100, ticks: { callback: v => `${v}%` } }, x: { grid: { display: false } } }
+                      }}
+                    />
+                  </div>
+                </div>
+                <div style={{ background: 'var(--glass)', border: '1px solid rgba(255,255,255,0.72)', borderRadius: '16px', padding: '16px', boxShadow: 'var(--shadow-soft)' }}>
+                  <p style={{ fontWeight: '800', fontSize: '12px', color: 'var(--ink-950)', margin: '0 0 10px' }}>Cumplimiento por nivel · {slaMeses[idxUltimoMes]}</p>
+                  <div style={{ position: 'relative', height: '180px' }}>
+                    <Bar
+                      data={dataCumplimientoNivel}
+                      options={{
+                        responsive: true, maintainAspectRatio: false,
+                        plugins: { legend: { position: 'bottom', labels: { boxWidth: 8, font: { size: 10 } } } },
+                        scales: { y: { min: 90, max: 100, ticks: { callback: v => `${v}%` } }, x: { grid: { display: false } } }
+                      }}
+                    />
+                  </div>
                 </div>
               </div>
             </>
