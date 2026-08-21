@@ -12,29 +12,33 @@
 // simplemente desaparece de esa lista y la app salta sola al siguiente —
 // cero cambios de código necesarios.
 //
-// NOTA (20-ago-2026): esta selección automática a veces elige un modelo
-// "razonador" (tipo DeepSeek-R1/Qwen3), que por defecto devuelve su cadena
-// de pensamiento envuelta en <think>...</think> ANTES de la respuesta real
-// — eso rompía el parseo de JSON en Agrupación IA y ensuciaba el texto en
-// IA Insights. Se corrige acá, en un solo lugar, con reasoning_format:
-// 'hidden' (Groq lo ignora si el modelo no es razonador) más una limpieza
-// de respaldo por si algún modelo no respeta ese parámetro.
+// NOTA (21-ago-2026): la selección automática puede tocarle a un modelo
+// que "existe y responde" pero no sirve para esta app por distintos
+// motivos — razonador (piensa en <think> antes de responder), agéntico
+// ("compound", orquesta herramientas en vez de solo responder texto), o de
+// nicho con cuota de throughput muy chica (ej. allam-2-7b, especializado en
+// árabe, con límite de 6.000 tokens/minuto). Parchar cada nombre de a uno
+// es un juego sin fin, así que el fix de fondo es este: en vez de probar
+// solo el modelo #1 y reintentar una vez, se recorre TODA la lista
+// ordenada de candidatos hasta que uno funcione de verdad — cualquier
+// modelo problemático nuevo que aparezca queda cubierto solo, sin tocar
+// código, siempre que exista al menos un candidato sano en la lista.
 //
 // Uso en cualquier componente:
 //   import { llamarGroq } from '../utils/groqClient';
 //   const data = await llamarGroq([{ role: 'user', content: prompt }], { temperature: 0.5, maxTokens: 700 });
 //   const texto = data.choices[0].message.content;
 
-let modeloCache = null;
+let listaCache = null;
 let cacheTimestamp = 0;
 const CACHE_MS = 30 * 60 * 1000; // 30 minutos — evita golpear /models en cada llamada
 
-// Filtra modelos que no sirven para chat de texto simple (voz, moderación,
-// y los "compound" — estos son agénticos: orquestan herramientas internas
-// como búsqueda web o ejecución de código en vez de solo responder texto, y
-// pueden terminar con finish_reason "stop" sin devolver contenido si no
-// hay nada más que "hacer". Esta app solo necesita texto/JSON de una pasada.
-const NO_ES_CHAT = /whisper|tts|orpheus|guard|safeguard|compound/i;
+// Filtra modelos que no sirven para chat de texto simple:
+// - voz/moderación (whisper, tts, guard...)
+// - "compound": agénticos, orquestan herramientas en vez de solo responder
+// - modelos regionales/de nicho con cuota de throughput muy chica para esta
+//   app (allam, mistral-saba: modelos especializados en árabe con TPM bajo)
+const NO_ES_CHAT = /whisper|tts|orpheus|guard|safeguard|compound|allam|saba/i;
 
 // Modelos "razonadores" (DeepSeek-R1, Qwen3, gpt-oss, etc.): antes de
 // responder gastan tokens "pensando" en voz alta. Para lo que esta app les
@@ -66,29 +70,31 @@ async function obtenerModelosActivos() {
   return [...normales, ...razonadores];
 }
 
-async function obtenerModeloGroq(forzarRefresh = false) {
+// Lista de IDs en orden de preferencia. Cachea 30 min para no golpear
+// /models en cada llamada; se puede forzar un refresh.
+async function obtenerListaModelos(forzarRefresh = false) {
   const ahora = Date.now();
-  if (!forzarRefresh && modeloCache && (ahora - cacheTimestamp) < CACHE_MS) {
-    return modeloCache;
+  if (!forzarRefresh && listaCache && (ahora - cacheTimestamp) < CACHE_MS) {
+    return listaCache;
   }
   try {
     const candidatos = await obtenerModelosActivos();
     if (candidatos.length > 0) {
-      modeloCache = candidatos[0].id;
+      listaCache = candidatos.map(m => m.id);
       cacheTimestamp = ahora;
-      return modeloCache;
+      return listaCache;
     }
   } catch (err) {
     console.warn('[groqClient] No se pudo obtener /models, usando fallback fijo:', err.message);
   }
   // Fallback solo si /models falla por completo (ej. sin internet momentáneo)
-  return 'openai/gpt-oss-120b';
+  return ['openai/gpt-oss-120b'];
 }
 
 /**
- * Llama a GROQ para generar texto (chat completion). Reintenta una vez con
- * el siguiente modelo disponible si el primero fallara (ej. justo se
- * descontinuó y el caché local todavía no se había refrescado).
+ * Llama a GROQ para generar texto (chat completion). Recorre la lista
+ * completa de modelos activos, en orden, hasta que uno responda con
+ * contenido de verdad — no se rinde después de un solo reintento.
  *
  * @param {Array<{role: string, content: string}>} mensajes
  * @param {{ temperature?: number, maxTokens?: number }} opciones
@@ -141,33 +147,49 @@ export async function llamarGroq(mensajes, opciones = {}) {
     // Si el modelo agotó max_tokens pensando, el contenido puede llegar
     // vacío de dos formas: porque acá se lo dejó vacío al limpiar un
     // <think> completo, O porque Groq ya lo separó en el campo "reasoning"
-    // (con reasoning_format:'hidden' funcionando bien) y no quedó
-    // presupuesto para la respuesta — en ese caso "content" ya viene vacío
-    // de la API, sin pasar por la limpieza. Cubrimos los dos casos, si no
-    // el error se pierde y aguas abajo solo se ve el mensaje genérico.
+    // y no quedó presupuesto para la respuesta — en ese caso "content" ya
+    // viene vacío de la API, sin pasar por la limpieza. Cubrimos los dos
+    // casos, si no el error se pierde y esta llamada se da por "exitosa"
+    // sin serlo, saltándose el paso a probar el siguiente modelo.
     if (!contenidoLimpio) {
       const motivo = data.choices?.[0]?.finish_reason;
-      throw new Error(`El modelo "${modelo}" no devolvió contenido (finish_reason: ${motivo || 'desconocido'}). Probablemente gastó el límite de tokens pensando — probá con menos datos de entrada o reintenta.`);
+      throw new Error(`El modelo "${modelo}" no devolvió contenido (finish_reason: ${motivo || 'desconocido'}).`);
     }
     return data;
   };
 
-  const modelo = await obtenerModeloGroq();
-  try {
-    return await intentar(modelo);
-  } catch (err) {
-    // El modelo en caché falló (probablemente recién descontinuado) —
-    // refrescamos la lista y probamos una vez más con el siguiente disponible.
-    console.warn(`[groqClient] Modelo "${modelo}" falló (${err.message}), reintentando con otro...`);
-    const modeloAlterno = await obtenerModeloGroq(true);
-    if (modeloAlterno === modelo) throw err; // no hay otro modelo distinto disponible
-    return await intentar(modeloAlterno);
+  const candidatos = await obtenerListaModelos();
+  const erroresPorModelo = [];
+
+  for (let i = 0; i < candidatos.length; i++) {
+    const modelo = candidatos[i];
+    try {
+      return await intentar(modelo);
+    } catch (err) {
+      erroresPorModelo.push(`${modelo}: ${err.message}`);
+      console.warn(`[groqClient] Modelo "${modelo}" falló (${err.message}), probando el siguiente...`);
+      // Si es el último candidato de la lista cacheada, se refresca por si
+      // hay modelos nuevos que la caché de 30 min todavía no conoce.
+      if (i === candidatos.length - 1) {
+        const listaFresca = await obtenerListaModelos(true);
+        const nuevos = listaFresca.filter(m => !candidatos.includes(m));
+        for (const modeloNuevo of nuevos) {
+          try {
+            return await intentar(modeloNuevo);
+          } catch (err2) {
+            erroresPorModelo.push(`${modeloNuevo}: ${err2.message}`);
+          }
+        }
+      }
+    }
   }
+
+  throw new Error(`Ningún modelo GROQ disponible pudo responder. Detalle: ${erroresPorModelo.join(' | ')}`);
 }
 
 /**
- * Devuelve la lista completa de modelos activos aptos para chat, para
- * pantallas de diagnóstico como "Test IA".
+ * Devuelve la lista completa de modelos activos aptos para chat, con sus
+ * datos (context_window, etc.), para pantallas de diagnóstico como "Test IA".
  */
 export async function listarModelosDisponibles() {
   return obtenerModelosActivos();
