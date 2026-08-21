@@ -215,7 +215,16 @@ Responde SOLO con este JSON sin markdown:
           { temperature: 0.1, maxTokens: 3000 }
         );
         respuestaTexto = data.choices?.[0]?.message?.content || '';
-        console.log(`✅ Agrupación IA con modelo: ${data.model || '(desconocido)'}`);
+        const motivoCorte = data.choices?.[0]?.finish_reason;
+        console.log(`✅ Agrupación IA con modelo: ${data.model || '(desconocido)'} · finish_reason: ${motivoCorte} · largo respuesta: ${respuestaTexto.length}`);
+        if (!respuestaTexto) {
+          // La llamada "tuvo éxito" pero vino sin contenido — esto pasa
+          // sobre todo si el modelo cortó por longitud (finish_reason
+          // "length") antes de escribir nada útil, con un prompt tan largo
+          // (hasta 80 registros) y maxTokens:3000. Se deja constancia del
+          // motivo real en vez de perderlo.
+          errorGroqReal = `El modelo "${data.model || 'desconocido'}" devolvió una respuesta vacía (finish_reason: ${motivoCorte || 'desconocido'}). Probá con un período más corto (menos registros) o reintenta.`;
+        }
       } catch (err) {
         errorGroqReal = err.message;
         console.warn('Error llamando a GROQ:', err.message);

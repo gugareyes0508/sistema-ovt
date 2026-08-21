@@ -134,12 +134,16 @@ export async function llamarGroq(mensajes, opciones = {}) {
     const contenidoOriginal = data.choices?.[0]?.message?.content || '';
     const contenidoLimpio = limpiarRazonamiento(contenidoOriginal);
     if (data.choices?.[0]?.message) data.choices[0].message.content = contenidoLimpio;
-    // Si un modelo razonador gastó todo max_tokens "pensando" y nunca llegó
-    // a escribir la respuesta, el contenido queda vacío después de limpiar
-    // — sin esto, el error se pierde y aguas abajo solo se ve el mensaje
-    // genérico "no se pudo obtener respuesta".
-    if (!contenidoLimpio && contenidoOriginal) {
-      throw new Error(`El modelo "${modelo}" agotó el límite de tokens pensando y no llegó a responder. Probá de nuevo (puede tocarle otro modelo).`);
+    // Si el modelo agotó max_tokens pensando, el contenido puede llegar
+    // vacío de dos formas: porque acá se lo dejó vacío al limpiar un
+    // <think> completo, O porque Groq ya lo separó en el campo "reasoning"
+    // (con reasoning_format:'hidden' funcionando bien) y no quedó
+    // presupuesto para la respuesta — en ese caso "content" ya viene vacío
+    // de la API, sin pasar por la limpieza. Cubrimos los dos casos, si no
+    // el error se pierde y aguas abajo solo se ve el mensaje genérico.
+    if (!contenidoLimpio) {
+      const motivo = data.choices?.[0]?.finish_reason;
+      throw new Error(`El modelo "${modelo}" no devolvió contenido (finish_reason: ${motivo || 'desconocido'}). Probablemente gastó el límite de tokens pensando — probá con menos datos de entrada o reintenta.`);
     }
     return data;
   };
