@@ -29,8 +29,12 @@ let modeloCache = null;
 let cacheTimestamp = 0;
 const CACHE_MS = 30 * 60 * 1000; // 30 minutos — evita golpear /models en cada llamada
 
-// Filtra modelos que no sirven para chat de texto (voz, moderación, etc.)
-const NO_ES_CHAT = /whisper|tts|orpheus|guard|safeguard/i;
+// Filtra modelos que no sirven para chat de texto simple (voz, moderación,
+// y los "compound" — estos son agénticos: orquestan herramientas internas
+// como búsqueda web o ejecución de código en vez de solo responder texto, y
+// pueden terminar con finish_reason "stop" sin devolver contenido si no
+// hay nada más que "hacer". Esta app solo necesita texto/JSON de una pasada.
+const NO_ES_CHAT = /whisper|tts|orpheus|guard|safeguard|compound/i;
 
 // Modelos "razonadores" (DeepSeek-R1, Qwen3, gpt-oss, etc.): antes de
 // responder gastan tokens "pensando" en voz alta. Para lo que esta app les
