@@ -80,30 +80,44 @@ async function obtenerModeloGroq(forzarRefresh = false) {
 export async function llamarGroq(mensajes, opciones = {}) {
   const { temperature = 0.5, maxTokens = 700 } = opciones;
 
-  const intentar = async (modelo) => {
+  const pedirCompletion = async (modelo, conReasoningFormat) => {
+    const body = { model: modelo, messages: mensajes, temperature, max_tokens: maxTokens };
+    // Si el modelo es razonador, que la cadena de pensamiento no venga
+    // mezclada en el contenido. No todos los modelos aceptan este parámetro
+    // — algunos directamente devuelven error 400 si se lo mandamos, así que
+    // se agrega solo en el primer intento y se reintenta sin él si falla.
+    if (conReasoningFormat) body.reasoning_format = 'hidden';
+
     const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${process.env.REACT_APP_GROQ_API_KEY}`
       },
-      body: JSON.stringify({
-        model: modelo,
-        messages: mensajes,
-        temperature,
-        max_tokens: maxTokens,
-        // Si el modelo es razonador, que la cadena de pensamiento no venga
-        // mezclada en el contenido. Los modelos no razonadores ignoran esto.
-        reasoning_format: 'hidden'
-      })
+      body: JSON.stringify(body)
     });
     if (!response.ok) {
       const errData = await response.json().catch(() => ({}));
       throw new Error(errData.error?.message || response.statusText);
     }
-    const data = await response.json();
-    // Respaldo: si igual vino un <think>...</think> colado en el contenido,
-    // se limpia acá antes de devolverlo a quien llamó.
+    return response.json();
+  };
+
+  const intentar = async (modelo) => {
+    let data;
+    try {
+      data = await pedirCompletion(modelo, true);
+    } catch (err) {
+      if (/reasoning_format/i.test(err.message)) {
+        // Este modelo no acepta el parámetro — mismo modelo, sin él.
+        data = await pedirCompletion(modelo, false);
+      } else {
+        throw err;
+      }
+    }
+    // Respaldo: si igual vino un <think>...</think> colado en el contenido
+    // (modelo razonador que no soporta 'hidden' pero sí piensa igual), se
+    // limpia acá antes de devolverlo a quien llamó.
     if (data.choices?.[0]?.message?.content) {
       data.choices[0].message.content = limpiarRazonamiento(data.choices[0].message.content);
     }
