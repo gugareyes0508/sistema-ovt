@@ -32,6 +32,15 @@ const CACHE_MS = 30 * 60 * 1000; // 30 minutos — evita golpear /models en cada
 // Filtra modelos que no sirven para chat de texto (voz, moderación, etc.)
 const NO_ES_CHAT = /whisper|tts|orpheus|guard|safeguard/i;
 
+// Modelos "razonadores" (DeepSeek-R1, Qwen3, gpt-oss, etc.): antes de
+// responder gastan tokens "pensando" en voz alta. Para lo que esta app les
+// pide (JSON corto, resúmenes breves) eso trae dos problemas: si el
+// pensamiento no cabe en max_tokens, la respuesta útil queda vacía; y si
+// cabe, hay que limpiar el bloque <think> aparte. Se prefieren modelos
+// normales para estos usos — solo se cae a un razonador si no queda
+// ninguna otra alternativa activa.
+const ES_RAZONADOR = /deepseek-r1|qwen3|gpt-oss|reasoning|thinking|-r1(?:[^a-z]|$)/i;
+
 // Quita cualquier bloque de razonamiento que el modelo haya devuelto igual
 // dentro del contenido, en vez de en el campo separado "reasoning".
 const limpiarRazonamiento = (texto) => (texto || '').replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
@@ -42,11 +51,15 @@ async function obtenerModelosActivos() {
   });
   if (!res.ok) throw new Error('No se pudo consultar la lista de modelos de GROQ');
   const data = await res.json();
-  return (data.data || [])
-    .filter(m => m.active && !NO_ES_CHAT.test(m.id))
-    // Preferimos el modelo con mayor ventana de contexto: normalmente indica
-    // el modelo "insignia" más capaz de la familia vigente en ese momento.
-    .sort((a, b) => (b.context_window || 0) - (a.context_window || 0));
+  const activos = (data.data || []).filter(m => m.active && !NO_ES_CHAT.test(m.id));
+
+  const porContexto = (a, b) => (b.context_window || 0) - (a.context_window || 0);
+  const normales = activos.filter(m => !ES_RAZONADOR.test(m.id)).sort(porContexto);
+  const razonadores = activos.filter(m => ES_RAZONADOR.test(m.id)).sort(porContexto);
+
+  // Los normales van primero siempre; los razonadores quedan al final,
+  // como último recurso si no hay ningún modelo normal activo.
+  return [...normales, ...razonadores];
 }
 
 async function obtenerModeloGroq(forzarRefresh = false) {
@@ -118,8 +131,15 @@ export async function llamarGroq(mensajes, opciones = {}) {
     // Respaldo: si igual vino un <think>...</think> colado en el contenido
     // (modelo razonador que no soporta 'hidden' pero sí piensa igual), se
     // limpia acá antes de devolverlo a quien llamó.
-    if (data.choices?.[0]?.message?.content) {
-      data.choices[0].message.content = limpiarRazonamiento(data.choices[0].message.content);
+    const contenidoOriginal = data.choices?.[0]?.message?.content || '';
+    const contenidoLimpio = limpiarRazonamiento(contenidoOriginal);
+    if (data.choices?.[0]?.message) data.choices[0].message.content = contenidoLimpio;
+    // Si un modelo razonador gastó todo max_tokens "pensando" y nunca llegó
+    // a escribir la respuesta, el contenido queda vacío después de limpiar
+    // — sin esto, el error se pierde y aguas abajo solo se ve el mensaje
+    // genérico "no se pudo obtener respuesta".
+    if (!contenidoLimpio && contenidoOriginal) {
+      throw new Error(`El modelo "${modelo}" agotó el límite de tokens pensando y no llegó a responder. Probá de nuevo (puede tocarle otro modelo).`);
     }
     return data;
   };
