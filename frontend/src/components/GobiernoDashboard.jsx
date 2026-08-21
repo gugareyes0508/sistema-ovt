@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import axios from 'axios';
 import * as XLSX from 'xlsx';
+import { llamarGroq } from '../utils/groqClient';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -71,7 +72,7 @@ export default function GobiernoDashboard({ token, apiUrl, clienteActivo }) {
   const headers = buildHeaders(token, clienteActivo);
   const fileRef = useRef(null);
 
-  const [subTab, setSubTab] = useState('panel'); // 'panel' | 'monitoreo' | 'inventario' | 'sla' | 'config'
+  const [subTab, setSubTab] = useState('panel'); // 'panel' | 'monitoreo' | 'inventario' | 'sla' | 'eventos' | 'config'
 
   const [items, setItems] = useState([]);
   const [cargando, setCargando] = useState(true);
@@ -109,6 +110,19 @@ export default function GobiernoDashboard({ token, apiUrl, clienteActivo }) {
   const [errorSla, setErrorSla] = useState(null);
   const [subiendoSla, setSubiendoSla] = useState(false);
   const [mensajeSla, setMensajeSla] = useState(null);
+
+  // ============ EVENTOS (se nutre de Control de Alertas, sin carga propia) ============
+  const [eventosRaw, setEventosRaw] = useState([]);
+  const [cargandoEventos, setCargandoEventos] = useState(true);
+  const [errorEventos, setErrorEventos] = useState(null);
+  const [entornoEventos, setEntornoEventos] = useState('Todas'); // 'Todas' | 'Operaciones Cloud' | 'Middleware Cloud'
+  const hoyISO = new Date().toISOString().slice(0, 10);
+  const hace30ISO = new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
+  const [fechaDesdeEventos, setFechaDesdeEventos] = useState(hace30ISO);
+  const [fechaHastaEventos, setFechaHastaEventos] = useState(hoyISO);
+  const [insightsEventos, setInsightsEventos] = useState(null);
+  const [cargandoInsights, setCargandoInsights] = useState(false);
+  const [errorInsights, setErrorInsights] = useState(null);
 
   const cargarDatos = useCallback(async () => {
     setCargando(true);
@@ -171,6 +185,24 @@ export default function GobiernoDashboard({ token, apiUrl, clienteActivo }) {
   }, [apiUrl, clienteActivo]);
 
   useEffect(() => { cargarSla(); }, [cargarSla]);
+
+  const cargarEventos = useCallback(async () => {
+    setCargandoEventos(true);
+    setErrorEventos(null);
+    try {
+      // Se reutiliza el endpoint que ya usa Control de Alertas — sin carga
+      // propia, esta pestaña solo lee lo que ya está importado ahí.
+      const res = await axios.get(`${apiUrl}/api/alertas`, { headers });
+      setEventosRaw(res.data || []);
+    } catch (err) {
+      setErrorEventos('Error cargando eventos desde Control de Alertas: ' + (err.response?.data?.error || err.message));
+    } finally {
+      setCargandoEventos(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [apiUrl, clienteActivo]);
+
+  useEffect(() => { cargarEventos(); }, [cargarEventos]);
 
   const abrirEditar = (item) => {
     setModalItem({ ...item });
@@ -685,6 +717,143 @@ export default function GobiernoDashboard({ token, apiUrl, clienteActivo }) {
     };
   }, [slaReq, slaInc, idxUltimoMes]);
 
+  // ============ CÓMPUTOS DERIVADOS DE EVENTOS (Control de Alertas) ============
+  const BUCKET_GRAVEDAD = {
+    Critical: 'Críticos', Disaster: 'Críticos',
+    Major: 'Altos', High: 'Altos',
+    Average: 'Medios', Warning: 'Medios',
+    Information: 'Bajos', 'Not classified': 'Bajos'
+  };
+  const bucketDe = (gravedad) => BUCKET_GRAVEDAD[gravedad] || 'Bajos';
+  const COLOR_BUCKET = { Críticos: '#d73b47', Altos: '#f0a11a', Medios: '#eda100', Bajos: '#20a66a' };
+  const fechaDeEvento = (a) => a.creado?._seconds ? new Date(a.creado._seconds * 1000) : (a.creado ? new Date(a.creado) : null);
+  const eventoEstaCerrado = (a) => /cerr|resuel|clos/i.test(String(a.estado || ''));
+
+  const eventosFiltrados = useMemo(() => {
+    const desde = new Date(fechaDesdeEventos + 'T00:00:00');
+    const hasta = new Date(fechaHastaEventos + 'T23:59:59');
+    return eventosRaw.filter(a => {
+      if (entornoEventos !== 'Todas' && a.grupo !== entornoEventos) return false;
+      const f = fechaDeEvento(a);
+      if (!f) return false;
+      return f >= desde && f <= hasta;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [eventosRaw, entornoEventos, fechaDesdeEventos, fechaHastaEventos]);
+
+  const eventosPeriodoAnterior = useMemo(() => {
+    const desde = new Date(fechaDesdeEventos + 'T00:00:00');
+    const hasta = new Date(fechaHastaEventos + 'T23:59:59');
+    const largoMs = hasta - desde;
+    const desdeAnt = new Date(desde.getTime() - largoMs);
+    const hastaAnt = new Date(desde.getTime() - 1);
+    return eventosRaw.filter(a => {
+      if (entornoEventos !== 'Todas' && a.grupo !== entornoEventos) return false;
+      const f = fechaDeEvento(a);
+      if (!f) return false;
+      return f >= desdeAnt && f <= hastaAnt;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [eventosRaw, entornoEventos, fechaDesdeEventos, fechaHastaEventos]);
+
+  const kpisEventos = useMemo(() => {
+    const porBucket = { Críticos: 0, Altos: 0, Medios: 0, Bajos: 0 };
+    eventosFiltrados.forEach(a => { porBucket[bucketDe(a.gravedad)]++; });
+    const dias = Math.max(1, Math.round((new Date(fechaHastaEventos) - new Date(fechaDesdeEventos)) / 86400000) + 1);
+    return { total: eventosFiltrados.length, ...porBucket, promedioDia: +(eventosFiltrados.length / dias).toFixed(1) };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [eventosFiltrados, fechaDesdeEventos, fechaHastaEventos]);
+
+  const variacionVsAnterior = useMemo(() => {
+    const actual = { Críticos: 0, Altos: 0, Medios: 0, Bajos: 0 };
+    const anterior = { Críticos: 0, Altos: 0, Medios: 0, Bajos: 0 };
+    eventosFiltrados.forEach(a => { actual[bucketDe(a.gravedad)]++; });
+    eventosPeriodoAnterior.forEach(a => { anterior[bucketDe(a.gravedad)]++; });
+    return ['Críticos', 'Altos', 'Medios', 'Bajos'].map(b => ({
+      severidad: b, actual: actual[b], anterior: anterior[b],
+      variacion: actual[b] - anterior[b],
+      pctVariacion: anterior[b] ? +(100 * (actual[b] - anterior[b]) / anterior[b]).toFixed(1) : null
+    }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [eventosFiltrados, eventosPeriodoAnterior]);
+
+  const dataEvolucionSeveridad = useMemo(() => {
+    const porDia = {};
+    eventosFiltrados.forEach(a => {
+      const f = fechaDeEvento(a);
+      const key = f.toISOString().slice(0, 10);
+      if (!porDia[key]) porDia[key] = { Críticos: 0, Altos: 0, Medios: 0, Bajos: 0 };
+      porDia[key][bucketDe(a.gravedad)]++;
+    });
+    const dias = Object.keys(porDia).sort();
+    return {
+      labels: dias.map(d => d.slice(8, 10) + '/' + d.slice(5, 7)),
+      datasets: ['Críticos', 'Altos', 'Medios', 'Bajos'].map(b => ({
+        label: b, data: dias.map(d => porDia[d][b]),
+        backgroundColor: COLOR_BUCKET[b], borderColor: COLOR_BUCKET[b], fill: true, tension: 0.3, pointRadius: 0
+      }))
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [eventosFiltrados]);
+
+  const topCategorias = useMemo(() => {
+    const conteo = {};
+    eventosFiltrados.forEach(a => { const t = a.tipo || 'Sin categoría'; conteo[t] = (conteo[t] || 0) + 1; });
+    return Object.entries(conteo).sort((a, b) => b[1] - a[1]).slice(0, 5);
+  }, [eventosFiltrados]);
+
+  const topHosts = useMemo(() => {
+    const conteo = {};
+    eventosFiltrados.forEach(a => { const h = a.host || 'Desconocido'; conteo[h] = (conteo[h] || 0) + 1; });
+    const total = eventosFiltrados.length || 1;
+    return Object.entries(conteo).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([host, n]) => ({ host, n, pct: +(100 * n / total).toFixed(1) }));
+  }, [eventosFiltrados]);
+
+  const criticosAbiertos = useMemo(() => {
+    const ahora = new Date();
+    return eventosFiltrados
+      .filter(a => bucketDe(a.gravedad) === 'Críticos' && !eventoEstaCerrado(a))
+      .map(a => {
+        const inicio = a.horaEventoInicial?._seconds ? new Date(a.horaEventoInicial._seconds * 1000) : (a.horaEventoInicial ? new Date(a.horaEventoInicial) : fechaDeEvento(a));
+        const minutos = inicio ? Math.floor((ahora - inicio) / 60000) : 0;
+        return { ...a, minutosAbierto: minutos };
+      })
+      .sort((a, b) => b.minutosAbierto - a.minutosAbierto)
+      .slice(0, 10);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [eventosFiltrados]);
+
+  const fmtDuracion = (min) => {
+    if (min < 60) return `${min}m`;
+    const h = Math.floor(min / 60), m = min % 60;
+    return `${h}h ${m}m`;
+  };
+
+  const generarInsightsEventos = async () => {
+    setCargandoInsights(true);
+    setErrorInsights(null);
+    try {
+      const prompt = `Analiza estos datos de eventos de monitoreo (Zabbix/ServiceNow) de Kyndryl Chile y genera 3-5 insights accionables, breves (máx 100 caracteres cada uno), en español:
+
+Periodo: ${fechaDesdeEventos} a ${fechaHastaEventos}
+Total eventos: ${kpisEventos.total} (Críticos: ${kpisEventos.Críticos}, Altos: ${kpisEventos.Altos}, Medios: ${kpisEventos.Medios}, Bajos: ${kpisEventos.Bajos})
+Variación vs período anterior: ${variacionVsAnterior.map(v => `${v.severidad} ${v.variacion >= 0 ? '+' : ''}${v.variacion}`).join(', ')}
+Top categorías: ${topCategorias.map(([t, n]) => `${t} (${n})`).join(', ')}
+Top hosts: ${topHosts.map(h => `${h.host} (${h.n})`).join(', ')}
+Eventos críticos abiertos: ${criticosAbiertos.length}
+
+Responde solo con la lista de insights, uno por línea, sin numeración ni encabezados.`;
+
+      const data = await llamarGroq([{ role: 'user', content: prompt }], { temperature: 0.4, maxTokens: 400 });
+      const texto = data.choices[0].message.content;
+      setInsightsEventos(texto.split('\n').map(l => l.replace(/^[-•\d.]+\s*/, '').trim()).filter(Boolean));
+    } catch (err) {
+      setErrorInsights('Error generando insights: ' + err.message);
+    } finally {
+      setCargandoInsights(false);
+    }
+  };
+
   // KPIs de resumen (pestaña Panel)
   const itemsEstado = items.filter(i => i.tipo === 'estado');
   const alDia = itemsEstado.filter(i => i.estado === 'al_dia').length;
@@ -736,6 +905,14 @@ export default function GobiernoDashboard({ token, apiUrl, clienteActivo }) {
             background: subTab === 'sla' ? 'linear-gradient(135deg,var(--ink-900),var(--bank-blue))' : 'rgba(255,255,255,0.72)',
             color: subTab === 'sla' ? '#fff' : 'var(--ink-800)' }}>
           <i className="ti ti-clock-check" aria-hidden="true" style={{ marginRight: 4 }}></i>SLA Mensual
+        </button>
+        <button
+          onClick={() => setSubTab('eventos')}
+          style={{ padding: '9px 16px', borderRadius: '999px', fontSize: '12px', fontWeight: '800', cursor: 'pointer',
+            border: subTab === 'eventos' ? 'none' : '1px solid var(--line)',
+            background: subTab === 'eventos' ? 'linear-gradient(135deg,var(--ink-900),var(--bank-blue))' : 'rgba(255,255,255,0.72)',
+            color: subTab === 'eventos' ? '#fff' : 'var(--ink-800)' }}>
+          <i className="ti ti-chart-histogram" aria-hidden="true" style={{ marginRight: 4 }}></i>Eventos
         </button>
         <button
           onClick={() => setSubTab('config')}
@@ -1557,6 +1734,202 @@ export default function GobiernoDashboard({ token, apiUrl, clienteActivo }) {
                     />
                   </div>
                 </div>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* ============ EVENTOS ============ */}
+      {subTab === 'eventos' && (
+        <div>
+          {errorEventos && (
+            <div style={{ background: 'rgba(215,59,71,0.08)', border: '1px solid rgba(215,59,71,0.24)', borderRadius: '14px', padding: '10px 16px', color: '#a61e2b', fontSize: '13px', fontWeight: '600', marginBottom: '18px' }}>
+              {errorEventos}
+            </div>
+          )}
+
+          {/* Filtros */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 18, flexWrap: 'wrap' }}>
+            <div>
+              <div style={{ fontSize: '13px', fontWeight: '800', color: 'var(--ink-950)' }}>Evolución de Eventos</div>
+              <div style={{ fontSize: '11px', color: 'var(--muted)', fontWeight: '600' }}>Nutrido de Control de Alertas · {eventosFiltrados.length} eventos en el período</div>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+              <select value={entornoEventos} onChange={e => setEntornoEventos(e.target.value)}
+                style={{ border: '1px solid var(--line)', borderRadius: '10px', padding: '8px 12px', fontSize: '11px', fontWeight: '700', background: '#fff' }}>
+                <option value="Todas">Todos los entornos</option>
+                <option value="Operaciones Cloud">Operaciones Cloud</option>
+                <option value="Middleware Cloud">Middleware Cloud</option>
+              </select>
+              <input type="date" value={fechaDesdeEventos} onChange={e => setFechaDesdeEventos(e.target.value)}
+                style={{ border: '1px solid var(--line)', borderRadius: '10px', padding: '8px 10px', fontSize: '11px', fontWeight: '700' }} />
+              <span style={{ color: 'var(--muted)', fontSize: '11px' }}>—</span>
+              <input type="date" value={fechaHastaEventos} onChange={e => setFechaHastaEventos(e.target.value)}
+                style={{ border: '1px solid var(--line)', borderRadius: '10px', padding: '8px 10px', fontSize: '11px', fontWeight: '700' }} />
+              <button onClick={cargarEventos} disabled={cargandoEventos}
+                style={{ padding: '8px 14px', background: 'linear-gradient(135deg,var(--ink-900),var(--bank-blue))', color: '#fff', border: 'none', borderRadius: '10px', fontWeight: '800', fontSize: '11px', cursor: 'pointer' }}>
+                {cargandoEventos ? 'Cargando...' : 'Actualizar'}
+              </button>
+            </div>
+          </div>
+
+          {cargandoEventos ? (
+            <p style={{ textAlign: 'center', color: 'var(--muted)', padding: '30px', fontWeight: '600' }}>Cargando...</p>
+          ) : eventosFiltrados.length === 0 ? (
+            <div style={{ background: 'var(--glass)', border: '1px dashed rgba(255,255,255,0.72)', borderRadius: '22px', padding: '30px', textAlign: 'center', color: 'var(--muted)', fontSize: '13px' }}>
+              No hay eventos en Control de Alertas para el período/entorno seleccionado.
+            </div>
+          ) : (
+            <>
+              {/* KPIs */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 10, marginBottom: 18 }}>
+                <div style={{ background: 'var(--glass)', border: '1px solid rgba(255,255,255,0.72)', borderRadius: '16px', padding: '14px', boxShadow: 'var(--shadow-soft)' }}>
+                  <div style={{ fontSize: '9px', fontWeight: '800', color: 'var(--muted)', letterSpacing: '.03em', marginBottom: 6 }}>TOTAL EVENTOS</div>
+                  <div style={{ fontSize: '20px', fontWeight: '800', color: 'var(--ink-950)', fontFamily: "'IBM Plex Mono',monospace" }}>{kpisEventos.total.toLocaleString('es-CL')}</div>
+                </div>
+                {['Críticos', 'Altos', 'Medios', 'Bajos'].map(b => (
+                  <div key={b} style={{ background: b === 'Críticos' ? 'rgba(215,59,71,0.05)' : b === 'Altos' ? 'rgba(240,161,26,0.08)' : 'var(--glass)', border: b === 'Críticos' ? '1px solid rgba(215,59,71,0.22)' : b === 'Altos' ? '1px solid rgba(240,161,26,0.3)' : '1px solid rgba(255,255,255,0.72)', borderRadius: '16px', padding: '14px', boxShadow: 'var(--shadow-soft)' }}>
+                    <div style={{ fontSize: '9px', fontWeight: '800', color: 'var(--muted)', letterSpacing: '.03em', marginBottom: 6 }}>{b.toUpperCase()}</div>
+                    <div style={{ fontSize: '20px', fontWeight: '800', color: COLOR_BUCKET[b], fontFamily: "'IBM Plex Mono',monospace" }}>{kpisEventos[b].toLocaleString('es-CL')}</div>
+                  </div>
+                ))}
+                <div style={{ background: 'var(--glass)', border: '1px solid rgba(255,255,255,0.72)', borderRadius: '16px', padding: '14px', boxShadow: 'var(--shadow-soft)' }}>
+                  <div style={{ fontSize: '9px', fontWeight: '800', color: 'var(--muted)', letterSpacing: '.03em', marginBottom: 6 }}>PROM / DÍA</div>
+                  <div style={{ fontSize: '20px', fontWeight: '800', color: 'var(--ink-950)', fontFamily: "'IBM Plex Mono',monospace" }}>{kpisEventos.promedioDia}</div>
+                </div>
+              </div>
+
+              {/* Evolución + Distribución */}
+              <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 10, marginBottom: 18 }}>
+                <div style={{ background: 'var(--glass)', border: '1px solid rgba(255,255,255,0.72)', borderRadius: '16px', padding: '16px', boxShadow: 'var(--shadow-soft)' }}>
+                  <p style={{ fontWeight: '800', fontSize: '12px', color: 'var(--ink-950)', margin: '0 0 10px' }}>Evolución de eventos por severidad</p>
+                  <div style={{ position: 'relative', height: '200px' }}>
+                    <Line data={dataEvolucionSeveridad} options={{
+                      responsive: true, maintainAspectRatio: false,
+                      plugins: { legend: { position: 'bottom', labels: { boxWidth: 8, font: { size: 9 } } } },
+                      scales: { y: { stacked: true, beginAtZero: true }, x: { stacked: true, grid: { display: false }, ticks: { font: { size: 9 } } } }
+                    }} />
+                  </div>
+                </div>
+                <div style={{ background: 'var(--glass)', border: '1px solid rgba(255,255,255,0.72)', borderRadius: '16px', padding: '16px', boxShadow: 'var(--shadow-soft)' }}>
+                  <p style={{ fontWeight: '800', fontSize: '12px', color: 'var(--ink-950)', margin: '0 0 10px' }}>Distribución por severidad</p>
+                  <div style={{ position: 'relative', height: '130px' }}>
+                    <Doughnut
+                      data={{ labels: ['Críticos', 'Altos', 'Medios', 'Bajos'], datasets: [{ data: [kpisEventos.Críticos, kpisEventos.Altos, kpisEventos.Medios, kpisEventos.Bajos], backgroundColor: ['#d73b47', '#f0a11a', '#eda100', '#20a66a'], borderColor: '#fff', borderWidth: 2 }] }}
+                      options={{ responsive: true, maintainAspectRatio: false, cutout: '65%', plugins: { legend: { display: false } } }}
+                    />
+                  </div>
+                  <div style={{ marginTop: 8 }}>
+                    {['Críticos', 'Altos', 'Medios', 'Bajos'].map(b => (
+                      <div key={b} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 10, color: 'var(--ink-800)', marginBottom: 3 }}>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                          <span style={{ width: 7, height: 7, borderRadius: 2, background: COLOR_BUCKET[b], display: 'inline-block' }}></span>{b}
+                        </span>
+                        <span style={{ fontWeight: 800 }}>{kpisEventos[b]} <span style={{ color: 'var(--muted)', fontWeight: 600 }}>({kpisEventos.total ? (100 * kpisEventos[b] / kpisEventos.total).toFixed(1) : 0}%)</span></span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Top categorías + Top hosts */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 18 }}>
+                <div style={{ background: 'var(--glass)', border: '1px solid rgba(255,255,255,0.72)', borderRadius: '16px', padding: '16px', boxShadow: 'var(--shadow-soft)' }}>
+                  <p style={{ fontWeight: '800', fontSize: '12px', color: 'var(--ink-950)', margin: '0 0 10px' }}>Top 5 categorías (campo "tipo")</p>
+                  {topCategorias.map(([t, n]) => (
+                    <div key={t} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 11, color: 'var(--ink-800)', marginBottom: 6, gap: 10 }}>
+                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t}</span>
+                      <span style={{ fontWeight: 800, flexShrink: 0 }}>{n}</span>
+                    </div>
+                  ))}
+                </div>
+                <div style={{ background: 'var(--glass)', border: '1px solid rgba(255,255,255,0.72)', borderRadius: '16px', padding: '16px', boxShadow: 'var(--shadow-soft)' }}>
+                  <p style={{ fontWeight: '800', fontSize: '12px', color: 'var(--ink-950)', margin: '0 0 10px' }}>Top 5 hosts</p>
+                  {topHosts.map(h => (
+                    <div key={h.host} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 11, color: 'var(--ink-800)', marginBottom: 6, gap: 10 }}>
+                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{h.host}</span>
+                      <span style={{ fontWeight: 800, flexShrink: 0 }}>{h.n} <span style={{ color: 'var(--muted)', fontWeight: 600 }}>({h.pct}%)</span></span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Variación vs período anterior + Críticos abiertos */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 18 }}>
+                <div style={{ background: 'var(--glass)', border: '1px solid rgba(255,255,255,0.72)', borderRadius: '16px', padding: '16px', boxShadow: 'var(--shadow-soft)' }}>
+                  <p style={{ fontWeight: '800', fontSize: '12px', color: 'var(--ink-950)', margin: '0 0 10px' }}>Variación vs. período anterior</p>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11px' }}>
+                    <thead><tr>
+                      <th style={{ textAlign: 'left', color: 'var(--muted)', fontWeight: 800, padding: '4px 0' }}>Severidad</th>
+                      <th style={{ textAlign: 'right', color: 'var(--muted)', fontWeight: 800, padding: '4px 8px' }}>Actual</th>
+                      <th style={{ textAlign: 'right', color: 'var(--muted)', fontWeight: 800, padding: '4px 8px' }}>Anterior</th>
+                      <th style={{ textAlign: 'right', color: 'var(--muted)', fontWeight: 800, padding: '4px 0' }}>Variación</th>
+                    </tr></thead>
+                    <tbody>
+                      {variacionVsAnterior.map(v => (
+                        <tr key={v.severidad}>
+                          <td style={{ padding: '5px 0', fontWeight: 700, color: 'var(--ink-800)', borderTop: '1px solid rgba(18,52,78,0.06)' }}>{v.severidad}</td>
+                          <td style={{ padding: '5px 8px', textAlign: 'right', fontWeight: 800, color: 'var(--ink-950)', borderTop: '1px solid rgba(18,52,78,0.06)' }}>{v.actual}</td>
+                          <td style={{ padding: '5px 8px', textAlign: 'right', color: 'var(--muted)', borderTop: '1px solid rgba(18,52,78,0.06)' }}>{v.anterior}</td>
+                          <td style={{ padding: '5px 0', textAlign: 'right', fontWeight: 800, color: v.variacion > 0 ? '#a61e2b' : v.variacion < 0 ? '#116642' : 'var(--muted)', borderTop: '1px solid rgba(18,52,78,0.06)' }}>
+                            {v.variacion >= 0 ? '+' : ''}{v.variacion}{v.pctVariacion != null ? ` (${v.pctVariacion >= 0 ? '+' : ''}${v.pctVariacion}%)` : ''}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <div style={{ background: 'var(--glass)', border: '1px solid rgba(255,255,255,0.72)', borderRadius: '16px', padding: '16px', boxShadow: 'var(--shadow-soft)' }}>
+                  <p style={{ fontWeight: '800', fontSize: '12px', color: 'var(--ink-950)', margin: '0 0 2px' }}>Eventos críticos abiertos</p>
+                  <p style={{ fontSize: '10px', color: 'var(--muted)', margin: '0 0 10px' }}>{criticosAbiertos.length} en el período (top 10 por antigüedad)</p>
+                  {criticosAbiertos.length === 0 ? (
+                    <p style={{ fontSize: '11px', color: 'var(--muted)' }}>Sin eventos críticos abiertos.</p>
+                  ) : (
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '10px' }}>
+                      <thead><tr>
+                        <th style={{ textAlign: 'left', color: 'var(--muted)', fontWeight: 800, padding: '4px 0' }}>Host</th>
+                        <th style={{ textAlign: 'left', color: 'var(--muted)', fontWeight: 800, padding: '4px 8px' }}>Tipo</th>
+                        <th style={{ textAlign: 'right', color: 'var(--muted)', fontWeight: 800, padding: '4px 0' }}>Abierto hace</th>
+                      </tr></thead>
+                      <tbody>
+                        {criticosAbiertos.map((a, i) => (
+                          <tr key={i}>
+                            <td style={{ padding: '5px 0', fontWeight: 700, color: 'var(--ink-800)', borderTop: '1px solid rgba(18,52,78,0.06)' }}>{a.host || 'Desconocido'}</td>
+                            <td style={{ padding: '5px 8px', color: 'var(--muted)', borderTop: '1px solid rgba(18,52,78,0.06)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 160 }}>{a.tipo}</td>
+                            <td style={{ padding: '5px 0', textAlign: 'right', fontWeight: 800, color: '#a61e2b', borderTop: '1px solid rgba(18,52,78,0.06)' }}>{fmtDuracion(a.minutosAbierto)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
+                </div>
+              </div>
+
+              {/* Insights automáticos (GROQ) */}
+              <div style={{ background: 'var(--glass)', border: '1px solid rgba(255,255,255,0.72)', borderRadius: '16px', padding: '16px', boxShadow: 'var(--shadow-soft)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                  <p style={{ fontWeight: '800', fontSize: '12px', color: 'var(--ink-950)', margin: 0 }}>
+                    <i className="ti ti-sparkles" aria-hidden="true" style={{ marginRight: 6, color: 'var(--signal)' }}></i>Insights automáticos
+                  </p>
+                  <button className="btn-editar" onClick={generarInsightsEventos} disabled={cargandoInsights}>
+                    {cargandoInsights ? 'Generando...' : (insightsEventos ? 'Regenerar' : 'Generar')}
+                  </button>
+                </div>
+                {errorInsights && <p style={{ fontSize: '11px', color: '#a61e2b', fontWeight: 600 }}>{errorInsights}</p>}
+                {!insightsEventos && !cargandoInsights && !errorInsights && (
+                  <p style={{ fontSize: '11px', color: 'var(--muted)' }}>Genera un resumen con IA a partir de los eventos filtrados arriba.</p>
+                )}
+                {insightsEventos && (
+                  <div>
+                    {insightsEventos.map((linea, i) => (
+                      <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'flex-start', fontSize: '12px', color: 'var(--ink-800)', marginBottom: 6 }}>
+                        <i className="ti ti-point-filled" aria-hidden="true" style={{ fontSize: 10, color: 'var(--signal)', marginTop: 4, flexShrink: 0 }}></i>
+                        <span>{linea}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </>
           )}
