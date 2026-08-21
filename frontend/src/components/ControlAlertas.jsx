@@ -394,6 +394,7 @@ Responde SOLO con este JSON sin markdown:
 {"grupos":[{"nombre":"string","descripcion":"string","alertas":0,"hosts_afectados":0,"prioridad":"alta|media|baja","top_hosts":["host1","host2"],"recomendacion":"string max 120 chars"}],"resumen_ejecutivo":"string","host_mas_critico":"string","patron_principal":"string"}`;
 
       let respuestaTexto = '';
+      let errorGroqReal = null;
       try {
         const data = await llamarGroq(
           [
@@ -404,10 +405,11 @@ Responde SOLO con este JSON sin markdown:
         );
         respuestaTexto = data.choices?.[0]?.message?.content || '';
       } catch (err) {
+        errorGroqReal = err.message;
         console.warn('Error llamando a GROQ:', err.message);
       }
 
-      if (!respuestaTexto) throw new Error('No se pudo obtener respuesta de ningún modelo GROQ disponible.');
+      if (!respuestaTexto) throw new Error(errorGroqReal || 'No se pudo obtener respuesta de ningún modelo GROQ disponible.');
 
       let limpio = respuestaTexto.replace(/```json/gi, '').replace(/```/g, '').trim();
       if (!limpio.endsWith('}')) {

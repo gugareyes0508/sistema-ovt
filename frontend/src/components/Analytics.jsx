@@ -205,6 +205,7 @@ Responde SOLO con este JSON sin markdown:
 {"grupos":[{"nombre":"string","descripcion":"string","registros":0,"horas":0.0,"porcentaje":0.0,"tendencia":"creciente|estable|decreciente","actividades_frecuentes":["a1","a2","a3"],"recomendacion":"string max 120 chars"}],"resumen_ejecutivo":"string","actividad_mas_costosa":"string","actividad_mas_frecuente":"string"}`;
 
       let respuestaTexto = '';
+      let errorGroqReal = null;
       try {
         const data = await llamarGroq(
           [
@@ -216,11 +217,12 @@ Responde SOLO con este JSON sin markdown:
         respuestaTexto = data.choices?.[0]?.message?.content || '';
         console.log(`✅ Agrupación IA con modelo: ${data.model || '(desconocido)'}`);
       } catch (err) {
+        errorGroqReal = err.message;
         console.warn('Error llamando a GROQ:', err.message);
       }
 
       if (!respuestaTexto) {
-        throw new Error('No se pudo obtener respuesta de ningún modelo GROQ disponible.');
+        throw new Error(errorGroqReal || 'No se pudo obtener respuesta de ningún modelo GROQ disponible.');
       }
 
       // Limpiar y parsear JSON de forma robusta
