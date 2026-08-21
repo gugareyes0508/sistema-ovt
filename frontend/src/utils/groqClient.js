@@ -103,13 +103,22 @@ async function obtenerListaModelos(forzarRefresh = false) {
 export async function llamarGroq(mensajes, opciones = {}) {
   const { temperature = 0.5, maxTokens = 700 } = opciones;
 
-  const pedirCompletion = async (modelo, conReasoningFormat) => {
-    const body = { model: modelo, messages: mensajes, temperature, max_tokens: maxTokens };
-    // Si el modelo es razonador, que la cadena de pensamiento no venga
-    // mezclada en el contenido. No todos los modelos aceptan este parámetro
-    // — algunos directamente devuelven error 400 si se lo mandamos, así que
-    // se agrega solo en el primer intento y se reintenta sin él si falla.
-    if (conReasoningFormat) body.reasoning_format = 'hidden';
+  const pedirCompletion = async (modelo, conParamsRazonador) => {
+    const esRazonador = ES_RAZONADOR.test(modelo);
+    // Los razonadores necesitan presupuesto extra: parte se les va en
+    // pensar (aunque sea "poco") antes de escribir la respuesta real. Si
+    // solo les damos los mismos max_tokens que a un modelo normal, se
+    // quedan sin espacio para el contenido — es justo lo que veníamos viendo.
+    const maxTokensEfectivo = esRazonador ? Math.max(maxTokens * 2, maxTokens + 1500) : maxTokens;
+    const body = { model: modelo, messages: mensajes, temperature, max_tokens: maxTokensEfectivo };
+    if (conParamsRazonador) {
+      // 'hidden' saca el razonamiento del content; 'low' reduce cuánto
+      // piensa antes de responder (algunos modelos igual ignoran esto,
+      // pero para los que lo soportan deja mucho más lugar para la
+      // respuesta real dentro del mismo presupuesto de tokens).
+      body.reasoning_format = 'hidden';
+      body.reasoning_effort = 'low';
+    }
 
     const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
@@ -131,8 +140,8 @@ export async function llamarGroq(mensajes, opciones = {}) {
     try {
       data = await pedirCompletion(modelo, true);
     } catch (err) {
-      if (/reasoning_format/i.test(err.message)) {
-        // Este modelo no acepta el parámetro — mismo modelo, sin él.
+      if (/reasoning_format|reasoning_effort/i.test(err.message)) {
+        // Este modelo no acepta esos parámetros — mismo modelo, sin ellos.
         data = await pedirCompletion(modelo, false);
       } else {
         throw err;
