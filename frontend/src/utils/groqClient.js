@@ -12,6 +12,14 @@
 // simplemente desaparece de esa lista y la app salta sola al siguiente —
 // cero cambios de código necesarios.
 //
+// NOTA (20-ago-2026): esta selección automática a veces elige un modelo
+// "razonador" (tipo DeepSeek-R1/Qwen3), que por defecto devuelve su cadena
+// de pensamiento envuelta en <think>...</think> ANTES de la respuesta real
+// — eso rompía el parseo de JSON en Agrupación IA y ensuciaba el texto en
+// IA Insights. Se corrige acá, en un solo lugar, con reasoning_format:
+// 'hidden' (Groq lo ignora si el modelo no es razonador) más una limpieza
+// de respaldo por si algún modelo no respeta ese parámetro.
+//
 // Uso en cualquier componente:
 //   import { llamarGroq } from '../utils/groqClient';
 //   const data = await llamarGroq([{ role: 'user', content: prompt }], { temperature: 0.5, maxTokens: 700 });
@@ -23,6 +31,10 @@ const CACHE_MS = 30 * 60 * 1000; // 30 minutos — evita golpear /models en cada
 
 // Filtra modelos que no sirven para chat de texto (voz, moderación, etc.)
 const NO_ES_CHAT = /whisper|tts|orpheus|guard|safeguard/i;
+
+// Quita cualquier bloque de razonamiento que el modelo haya devuelto igual
+// dentro del contenido, en vez de en el campo separado "reasoning".
+const limpiarRazonamiento = (texto) => (texto || '').replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
 
 async function obtenerModelosActivos() {
   const res = await fetch('https://api.groq.com/openai/v1/models', {
@@ -75,13 +87,27 @@ export async function llamarGroq(mensajes, opciones = {}) {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${process.env.REACT_APP_GROQ_API_KEY}`
       },
-      body: JSON.stringify({ model: modelo, messages: mensajes, temperature, max_tokens: maxTokens })
+      body: JSON.stringify({
+        model: modelo,
+        messages: mensajes,
+        temperature,
+        max_tokens: maxTokens,
+        // Si el modelo es razonador, que la cadena de pensamiento no venga
+        // mezclada en el contenido. Los modelos no razonadores ignoran esto.
+        reasoning_format: 'hidden'
+      })
     });
     if (!response.ok) {
       const errData = await response.json().catch(() => ({}));
       throw new Error(errData.error?.message || response.statusText);
     }
-    return response.json();
+    const data = await response.json();
+    // Respaldo: si igual vino un <think>...</think> colado en el contenido,
+    // se limpia acá antes de devolverlo a quien llamó.
+    if (data.choices?.[0]?.message?.content) {
+      data.choices[0].message.content = limpiarRazonamiento(data.choices[0].message.content);
+    }
+    return data;
   };
 
   const modelo = await obtenerModeloGroq();
