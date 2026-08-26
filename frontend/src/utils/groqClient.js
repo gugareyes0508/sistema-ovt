@@ -100,16 +100,30 @@ async function obtenerListaModelos(forzarRefresh = false) {
  * @param {{ temperature?: number, maxTokens?: number }} opciones
  * @returns {Promise<any>} La respuesta completa de la API (usar .choices[0].message.content)
  */
+// Tope de tokens por minuto (prompt + respuesta) observado en esta cuenta
+// de Groq, en el tier gratuito on_demand — es el MISMO para todos los
+// modelos probados, así que es un límite de cuenta, no de modelo. Se deja
+// margen de seguridad (el límite real observado es 8.000).
+const TPM_MAX_SEGURO = 7000;
+
+// Estimación de tokens a partir de caracteres. Deliberadamente generosa
+// (sobreestima) para dejar margen: mejor pedir de menos que pasarse y que
+// Groq rechace la petición entera por "Request too large".
+const estimarTokens = (texto) => Math.ceil((texto || '').length / 3.3);
+
 export async function llamarGroq(mensajes, opciones = {}) {
   const { temperature = 0.5, maxTokens = 700 } = opciones;
+  const tokensPrompt = estimarTokens(mensajes.map(m => m.content).join('\n'));
 
   const pedirCompletion = async (modelo, conParamsRazonador) => {
     const esRazonador = ES_RAZONADOR.test(modelo);
     // Los razonadores necesitan presupuesto extra: parte se les va en
-    // pensar (aunque sea "poco") antes de escribir la respuesta real. Si
-    // solo les damos los mismos max_tokens que a un modelo normal, se
-    // quedan sin espacio para el contenido — es justo lo que veníamos viendo.
-    const maxTokensEfectivo = esRazonador ? Math.max(maxTokens * 2, maxTokens + 1500) : maxTokens;
+    // pensar (aunque sea "poco") antes de escribir la respuesta real. Pero
+    // nunca se puede superar lo que la cuenta permite por minuto en total
+    // (prompt + respuesta) — de ahí el tope contra maxTokensDisponible.
+    const maxTokensDisponible = Math.max(300, TPM_MAX_SEGURO - tokensPrompt);
+    const maxTokensDeseado = esRazonador ? Math.max(maxTokens * 2, maxTokens + 1500) : maxTokens;
+    const maxTokensEfectivo = Math.min(maxTokensDeseado, maxTokensDisponible);
     const body = { model: modelo, messages: mensajes, temperature, max_tokens: maxTokensEfectivo };
     if (conParamsRazonador) {
       // 'hidden' saca el razonamiento del content; 'low' reduce cuánto
