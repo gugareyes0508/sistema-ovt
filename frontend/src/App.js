@@ -13,6 +13,7 @@ import PermisosRoles from './components/PermisosRoles';
 import ControlAlertas from './components/ControlAlertas';
 import EquipoTeam from './components/EquipoTeam';
 import GobiernoDashboard from './components/GobiernoDashboard';
+import Compliance from './components/Compliance';
 import './App.css';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
@@ -865,6 +866,7 @@ function App() {
     'proyeccion-nueva':{ eyebrow:'ITSM',            title: 'Nueva proyección',         sub: 'Crea una nueva proyección de tickets ITSM.' },
     'proyeccion-mis':  { eyebrow:'ITSM',            title: 'Mis proyecciones',         sub: 'Historial de proyecciones enviadas.' },
     'proyeccion-excel':{ eyebrow:'ITSM',            title: 'Cargar Excel ITSM',        sub: 'Carga masiva desde planilla ITSM.' },
+    compliance:      { eyebrow: 'Compliance',        title: 'Compliance',               sub: 'Hardening, parchado y vulnerabilidades — Banco y Banchile.' },
     'test-groq':     { eyebrow: 'Sistema',          title: 'Test API IA',              sub: 'Verificar conectividad con GROQ.' },
   };
   const meta = PAGE_META[vista] || { eyebrow: '', title: '', sub: '' };
@@ -946,6 +948,7 @@ function App() {
             {puedeVer('resumen') && <button className={vista==='resumen'?'nav-btn active':'nav-btn'} onClick={()=>setVista('resumen')}><i className="ti ti-chart-bar" aria-hidden="true"></i>Mi resumen</button>}
             {puedeVer('carga-excel') && <button className={vista==='excel-upload'?'nav-btn active':'nav-btn'} onClick={()=>setVista('excel-upload')}><i className="ti ti-upload" aria-hidden="true"></i>Cargar Excel</button>}
             {puedeVer('alertas') && <button className={vista==='alertas'?'nav-btn active':'nav-btn'} onClick={()=>setVista('alertas')}><i className="ti ti-bell" aria-hidden="true"></i>Control de Alertas</button>}
+            {puedeVer('compliance') && <button className={vista==='compliance'?'nav-btn active':'nav-btn'} onClick={()=>setVista('compliance')}><i className="ti ti-shield-lock" aria-hidden="true"></i>Compliance</button>}
           </nav>
         )}
 
@@ -955,6 +958,7 @@ function App() {
             {puedeVer('proyeccion-mis') && <button className={vista==='proyeccion-mis'?'nav-btn active':'nav-btn'} onClick={()=>setVista('proyeccion-mis')}><i className="ti ti-list" aria-hidden="true"></i>Mis proyecciones</button>}
             {puedeVer('proyeccion-excel') && <button className={vista==='proyeccion-excel'?'nav-btn active':'nav-btn'} onClick={()=>setVista('proyeccion-excel')}><i className="ti ti-upload" aria-hidden="true"></i>Cargar Excel</button>}
             {puedeVer('alertas') && <button className={vista==='alertas'?'nav-btn active':'nav-btn'} onClick={()=>setVista('alertas')}><i className="ti ti-bell" aria-hidden="true"></i>Control de Alertas</button>}
+            {puedeVer('compliance') && <button className={vista==='compliance'?'nav-btn active':'nav-btn'} onClick={()=>setVista('compliance')}><i className="ti ti-shield-lock" aria-hidden="true"></i>Compliance</button>}
           </nav>
         )}
 
@@ -966,6 +970,7 @@ function App() {
             {usuario.rol==='dpe' && puedeVer('claim') && <button className={vista==='claim'?'nav-btn active':'nav-btn'} onClick={()=>setVista('claim')}><i className="ti ti-clock" aria-hidden="true"></i>Control de Labor</button>}
             {usuario.rol==='dpe' && puedeVer('usuarios') && <button className={vista==='usuarios'?'nav-btn active':'nav-btn'} onClick={()=>setVista('usuarios')}><i className="ti ti-users" aria-hidden="true"></i>Usuarios</button>}
             {puedeVer('equipo') && <button className={vista==='equipo'?'nav-btn active':'nav-btn'} onClick={()=>setVista('equipo')}><i className="ti ti-users-group" aria-hidden="true"></i>Equipo</button>}
+            {puedeVer('compliance') && <button className={vista==='compliance'?'nav-btn active':'nav-btn'} onClick={()=>setVista('compliance')}><i className="ti ti-shield-lock" aria-hidden="true"></i>Compliance</button>}
           </nav>
         )}
 
@@ -979,6 +984,7 @@ function App() {
               {puedeVer('claim') && <button className={vista==='claim'?'nav-btn active':'nav-btn'} onClick={()=>setVista('claim')}><i className="ti ti-clock" aria-hidden="true"></i>Control de Labor</button>}
               {puedeVer('alertas') && <button className={vista==='alertas'?'nav-btn active':'nav-btn'} onClick={()=>setVista('alertas')}><i className="ti ti-bell" aria-hidden="true"></i>Control de Alertas</button>}
               {puedeVer('equipo') && <button className={vista==='equipo'?'nav-btn active':'nav-btn'} onClick={()=>setVista('equipo')}><i className="ti ti-users-group" aria-hidden="true"></i>Equipo</button>}
+              {puedeVer('compliance') && <button className={vista==='compliance'?'nav-btn active':'nav-btn'} onClick={()=>setVista('compliance')}><i className="ti ti-shield-lock" aria-hidden="true"></i>Compliance</button>}
               {puedeVer('gobierno') && <button className={vista==='gobierno'?'nav-btn active':'nav-btn'} onClick={()=>setVista('gobierno')}><i className="ti ti-shield-check" aria-hidden="true"></i>Gobierno</button>}
             </nav>
             <div className="sidebar-section">Administración</div>
@@ -1926,6 +1932,10 @@ function App() {
 
         {vista === 'gobierno' && usuario.rol === 'admin' && (
           <GobiernoDashboard key={`gobierno-${clienteActivo}`} token={token} apiUrl={API_URL} clienteActivo={clienteActivo} />
+        )}
+
+        {vista === 'compliance' && puedeVer('compliance') && (
+          <Compliance key={`compliance-${clienteActivo}`} token={token} apiUrl={API_URL} clienteActivo={clienteActivo} usuario={usuario} />
         )}
       </main>
 

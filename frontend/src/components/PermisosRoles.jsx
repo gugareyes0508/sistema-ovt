@@ -19,6 +19,7 @@ const VISTAS = [
   { id:'alertas',          label:'Control de Alertas',    desc:'Ranking, gestión y análisis IA de alertas reiterativas', grupo:'Alertas' },
   { id:'equipo',           label:'Equipo',                desc:'Roster, turnos, skills, seguimiento y CSAT del equipo', grupo:'Equipo' },
   { id:'gobierno',         label:'Gobierno',              desc:'Tablero de reportes y KPIs de gobierno de cuenta (solo admin)', grupo:'Gobierno' },
+  { id:'compliance',       label:'Compliance',            desc:'Hardening, parchado y vulnerabilidades (Banco y Banchile). Abierto para todos por defecto', grupo:'Compliance' },
 ];
 
 const ROLES = [
@@ -29,14 +30,14 @@ const ROLES = [
   { id:'itsm',         label:'itsm',         color:'var(--success)', bg:'#d1fae5' },
 ];
 
-const GRUPOS = ['Admin/DPE','Especialista','ITSM','Alertas','Equipo','Gobierno'];
+const GRUPOS = ['Admin/DPE','Especialista','ITSM','Alertas','Equipo','Gobierno','Compliance'];
 
 const PERMISOS_DEFAULT = {
-  admin:        { dashboard:true, analytics:true, 'ovt-proyectado':true, claim:true, usuarios:true, mantenedor:true, auditoria:true, 'permisos-roles':true, registros:false, resumen:false, 'carga-excel':false, 'proyeccion-nueva':false, 'proyeccion-mis':false, 'proyeccion-excel':false },
-  dpe:          { dashboard:true, analytics:true, 'ovt-proyectado':true, claim:true, usuarios:true, mantenedor:false, auditoria:false, 'permisos-roles':false, registros:false, resumen:false, 'carga-excel':false, 'proyeccion-nueva':false, 'proyeccion-mis':false, 'proyeccion-excel':false },
-  teamleader:   { dashboard:true, analytics:true, 'ovt-proyectado':false, claim:false, usuarios:false, mantenedor:false, auditoria:false, 'permisos-roles':false, registros:false, resumen:false, 'carga-excel':false, 'proyeccion-nueva':false, 'proyeccion-mis':false, 'proyeccion-excel':false },
-  especialista: { dashboard:false, analytics:false, 'ovt-proyectado':false, claim:false, usuarios:false, mantenedor:false, auditoria:false, 'permisos-roles':false, registros:true, resumen:true, 'carga-excel':true, 'proyeccion-nueva':false, 'proyeccion-mis':false, 'proyeccion-excel':false },
-  itsm:         { dashboard:false, analytics:false, 'ovt-proyectado':false, claim:false, usuarios:false, mantenedor:false, auditoria:false, 'permisos-roles':false, registros:false, resumen:false, 'carga-excel':false, 'proyeccion-nueva':true, 'proyeccion-mis':true, 'proyeccion-excel':true },
+  admin:        { dashboard:true, analytics:true, 'ovt-proyectado':true, claim:true, usuarios:true, mantenedor:true, auditoria:true, 'permisos-roles':true, registros:false, resumen:false, 'carga-excel':false, 'proyeccion-nueva':false, 'proyeccion-mis':false, 'proyeccion-excel':false, compliance:true },
+  dpe:          { dashboard:true, analytics:true, 'ovt-proyectado':true, claim:true, usuarios:true, mantenedor:false, auditoria:false, 'permisos-roles':false, registros:false, resumen:false, 'carga-excel':false, 'proyeccion-nueva':false, 'proyeccion-mis':false, 'proyeccion-excel':false, compliance:true },
+  teamleader:   { dashboard:true, analytics:true, 'ovt-proyectado':false, claim:false, usuarios:false, mantenedor:false, auditoria:false, 'permisos-roles':false, registros:false, resumen:false, 'carga-excel':false, 'proyeccion-nueva':false, 'proyeccion-mis':false, 'proyeccion-excel':false, compliance:true },
+  especialista: { dashboard:false, analytics:false, 'ovt-proyectado':false, claim:false, usuarios:false, mantenedor:false, auditoria:false, 'permisos-roles':false, registros:true, resumen:true, 'carga-excel':true, 'proyeccion-nueva':false, 'proyeccion-mis':false, 'proyeccion-excel':false, compliance:true },
+  itsm:         { dashboard:false, analytics:false, 'ovt-proyectado':false, claim:false, usuarios:false, mantenedor:false, auditoria:false, 'permisos-roles':false, registros:false, resumen:false, 'carga-excel':false, 'proyeccion-nueva':true, 'proyeccion-mis':true, 'proyeccion-excel':true, compliance:true },
 };
 
 const Toggle = ({ activo, disabled, onChange }) => (

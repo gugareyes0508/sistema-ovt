@@ -1558,11 +1558,11 @@ app.delete('/api/grupos-servicio/:id', verificarToken, async (req, res) => {
 // ============================================
 
 const PERMISOS_DEFAULT = {
-  admin:        { dashboard:true, analytics:true, 'ovt-proyectado':true, claim:true, usuarios:true, mantenedor:true, auditoria:true, registros:false, resumen:false, 'carga-excel':false, 'proyeccion-nueva':false, 'proyeccion-mis':false, 'permisos-roles':true, alertas:true, equipo:true, gobierno:true },
-  dpe:          { dashboard:true, analytics:true, 'ovt-proyectado':true, claim:true, usuarios:true, mantenedor:false, auditoria:false, registros:false, resumen:false, 'carga-excel':false, 'proyeccion-nueva':false, 'proyeccion-mis':false, 'permisos-roles':false, alertas:false, equipo:true, gobierno:false },
-  teamleader:   { dashboard:true, analytics:true, 'ovt-proyectado':false, claim:false, usuarios:false, mantenedor:false, auditoria:false, registros:false, resumen:false, 'carga-excel':false, 'proyeccion-nueva':false, 'proyeccion-mis':false, 'permisos-roles':false, alertas:false, equipo:true, gobierno:false },
-  especialista: { dashboard:false, analytics:false, 'ovt-proyectado':false, claim:false, usuarios:false, mantenedor:false, auditoria:false, registros:true, resumen:true, 'carga-excel':true, 'proyeccion-nueva':false, 'proyeccion-mis':false, 'permisos-roles':false, alertas:true, equipo:false, gobierno:false },
-  itsm:         { dashboard:false, analytics:false, 'ovt-proyectado':false, claim:false, usuarios:false, mantenedor:false, auditoria:false, registros:false, resumen:false, 'carga-excel':false, 'proyeccion-nueva':true, 'proyeccion-mis':true, 'permisos-roles':false, alertas:true, equipo:false, gobierno:false },
+  admin:        { dashboard:true, analytics:true, 'ovt-proyectado':true, claim:true, usuarios:true, mantenedor:true, auditoria:true, registros:false, resumen:false, 'carga-excel':false, 'proyeccion-nueva':false, 'proyeccion-mis':false, 'permisos-roles':true, alertas:true, equipo:true, gobierno:true, compliance:true },
+  dpe:          { dashboard:true, analytics:true, 'ovt-proyectado':true, claim:true, usuarios:true, mantenedor:false, auditoria:false, registros:false, resumen:false, 'carga-excel':false, 'proyeccion-nueva':false, 'proyeccion-mis':false, 'permisos-roles':false, alertas:false, equipo:true, gobierno:false, compliance:true },
+  teamleader:   { dashboard:true, analytics:true, 'ovt-proyectado':false, claim:false, usuarios:false, mantenedor:false, auditoria:false, registros:false, resumen:false, 'carga-excel':false, 'proyeccion-nueva':false, 'proyeccion-mis':false, 'permisos-roles':false, alertas:false, equipo:true, gobierno:false, compliance:true },
+  especialista: { dashboard:false, analytics:false, 'ovt-proyectado':false, claim:false, usuarios:false, mantenedor:false, auditoria:false, registros:true, resumen:true, 'carga-excel':true, 'proyeccion-nueva':false, 'proyeccion-mis':false, 'permisos-roles':false, alertas:true, equipo:false, gobierno:false, compliance:true },
+  itsm:         { dashboard:false, analytics:false, 'ovt-proyectado':false, claim:false, usuarios:false, mantenedor:false, auditoria:false, registros:false, resumen:false, 'carga-excel':false, 'proyeccion-nueva':true, 'proyeccion-mis':true, 'permisos-roles':false, alertas:true, equipo:false, gobierno:false, compliance:true },
 };
 
 // GET /api/permisos-roles — cualquier usuario autenticado puede leer
@@ -1574,7 +1574,15 @@ app.get('/api/permisos-roles', verificarToken, async (req, res) => {
       await db.collection('permisos_roles').doc('config').set(PERMISOS_DEFAULT);
       return res.json(PERMISOS_DEFAULT);
     }
-    res.json(doc.data());
+    // Vistas nuevas abiertas por defecto: si el doc guardado todavía no las trae, se
+    // entregan activas para cada rol (el admin puede apagarlas desde Permisos).
+    const guardados = doc.data();
+    ['compliance'].forEach(vista => {
+      Object.keys(PERMISOS_DEFAULT).forEach(rol => {
+        if (guardados[rol] && guardados[rol][vista] === undefined) guardados[rol][vista] = true;
+      });
+    });
+    res.json(guardados);
   } catch (err) {
     console.error('Error GET /api/permisos-roles:', err);
     res.status(500).json({ error: err.message });
@@ -2675,6 +2683,362 @@ app.get('/api/gobierno/sla', verificarToken, async (req, res) => {
     res.json(doc.data());
   } catch (err) {
     console.error('Error GET /api/gobierno/sla:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ============================================
+// GOBIERNO — PV vs ACTUAL (Revisión Financiera Mensual, histórico acumulado)
+// ============================================
+// A diferencia de SLA Mensual, este archivo representa UN solo mes de cierre
+// por carga (no trae varios meses embebidos), así que cada carga se guarda
+// como una entrada nueva del histórico — igual que Monitoreo/Inventario —
+// para poder ver la tendencia PV vs Actual mes a mes.
+
+app.post('/api/gobierno/pv/upload', verificarToken, async (req, res) => {
+  try {
+    if (!GOBIERNO_ROLES.includes(req.usuario.rol)) return res.status(403).json({ error: 'Sin permisos' });
+    const { mesCierre, items } = req.body;
+    if (!mesCierre || !/^\d{4}-\d{2}$/.test(mesCierre) || !Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({ error: 'Datos de PV incompletos (falta mesCierre o items)' });
+    }
+    const clienteActivoId = req.headers['x-cliente-activo'] || 'bcochile';
+
+    const docRef = db.collection('gobierno_pv').doc(`${clienteActivoId}_${mesCierre}`);
+    await docRef.set({
+      clienteId: clienteActivoId,
+      mesCierre,
+      items,
+      cargadoPor: req.usuario.nombre,
+      cargadoEn: new Date()
+    });
+
+    await db.collection('auditoria').add({
+      accion: 'GOBIERNO_PV_UPLOAD',
+      usuarioNombre: req.usuario.nombre,
+      clienteId: clienteActivoId,
+      timestamp: new Date(),
+      detalles: `PV vs Actual cargado para ${mesCierre}: ${items.length} líneas`
+    });
+
+    res.json({ success: true, id: docRef.id });
+  } catch (err) {
+    console.error('Error POST /api/gobierno/pv/upload:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/gobierno/pv — histórico completo (todas las cargas mensuales) del cliente activo
+app.get('/api/gobierno/pv', verificarToken, async (req, res) => {
+  try {
+    if (!GOBIERNO_ROLES.includes(req.usuario.rol)) return res.status(403).json({ error: 'Sin permisos' });
+    const clienteActivoId = req.headers['x-cliente-activo'] || 'bcochile';
+
+    const snap = await db.collection('gobierno_pv').where('clienteId', '==', clienteActivoId).get();
+    const cargas = [];
+    snap.forEach(doc => {
+      const d = doc.data();
+      cargas.push({ id: doc.id, mesCierre: d.mesCierre, items: d.items || [], cargadoPor: d.cargadoPor || '', cargadoEn: d.cargadoEn });
+    });
+
+    cargas.sort((a, b) => a.mesCierre.localeCompare(b.mesCierre));
+
+    res.json(cargas);
+  } catch (err) {
+    console.error('Error GET /api/gobierno/pv:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// PUT /api/gobierno/pv/:id/comentario — actualiza el comentario de una línea
+// puntual dentro de una carga (identificada por su índice en el array items)
+app.put('/api/gobierno/pv/:id/comentario', verificarToken, async (req, res) => {
+  try {
+    if (!GOBIERNO_ROLES.includes(req.usuario.rol)) return res.status(403).json({ error: 'Sin permisos' });
+    const { indice, comentario } = req.body;
+    if (typeof indice !== 'number') return res.status(400).json({ error: 'Falta el índice de la línea' });
+
+    const docRef = db.collection('gobierno_pv').doc(req.params.id);
+    const doc = await docRef.get();
+    if (!doc.exists) return res.status(404).json({ error: 'Carga no encontrada' });
+
+    const items = doc.data().items || [];
+    if (!items[indice]) return res.status(404).json({ error: 'Línea no encontrada' });
+    items[indice] = { ...items[indice], comentario: comentario || '' };
+
+    await docRef.update({ items });
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Error PUT /api/gobierno/pv/:id/comentario:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ============================================
+// COMPLIANCE — Hardening / Parchado / Vulnerabilidades (Banco y Banchile)
+// ============================================
+// Se alimenta del inventario semanal (inventario_BCH.xlsx, hojas CMDB Banco y
+// CMDB Banchile). El frontend parsea el Excel y manda las filas compactas:
+//   fila = [host, tipo, cap, hard, ubi, clas, amb, est, so, svc, adh]
+// (textos repetidos como índices a `dict`, adh 0-100 con -1 = vacío).
+// Las filas se guardan en bloques (Firestore no admite arreglos anidados ni
+// documentos > 1 MiB): cada bloque es un string JSON en `compliance_filas`.
+// La gestión (estado, responsable, compromiso, historial) vive aparte,
+// por hostname, para que se conserve de una carga semanal a la siguiente.
+
+const COMPLIANCE_ENTIDADES = ['banco', 'banchile'];
+const COMPLIANCE_ROLES_CARGA = ['admin', 'dpe'];
+const COMPLIANCE_ESTADOS = ['Pendiente', 'En gestión', 'Escalado', 'Excepción', 'Resuelto'];
+const COMPLIANCE_COLS_FILA = 11;
+const COMPLIANCE_DICT_KEYS = ['tipo', 'cap', 'hard', 'ubi', 'clas', 'amb', 'est', 'so', 'svc'];
+const COMPLIANCE_FILAS_POR_BLOQUE = 1500;
+const COMPLIANCE_MAX_FILAS = 60000;
+const COMPLIANCE_MAX_HOSTS_GESTION = 400;
+const COMPLIANCE_CONFIG_DEFAULT = {
+  umbral: 90,
+  filtros: { tipo: ['CLOUD'], cap: ['SERVIDOR', 'APPLIANCE'], hard: ['SI'] },
+  kyndrylExcluye: ['GCP'],
+  excluirBajas: false
+};
+
+const complianceCliente = (req) => req.headers['x-cliente-activo'] || 'bcochile';
+
+// Misma regla que frontend/src/utils/compliance.js (claveHost)
+const complianceClaveHost = (h) =>
+  String(h === undefined || h === null ? '' : h).trim().toLowerCase()
+    .replace(/[^a-z0-9-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 150);
+
+// Valida {dict, rows} de una hoja; devuelve un texto de error o null si está bien
+function complianceValidarEntidad(datos) {
+  if (!datos || typeof datos !== 'object') return 'datos vacíos';
+  const { dict, rows } = datos;
+  if (!dict || typeof dict !== 'object') return 'falta el diccionario';
+  for (const k of COMPLIANCE_DICT_KEYS) {
+    if (!Array.isArray(dict[k]) || dict[k].some(v => typeof v !== 'string')) return `diccionario "${k}" inválido`;
+  }
+  if (!Array.isArray(rows) || rows.length === 0) return 'no trae filas';
+  if (rows.length > COMPLIANCE_MAX_FILAS) return `demasiadas filas (máximo ${COMPLIANCE_MAX_FILAS})`;
+  for (let i = 0; i < rows.length; i++) {
+    const r = rows[i];
+    if (!Array.isArray(r) || r.length !== COMPLIANCE_COLS_FILA) return `la fila ${i + 1} no tiene ${COMPLIANCE_COLS_FILA} columnas`;
+    if (typeof r[0] !== 'string' || r[0] === '') return `la fila ${i + 1} no tiene hostname`;
+    for (let c = 1; c <= 9; c++) {
+      const k = COMPLIANCE_DICT_KEYS[c - 1];
+      if (!Number.isInteger(r[c]) || r[c] < 0 || r[c] >= dict[k].length) return `la fila ${i + 1} tiene un valor inválido en "${k}"`;
+    }
+    if (!Number.isInteger(r[10]) || r[10] < -1 || r[10] > 100) return `la fila ${i + 1} tiene una adherencia inválida`;
+  }
+  return null;
+}
+
+const complianceFechaISO = (v) => (v && typeof v.toDate === 'function') ? v.toDate().toISOString() : (v || null);
+
+// POST /api/compliance/upload — carga semanal (admin / dpe). Re-subir la misma semana la reemplaza.
+app.post('/api/compliance/upload', verificarToken, async (req, res) => {
+  try {
+    if (!COMPLIANCE_ROLES_CARGA.includes(req.usuario.rol)) return res.status(403).json({ error: 'Solo admin o DPE pueden cargar el inventario' });
+    const { semana, entidades } = req.body || {};
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(semana || '')) return res.status(400).json({ error: 'Semana inválida (se espera AAAA-MM-DD)' });
+    if (!entidades || typeof entidades !== 'object') return res.status(400).json({ error: 'Faltan las hojas del inventario' });
+
+    const clienteId = complianceCliente(req);
+    const aGuardar = [];
+    for (const ent of COMPLIANCE_ENTIDADES) {
+      if (!entidades[ent]) continue;
+      const error = complianceValidarEntidad(entidades[ent]);
+      if (error) return res.status(400).json({ error: `Hoja ${ent}: ${error}` });
+      aGuardar.push(ent);
+    }
+    if (aGuardar.length === 0) return res.status(400).json({ error: 'No se recibió ninguna hoja (banco / banchile)' });
+
+    const resultado = {};
+    for (const ent of aGuardar) {
+      const { dict, rows } = entidades[ent];
+      const cargaId = `${clienteId}_${semana}_${ent}`;
+
+      // Si la semana ya existía, se borran sus bloques anteriores antes de escribir los nuevos
+      const previos = await db.collection('compliance_filas').where('cargaId', '==', cargaId).get();
+      const nBloques = Math.ceil(rows.length / COMPLIANCE_FILAS_POR_BLOQUE);
+      const batch = db.batch();
+      previos.forEach(d => batch.delete(d.ref));
+      for (let i = 0; i < nBloques; i++) {
+        const trozo = rows.slice(i * COMPLIANCE_FILAS_POR_BLOQUE, (i + 1) * COMPLIANCE_FILAS_POR_BLOQUE);
+        batch.set(db.collection('compliance_filas').doc(`${cargaId}_${i}`), { cargaId, i, rows: JSON.stringify(trozo) });
+      }
+      await batch.commit();
+
+      // La carga se publica al final: si algo falla antes, no queda una semana a medias visible
+      await db.collection('compliance_cargas').doc(cargaId).set({
+        clienteId, semana, entidad: ent, totalFilas: rows.length, bloques: nBloques, dict,
+        cargadoPor: req.usuario.nombre, cargadoEn: new Date()
+      });
+      resultado[ent] = { filas: rows.length };
+    }
+
+    await db.collection('auditoria').add({
+      accion: 'COMPLIANCE_UPLOAD', usuarioNombre: req.usuario.nombre, clienteId, timestamp: new Date(),
+      detalles: `Inventario semana ${semana}: ` + aGuardar.map(e => `${e} ${resultado[e].filas} filas`).join(', ')
+    });
+    res.json({ success: true, semana, entidades: resultado });
+  } catch (err) {
+    console.error('Error POST /api/compliance/upload:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/compliance/cargas — semanas cargadas (más reciente primero)
+app.get('/api/compliance/cargas', verificarToken, async (req, res) => {
+  try {
+    const snap = await db.collection('compliance_cargas').where('clienteId', '==', complianceCliente(req)).get();
+    const porSemana = {};
+    snap.forEach(doc => {
+      const d = doc.data();
+      if (!porSemana[d.semana]) porSemana[d.semana] = { semana: d.semana, entidades: {}, cargadoPor: d.cargadoPor || '', cargadoEn: complianceFechaISO(d.cargadoEn) };
+      porSemana[d.semana].entidades[d.entidad] = d.totalFilas;
+    });
+    res.json(Object.values(porSemana).sort((a, b) => b.semana.localeCompare(a.semana)));
+  } catch (err) {
+    console.error('Error GET /api/compliance/cargas:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/compliance/cargas/:semana/:entidad — filas de una hoja de una semana
+app.get('/api/compliance/cargas/:semana/:entidad', verificarToken, async (req, res) => {
+  try {
+    const { semana, entidad } = req.params;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(semana) || !COMPLIANCE_ENTIDADES.includes(entidad)) return res.status(400).json({ error: 'Parámetros inválidos' });
+    const cargaId = `${complianceCliente(req)}_${semana}_${entidad}`;
+    const doc = await db.collection('compliance_cargas').doc(cargaId).get();
+    if (!doc.exists) return res.status(404).json({ error: 'No hay carga para esa semana y hoja' });
+    const meta = doc.data();
+
+    const snap = await db.collection('compliance_filas').where('cargaId', '==', cargaId).get();
+    const bloques = [];
+    snap.forEach(d => bloques.push(d.data()));
+    bloques.sort((a, b) => a.i - b.i);
+    let rows = [];
+    bloques.forEach(b => { rows = rows.concat(JSON.parse(b.rows)); });
+    if (rows.length !== meta.totalFilas) return res.status(500).json({ error: 'La carga está incompleta, vuelve a subir el archivo de esa semana' });
+
+    res.json({ semana, entidad, dict: meta.dict, rows, cargadoPor: meta.cargadoPor || '', cargadoEn: complianceFechaISO(meta.cargadoEn) });
+  } catch (err) {
+    console.error('Error GET /api/compliance/cargas/:semana/:entidad:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/compliance/config — umbral y filtros por defecto del módulo
+app.get('/api/compliance/config', verificarToken, async (req, res) => {
+  try {
+    const doc = await db.collection('compliance_config').doc(complianceCliente(req)).get();
+    const g = doc.exists ? doc.data() : {};
+    res.json({
+      umbral: Number.isInteger(g.umbral) ? g.umbral : COMPLIANCE_CONFIG_DEFAULT.umbral,
+      filtros: { ...COMPLIANCE_CONFIG_DEFAULT.filtros, ...(g.filtros || {}) },
+      kyndrylExcluye: Array.isArray(g.kyndrylExcluye) ? g.kyndrylExcluye : COMPLIANCE_CONFIG_DEFAULT.kyndrylExcluye,
+      excluirBajas: typeof g.excluirBajas === 'boolean' ? g.excluirBajas : COMPLIANCE_CONFIG_DEFAULT.excluirBajas
+    });
+  } catch (err) {
+    console.error('Error GET /api/compliance/config:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// PUT /api/compliance/config — fija el umbral y los filtros por defecto (admin / dpe)
+app.put('/api/compliance/config', verificarToken, async (req, res) => {
+  try {
+    if (!COMPLIANCE_ROLES_CARGA.includes(req.usuario.rol)) return res.status(403).json({ error: 'Solo admin o DPE pueden cambiar la configuración' });
+    const { umbral, filtros, kyndrylExcluye, excluirBajas } = req.body || {};
+    const lista = (a) => Array.isArray(a) && a.length <= 50 && a.every(v => typeof v === 'string');
+    if (!Number.isInteger(umbral) || umbral < 50 || umbral > 99) return res.status(400).json({ error: 'El umbral debe ser un entero entre 50 y 99' });
+    if (!filtros || !lista(filtros.tipo) || !lista(filtros.cap) || !lista(filtros.hard) || !lista(kyndrylExcluye) || typeof excluirBajas !== 'boolean') {
+      return res.status(400).json({ error: 'Configuración inválida' });
+    }
+    const clienteId = complianceCliente(req);
+    await db.collection('compliance_config').doc(clienteId).set({
+      umbral, filtros: { tipo: filtros.tipo, cap: filtros.cap, hard: filtros.hard }, kyndrylExcluye, excluirBajas,
+      actualizadoPor: req.usuario.nombre, actualizadoEn: new Date()
+    });
+    await db.collection('auditoria').add({
+      accion: 'COMPLIANCE_CONFIG', usuarioNombre: req.usuario.nombre, clienteId, timestamp: new Date(),
+      detalles: `Umbral ${umbral}%, excluye bajas: ${excluirBajas ? 'sí' : 'no'}`
+    });
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Error PUT /api/compliance/config:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/compliance/gestion?entidad=banco — gestión registrada, por hostname
+app.get('/api/compliance/gestion', verificarToken, async (req, res) => {
+  try {
+    const entidad = req.query.entidad;
+    if (!COMPLIANCE_ENTIDADES.includes(entidad)) return res.status(400).json({ error: 'Entidad inválida' });
+    const snap = await db.collection('compliance_gestion')
+      .where('clienteId', '==', complianceCliente(req)).where('entidad', '==', entidad).get();
+    const out = {};
+    snap.forEach(doc => {
+      const d = doc.data();
+      out[d.clave] = {
+        hostname: d.hostname, estado: d.estado, responsable: d.responsable || '', fechaCompromiso: d.fechaCompromiso || '',
+        historial: d.historial || [], actualizadoPor: d.actualizadoPor || '', actualizadoEn: complianceFechaISO(d.actualizadoEn)
+      };
+    });
+    res.json(out);
+  } catch (err) {
+    console.error('Error GET /api/compliance/gestion:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// PUT /api/compliance/gestion — registra una gestión sobre uno o varios hosts
+// (cualquier usuario autenticado). Cada cambio queda en el historial del host.
+app.put('/api/compliance/gestion', verificarToken, async (req, res) => {
+  try {
+    const { entidad, hosts, estado, responsable, fechaCompromiso, comentario } = req.body || {};
+    if (!COMPLIANCE_ENTIDADES.includes(entidad)) return res.status(400).json({ error: 'Entidad inválida' });
+    if (!COMPLIANCE_ESTADOS.includes(estado)) return res.status(400).json({ error: 'Estado inválido' });
+    if (!Array.isArray(hosts) || hosts.length === 0 || hosts.length > COMPLIANCE_MAX_HOSTS_GESTION) {
+      return res.status(400).json({ error: `Indica entre 1 y ${COMPLIANCE_MAX_HOSTS_GESTION} servidores por vez` });
+    }
+    if (fechaCompromiso && !/^\d{4}-\d{2}-\d{2}$/.test(fechaCompromiso)) return res.status(400).json({ error: 'Fecha de compromiso inválida' });
+
+    const clienteId = complianceCliente(req);
+    const ahora = new Date();
+    const entrada = {
+      fecha: ahora.toISOString(), usuario: req.usuario.nombre, estado,
+      responsable: String(responsable || '').trim().slice(0, 120),
+      fechaCompromiso: fechaCompromiso || '',
+      comentario: String(comentario || '').trim().slice(0, 1000)
+    };
+
+    const vistos = new Set();
+    const batch = db.batch();
+    for (const h of hosts) {
+      const clave = complianceClaveHost(h);
+      if (!clave || vistos.has(clave)) continue;
+      vistos.add(clave);
+      const campos = {
+        clienteId, entidad, clave, hostname: String(h).trim(), estado,
+        actualizadoPor: req.usuario.nombre, actualizadoEn: ahora,
+        historial: admin.firestore.FieldValue.arrayUnion(entrada)
+      };
+      if (entrada.responsable) campos.responsable = entrada.responsable;
+      if (entrada.fechaCompromiso) campos.fechaCompromiso = entrada.fechaCompromiso;
+      batch.set(db.collection('compliance_gestion').doc(`${clienteId}_${entidad}_${clave}`), campos, { merge: true });
+    }
+    if (vistos.size === 0) return res.status(400).json({ error: 'Ningún hostname válido' });
+    await batch.commit();
+
+    await db.collection('auditoria').add({
+      accion: 'COMPLIANCE_GESTION', usuarioNombre: req.usuario.nombre, clienteId, timestamp: new Date(),
+      detalles: `${entidad}: ${vistos.size} servidor(es) → ${estado}`
+    });
+    res.json({ success: true, actualizados: vistos.size });
+  } catch (err) {
+    console.error('Error PUT /api/compliance/gestion:', err);
     res.status(500).json({ error: err.message });
   }
 });

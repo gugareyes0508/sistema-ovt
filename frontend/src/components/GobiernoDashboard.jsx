@@ -72,7 +72,7 @@ export default function GobiernoDashboard({ token, apiUrl, clienteActivo }) {
   const headers = buildHeaders(token, clienteActivo);
   const fileRef = useRef(null);
 
-  const [subTab, setSubTab] = useState('panel'); // 'panel' | 'monitoreo' | 'inventario' | 'sla' | 'eventos' | 'config'
+  const [subTab, setSubTab] = useState('panel'); // 'panel' | 'monitoreo' | 'inventario' | 'sla' | 'eventos' | 'pv' | 'config'
 
   const [items, setItems] = useState([]);
   const [cargando, setCargando] = useState(true);
@@ -123,6 +123,17 @@ export default function GobiernoDashboard({ token, apiUrl, clienteActivo }) {
   const [insightsEventos, setInsightsEventos] = useState(null);
   const [cargandoInsights, setCargandoInsights] = useState(false);
   const [errorInsights, setErrorInsights] = useState(null);
+
+  // ============ PV vs ACTUAL (histórico acumulado, un mes por carga) ============
+  const filePvRef = useRef(null);
+  const [cargasPv, setCargasPv] = useState([]);
+  const [cargandoPv, setCargandoPv] = useState(true);
+  const [errorPv, setErrorPv] = useState(null);
+  const [subiendoPv, setSubiendoPv] = useState(false);
+  const [mensajePv, setMensajePv] = useState(null);
+  const [mesCierrePv, setMesCierrePv] = useState('');
+  const [editandoComentario, setEditandoComentario] = useState(null); // { cargaId, indice, texto }
+  const [guardandoComentario, setGuardandoComentario] = useState(false);
 
   const cargarDatos = useCallback(async () => {
     setCargando(true);
@@ -203,6 +214,22 @@ export default function GobiernoDashboard({ token, apiUrl, clienteActivo }) {
   }, [apiUrl, clienteActivo]);
 
   useEffect(() => { cargarEventos(); }, [cargarEventos]);
+
+  const cargarPv = useCallback(async () => {
+    setCargandoPv(true);
+    setErrorPv(null);
+    try {
+      const res = await axios.get(`${apiUrl}/api/gobierno/pv`, { headers });
+      setCargasPv(res.data || []);
+    } catch (err) {
+      setErrorPv('Error cargando PV vs Actual: ' + (err.response?.data?.error || err.message));
+    } finally {
+      setCargandoPv(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [apiUrl, clienteActivo]);
+
+  useEffect(() => { cargarPv(); }, [cargarPv]);
 
   const abrirEditar = (item) => {
     setModalItem({ ...item });
@@ -539,6 +566,76 @@ export default function GobiernoDashboard({ token, apiUrl, clienteActivo }) {
     }
   };
 
+  // ============ PARSEO DEL EXCEL DE PV vs ACTUAL ============
+  // Hoja "Actuales - Bridge": layout fijo por fila, no por posición exacta
+  // — cada fila con texto en la columna B es o un encabezado de sección
+  // ("Revenue Spread", "Cost Spread", "Contract Performace View") o una
+  // línea con datos en PV (col D) / Actual (col E) / Bridge (col F) /
+  // Comentarios (col H). Se recorre fila por fila en vez de hardcodear
+  // números de fila, porque pueden variar mes a mes.
+  const SECCIONES_PV = ['Revenue Spread', 'Cost Spread', 'Contract Performace View'];
+  const parsearHojaPv = (hoja) => {
+    const filas = XLSX.utils.sheet_to_json(hoja, { header: 1, defval: '' });
+    const items = [];
+    let seccionActual = 'Revenue Spread';
+    filas.forEach(fila => {
+      const label = String(fila[1] || '').trim();
+      if (!label) return;
+      if (SECCIONES_PV.includes(label)) { seccionActual = label; return; }
+      const pv = typeof fila[3] === 'number' ? fila[3] : null;
+      const actual = typeof fila[4] === 'number' ? fila[4] : null;
+      const bridge = typeof fila[5] === 'number' ? fila[5] : null;
+      if (pv === null && actual === null && bridge === null) return; // fila de puro texto
+      items.push({ seccion: seccionActual, nombre: label, pv, actual, bridge, comentario: String(fila[7] || '').trim() });
+    });
+    return items;
+  };
+
+  const procesarExcelPv = async (file) => {
+    if (!mesCierrePv) {
+      setMensajePv({ tipo: 'error', texto: 'Primero elegí el mes de cierre que corresponde a este archivo.' });
+      return;
+    }
+    setSubiendoPv(true);
+    setMensajePv(null);
+    try {
+      const buffer = await file.arrayBuffer();
+      const wb = XLSX.read(buffer, { type: 'array', cellDates: true });
+
+      const hoja = wb.Sheets['Actuales - Bridge'];
+      if (!hoja) throw new Error('No se encontró la hoja "Actuales - Bridge" en el archivo');
+
+      const items = parsearHojaPv(hoja);
+      if (items.length === 0) throw new Error('No se encontraron líneas de PV/Actual/Bridge en el archivo');
+
+      await axios.post(`${apiUrl}/api/gobierno/pv/upload`, { mesCierre: mesCierrePv, items }, { headers });
+
+      setMensajePv({ tipo: 'success', texto: `PV vs Actual cargado para ${mesCierrePv}: ${items.length} líneas.` });
+      cargarPv();
+    } catch (err) {
+      setMensajePv({ tipo: 'error', texto: 'Error procesando el archivo: ' + (err.response?.data?.error || err.message) });
+    } finally {
+      setSubiendoPv(false);
+    }
+  };
+
+  const guardarComentarioPv = async () => {
+    if (!editandoComentario) return;
+    setGuardandoComentario(true);
+    try {
+      await axios.put(`${apiUrl}/api/gobierno/pv/${editandoComentario.cargaId}/comentario`, {
+        indice: editandoComentario.indice,
+        comentario: editandoComentario.texto
+      }, { headers });
+      setEditandoComentario(null);
+      cargarPv();
+    } catch (err) {
+      setMensajePv({ tipo: 'error', texto: 'Error guardando comentario: ' + (err.response?.data?.error || err.message) });
+    } finally {
+      setGuardandoComentario(false);
+    }
+  };
+
   const verParchePendiente = async (carga, segmento) => {
     setCargandoParcheId(carga.id);
     try {
@@ -854,6 +951,70 @@ Responde solo con la lista de insights, uno por línea, sin numeración ni encab
     }
   };
 
+  // ============ CÓMPUTOS DERIVADOS DE PV vs ACTUAL ============
+  const ultimaCargaPv = cargasPv[cargasPv.length - 1] || null; // cargasPv viene ordenado asc por mesCierre desde el backend
+  const historicoAscPv = cargasPv;
+
+  const buscarItemPv = (items, nombre) => (items || []).find(i => i.nombre === nombre);
+
+  const totalesPv = useMemo(() => {
+    if (!ultimaCargaPv) return null;
+    const items = ultimaCargaPv.items;
+    const revenue = buscarItemPv(items, 'Total Revenue') || buscarItemPv(items, 'Total Revenue (Final)');
+    const costo = buscarItemPv(items, 'Total Cost (Final)') || buscarItemPv(items, 'Total Cost');
+    const gp = buscarItemPv(items, 'Total GP (Final)') || buscarItemPv(items, 'Total GP w/o OU');
+    const pctGp = buscarItemPv(items, '% GP (Final)') || buscarItemPv(items, '%GP w/o OU');
+    const laborCost = buscarItemPv(items, 'Total Labor Cost');
+    const noLaborCost = buscarItemPv(items, 'Total Non Labor Cost');
+    return { revenue, costo, gp, pctGp, laborCost, noLaborCost };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ultimaCargaPv]);
+
+  const lineasRevenuePv = useMemo(() => {
+    if (!ultimaCargaPv) return [];
+    return ultimaCargaPv.items.filter(i => i.seccion === 'Revenue Spread' && !i.nombre.startsWith('Total') && (i.pv || i.actual || i.bridge));
+  }, [ultimaCargaPv]);
+
+  const lineasCostoPv = useMemo(() => {
+    if (!ultimaCargaPv) return [];
+    return ultimaCargaPv.items.filter(i => i.seccion === 'Cost Spread' && !i.nombre.startsWith('Total') && (i.pv || i.actual || i.bridge));
+  }, [ultimaCargaPv]);
+
+  // Insight automático (sin IA, matemática directa): compara si el costo
+  // laboral y el no-laboral se movieron en direcciones distintas respecto
+  // al plan — señal típica de que la favorabilidad total esconde un
+  // problema puntual (ej. labor sobre-presupuesto compensado por
+  // proveedores no facturados todavía).
+  const insightPv = useMemo(() => {
+    if (!totalesPv?.laborCost || !totalesPv?.noLaborCost) return null;
+    const bLabor = totalesPv.laborCost.bridge || 0;
+    const bNoLabor = totalesPv.noLaborCost.bridge || 0;
+    if (bLabor > 0 && bNoLabor < 0) {
+      return `El costo laboral vino $${(bLabor / 1000).toFixed(1)}K por encima del plan, mientras que el no-laboral vino $${(Math.abs(bNoLabor) / 1000).toFixed(1)}K por debajo — vale confirmar si es eficiencia real o gasto de proveedores todavía no registrado.`;
+    }
+    if (bLabor < 0 && bNoLabor > 0) {
+      return `El costo laboral vino $${(Math.abs(bLabor) / 1000).toFixed(1)}K por debajo del plan, mientras que el no-laboral vino $${(bNoLabor / 1000).toFixed(1)}K por encima — vale revisar qué categoría no-laboral está empujando el sobregasto.`;
+    }
+    return null;
+  }, [totalesPv]);
+
+  const dataTendenciaPv = useMemo(() => {
+    const labels = historicoAscPv.map(c => c.mesCierre);
+    const revPv = historicoAscPv.map(c => buscarItemPv(c.items, 'Total Revenue')?.pv ?? null);
+    const revActual = historicoAscPv.map(c => buscarItemPv(c.items, 'Total Revenue')?.actual ?? null);
+    return {
+      labels,
+      datasets: [
+        { label: 'Revenue PV', data: revPv, borderColor: '#9aa8b2', borderDash: [5, 4], backgroundColor: 'transparent', tension: 0.3, pointRadius: 3, spanGaps: true },
+        { label: 'Revenue Actual', data: revActual, borderColor: '#003b71', backgroundColor: 'rgba(0,59,113,0.06)', fill: true, tension: 0.3, pointRadius: 3, spanGaps: true }
+      ]
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [historicoAscPv]);
+
+  const fmtUsd = (n) => n == null ? '—' : `$${(n / 1000).toLocaleString('es-CL', { maximumFractionDigits: 1 })}K`;
+  const fmtBridge = (n) => n == null ? '—' : `${n >= 0 ? '+' : ''}$${(n / 1000).toLocaleString('es-CL', { maximumFractionDigits: 1 })}K`;
+
   // KPIs de resumen (pestaña Panel)
   const itemsEstado = items.filter(i => i.tipo === 'estado');
   const alDia = itemsEstado.filter(i => i.estado === 'al_dia').length;
@@ -913,6 +1074,14 @@ Responde solo con la lista de insights, uno por línea, sin numeración ni encab
             background: subTab === 'eventos' ? 'linear-gradient(135deg,var(--ink-900),var(--bank-blue))' : 'rgba(255,255,255,0.72)',
             color: subTab === 'eventos' ? '#fff' : 'var(--ink-800)' }}>
           <i className="ti ti-chart-histogram" aria-hidden="true" style={{ marginRight: 4 }}></i>Eventos
+        </button>
+        <button
+          onClick={() => setSubTab('pv')}
+          style={{ padding: '9px 16px', borderRadius: '999px', fontSize: '12px', fontWeight: '800', cursor: 'pointer',
+            border: subTab === 'pv' ? 'none' : '1px solid var(--line)',
+            background: subTab === 'pv' ? 'linear-gradient(135deg,var(--ink-900),var(--bank-blue))' : 'rgba(255,255,255,0.72)',
+            color: subTab === 'pv' ? '#fff' : 'var(--ink-800)' }}>
+          <i className="ti ti-report-money" aria-hidden="true" style={{ marginRight: 4 }}></i>PV
         </button>
         <button
           onClick={() => setSubTab('config')}
@@ -1933,6 +2102,230 @@ Responde solo con la lista de insights, uno por línea, sin numeración ni encab
               </div>
             </>
           )}
+        </div>
+      )}
+
+      {/* ============ PV vs ACTUAL ============ */}
+      {subTab === 'pv' && (
+        <div>
+          {errorPv && (
+            <div style={{ background: 'rgba(215,59,71,0.08)', border: '1px solid rgba(215,59,71,0.24)', borderRadius: '14px', padding: '10px 16px', color: '#a61e2b', fontSize: '13px', fontWeight: '600', marginBottom: '18px' }}>
+              {errorPv}
+            </div>
+          )}
+
+          {/* CARGA DE EXCEL */}
+          <div style={{ border: '1px solid rgba(255,255,255,0.72)', borderRadius: '22px', background: 'var(--glass)', boxShadow: 'var(--shadow-soft)', padding: '18px 22px', marginBottom: '18px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
+              <div style={{ width: '42px', height: '42px', borderRadius: '14px', background: 'linear-gradient(135deg,var(--ink-900),var(--bank-blue))', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <i className="ti ti-report-money" aria-hidden="true" style={{ fontSize: '18px', color: '#fff' }}></i>
+              </div>
+              <div style={{ flex: 1, minWidth: '200px' }}>
+                <div style={{ fontWeight: '800', fontSize: '13px', color: 'var(--ink-950)', marginBottom: '2px' }}>
+                  {subiendoPv ? 'Procesando archivo...' : 'Cargar PV vs Actual (Revisión Financiera Mensual)'}
+                </div>
+                <div style={{ fontSize: '12px', fontWeight: '600', color: 'var(--muted)' }}>
+                  Hoja "Actuales - Bridge" · un mes por carga · queda guardado en el histórico
+                </div>
+              </div>
+              <div>
+                <label style={{ fontSize: '10px', fontWeight: '800', color: 'var(--muted)', display: 'block', marginBottom: 3 }}>MES DE CIERRE</label>
+                <input type="month" value={mesCierrePv} onChange={e => setMesCierrePv(e.target.value)}
+                  style={{ border: '1px solid var(--line)', borderRadius: '10px', padding: '8px 10px', fontSize: '12px', fontWeight: '700' }} />
+              </div>
+              <button
+                disabled={subiendoPv}
+                onClick={() => filePvRef.current?.click()}
+                style={{ padding: '10px 18px', background: subiendoPv ? 'var(--muted)' : 'linear-gradient(135deg,var(--ink-900),var(--bank-blue))', color: '#fff', border: 'none', borderRadius: '999px', fontWeight: '900', fontSize: '12px', cursor: subiendoPv ? 'not-allowed' : 'pointer', whiteSpace: 'nowrap' }}
+              >
+                {subiendoPv ? 'Cargando...' : 'Seleccionar archivo'}
+              </button>
+              <input
+                ref={filePvRef}
+                type="file"
+                accept=".xlsx,.xls"
+                style={{ display: 'none' }}
+                onChange={(e) => { if (e.target.files[0]) procesarExcelPv(e.target.files[0]); e.target.value = ''; }}
+              />
+            </div>
+          </div>
+
+          {mensajePv && (
+            <div style={{
+              background: mensajePv.tipo === 'error' ? 'rgba(215,59,71,0.08)' : 'rgba(32,166,106,0.1)',
+              border: `1px solid ${mensajePv.tipo === 'error' ? 'rgba(215,59,71,0.24)' : 'rgba(32,166,106,0.24)'}`,
+              borderRadius: '14px', padding: '10px 16px', fontSize: '13px', fontWeight: '600', marginBottom: '18px',
+              color: mensajePv.tipo === 'error' ? '#a61e2b' : '#116642'
+            }}>
+              {mensajePv.texto}
+            </div>
+          )}
+
+          {cargandoPv ? (
+            <p style={{ textAlign: 'center', color: 'var(--muted)', padding: '30px', fontWeight: '600' }}>Cargando...</p>
+          ) : !ultimaCargaPv ? (
+            <div style={{ background: 'var(--glass)', border: '1px dashed rgba(255,255,255,0.72)', borderRadius: '22px', padding: '30px', textAlign: 'center', color: 'var(--muted)', fontSize: '13px' }}>
+              Todavía no hay ninguna carga. Elegí el mes de cierre y subí el primer Excel para empezar el histórico.
+            </div>
+          ) : (
+            <>
+              <div style={{ fontSize: '12px', fontWeight: '800', color: 'var(--muted)', marginBottom: 10 }}>
+                Mostrando: {ultimaCargaPv.mesCierre} · cargado por {ultimaCargaPv.cargadoPor}
+              </div>
+
+              {/* KPIs */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 10, marginBottom: 18 }}>
+                <div style={{ background: 'var(--glass)', border: '1px solid rgba(255,255,255,0.72)', borderRadius: '16px', padding: '14px', boxShadow: 'var(--shadow-soft)' }}>
+                  <div style={{ fontSize: '9px', fontWeight: '800', color: 'var(--muted)', letterSpacing: '.03em', marginBottom: 6 }}>TOTAL REVENUE</div>
+                  <div style={{ fontSize: '20px', fontWeight: '800', color: 'var(--ink-950)', fontFamily: "'IBM Plex Mono',monospace" }}>{fmtUsd(totalesPv?.revenue?.actual)}</div>
+                  <div style={{ fontSize: '10px', color: 'var(--muted)', fontWeight: '700' }}>PV {fmtUsd(totalesPv?.revenue?.pv)} · <span style={{ color: (totalesPv?.revenue?.bridge || 0) >= 0 ? '#116642' : '#a61e2b' }}>{fmtBridge(totalesPv?.revenue?.bridge)}</span></div>
+                </div>
+                <div style={{ background: 'var(--glass)', border: '1px solid rgba(255,255,255,0.72)', borderRadius: '16px', padding: '14px', boxShadow: 'var(--shadow-soft)' }}>
+                  <div style={{ fontSize: '9px', fontWeight: '800', color: 'var(--muted)', letterSpacing: '.03em', marginBottom: 6 }}>TOTAL COSTO</div>
+                  <div style={{ fontSize: '20px', fontWeight: '800', color: 'var(--ink-950)', fontFamily: "'IBM Plex Mono',monospace" }}>{fmtUsd(totalesPv?.costo?.actual)}</div>
+                  <div style={{ fontSize: '10px', color: 'var(--muted)', fontWeight: '700' }}>PV {fmtUsd(totalesPv?.costo?.pv)} · <span style={{ color: (totalesPv?.costo?.bridge || 0) <= 0 ? '#116642' : '#a61e2b' }}>{fmtBridge(totalesPv?.costo?.bridge)}</span></div>
+                </div>
+                <div style={{ background: 'var(--glass)', border: '1px solid rgba(255,255,255,0.72)', borderRadius: '16px', padding: '14px', boxShadow: 'var(--shadow-soft)' }}>
+                  <div style={{ fontSize: '9px', fontWeight: '800', color: 'var(--muted)', letterSpacing: '.03em', marginBottom: 6 }}>TOTAL GP</div>
+                  <div style={{ fontSize: '20px', fontWeight: '800', color: 'var(--ink-950)', fontFamily: "'IBM Plex Mono',monospace" }}>{fmtUsd(totalesPv?.gp?.actual)}</div>
+                  <div style={{ fontSize: '10px', color: 'var(--muted)', fontWeight: '700' }}>PV {fmtUsd(totalesPv?.gp?.pv)} · <span style={{ color: (totalesPv?.gp?.bridge || 0) >= 0 ? '#116642' : '#a61e2b' }}>{fmtBridge(totalesPv?.gp?.bridge)}</span></div>
+                </div>
+                <div style={{ background: 'rgba(240,161,26,0.08)', border: '1px solid rgba(240,161,26,0.3)', borderRadius: '16px', padding: '14px' }}>
+                  <div style={{ fontSize: '9px', fontWeight: '800', color: 'var(--muted)', letterSpacing: '.03em', marginBottom: 6 }}>% GP</div>
+                  <div style={{ fontSize: '20px', fontWeight: '800', color: '#8a5a06', fontFamily: "'IBM Plex Mono',monospace" }}>{totalesPv?.pctGp?.actual != null ? `${(totalesPv.pctGp.actual * 100).toFixed(1)}%` : '—'}</div>
+                  <div style={{ fontSize: '10px', color: 'var(--muted)', fontWeight: '700' }}>PV {totalesPv?.pctGp?.pv != null ? `${(totalesPv.pctGp.pv * 100).toFixed(1)}%` : '—'}</div>
+                </div>
+              </div>
+
+              {insightPv && (
+                <div style={{ background: 'rgba(240,161,26,0.08)', border: '1px solid rgba(240,161,26,0.3)', borderRadius: '16px', padding: '14px 16px', marginBottom: 18 }}>
+                  <p style={{ fontWeight: '800', fontSize: '12px', color: '#8a5a06', margin: '0 0 4px' }}>⚠ Insight automático</p>
+                  <p style={{ fontSize: '12px', color: 'var(--ink-800)', margin: 0, lineHeight: 1.5 }}>{insightPv}</p>
+                </div>
+              )}
+
+              {/* Revenue Bridge + Cost Bridge */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 10, marginBottom: 18 }}>
+                {[['Revenue Bridge', lineasRevenuePv, true], ['Cost Bridge', lineasCostoPv, false]].map(([titulo, lineas, favorableEsPositivo]) => (
+                  <div key={titulo} style={{ background: 'var(--glass)', border: '1px solid rgba(255,255,255,0.72)', borderRadius: '16px', padding: '16px', boxShadow: 'var(--shadow-soft)' }}>
+                    <p style={{ fontWeight: '800', fontSize: '12px', color: 'var(--ink-950)', margin: '0 0 10px' }}>{titulo}</p>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11px' }}>
+                      <thead><tr>
+                        <th style={{ textAlign: 'left', color: 'var(--muted)', fontWeight: 800, padding: '4px 0' }}>Categoría</th>
+                        <th style={{ textAlign: 'right', color: 'var(--muted)', fontWeight: 800, padding: '4px 6px' }}>PV</th>
+                        <th style={{ textAlign: 'right', color: 'var(--muted)', fontWeight: 800, padding: '4px 6px' }}>Actual</th>
+                        <th style={{ textAlign: 'right', color: 'var(--muted)', fontWeight: 800, padding: '4px 0' }}>Bridge</th>
+                        <th></th>
+                      </tr></thead>
+                      <tbody>
+                        {lineas.map((linea, i) => {
+                          const bridge = linea.bridge || 0;
+                          const favorable = favorableEsPositivo ? bridge >= 0 : bridge <= 0;
+                          const color = bridge === 0 ? 'var(--muted)' : (favorable ? '#116642' : '#a61e2b');
+                          const globalIndex = ultimaCargaPv.items.indexOf(linea);
+                          return (
+                            <tr key={i}>
+                              <td style={{ padding: '5px 0', fontWeight: 700, color: 'var(--ink-800)', borderTop: '1px solid rgba(18,52,78,0.06)' }}>{linea.nombre}</td>
+                              <td style={{ padding: '5px 6px', textAlign: 'right', color: 'var(--muted)', borderTop: '1px solid rgba(18,52,78,0.06)' }}>{fmtUsd(linea.pv)}</td>
+                              <td style={{ padding: '5px 6px', textAlign: 'right', color: 'var(--ink-950)', fontWeight: 700, borderTop: '1px solid rgba(18,52,78,0.06)' }}>{fmtUsd(linea.actual)}</td>
+                              <td style={{ padding: '5px 0', textAlign: 'right', fontWeight: 800, color, borderTop: '1px solid rgba(18,52,78,0.06)' }}>{fmtBridge(linea.bridge)}</td>
+                              <td style={{ padding: '5px 0 5px 6px', borderTop: '1px solid rgba(18,52,78,0.06)', textAlign: 'center' }}>
+                                <i
+                                  className={`ti ${linea.comentario ? 'ti-message-2-filled' : 'ti-message-2'}`}
+                                  aria-hidden="true"
+                                  title={linea.comentario || 'Agregar comentario'}
+                                  onClick={() => setEditandoComentario({ cargaId: ultimaCargaPv.id, indice: globalIndex, texto: linea.comentario || '' })}
+                                  style={{ fontSize: 13, color: linea.comentario ? 'var(--bank-blue)' : 'var(--muted)', cursor: 'pointer' }}
+                                ></i>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                ))}
+              </div>
+
+              {/* Tendencia */}
+              <div style={{ background: 'var(--glass)', border: '1px solid rgba(255,255,255,0.72)', borderRadius: '22px', padding: '18px', boxShadow: 'var(--shadow-soft)', marginBottom: '18px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                  <p style={{ fontWeight: '800', fontSize: '13px', color: 'var(--ink-950)', margin: 0 }}>Evolución Revenue PV vs Actual</p>
+                  <span style={{ fontSize: '10px', color: 'var(--muted)', fontWeight: '700' }}>
+                    {cargasPv.length} {cargasPv.length === 1 ? 'mes' : 'meses'} en el histórico
+                  </span>
+                </div>
+                {cargasPv.length < 2 ? (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '14px 0' }}>
+                    <div style={{ width: 10, height: 10, borderRadius: '50%', background: '#003b71', flexShrink: 0 }}></div>
+                    <div style={{ flex: 1, height: 1, background: 'var(--line)' }}></div>
+                    <div style={{ fontSize: '11px', color: 'var(--muted)', fontWeight: '700', whiteSpace: 'nowrap' }}>
+                      Se necesitan al menos 2 meses para trazar la tendencia
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ position: 'relative', height: '220px' }}>
+                    <Line data={dataTendenciaPv} options={{
+                      responsive: true, maintainAspectRatio: false,
+                      plugins: { legend: { position: 'bottom', labels: { boxWidth: 8, font: { size: 10 } } } },
+                      scales: { y: { beginAtZero: false }, x: { grid: { display: false } } }
+                    }} />
+                  </div>
+                )}
+              </div>
+
+              {/* Histórico de meses */}
+              <div style={{ background: 'var(--glass)', border: '1px solid rgba(255,255,255,0.72)', borderRadius: '22px', padding: '16px 18px', boxShadow: 'var(--shadow-soft)' }}>
+                <p style={{ fontWeight: '800', fontSize: '13px', color: 'var(--ink-950)', margin: '0 0 10px' }}>Histórico de cierres</p>
+                <table className="tabla">
+                  <thead>
+                    <tr><th>Mes</th><th>Revenue Actual</th><th>Bridge Revenue</th><th>Costo Actual</th><th>Bridge Costo</th><th>Subido por</th></tr>
+                  </thead>
+                  <tbody>
+                    {[...cargasPv].reverse().map((c, i) => {
+                      const r = buscarItemPv(c.items, 'Total Revenue');
+                      const co = buscarItemPv(c.items, 'Total Cost');
+                      return (
+                        <tr key={c.id} style={i === 0 ? { background: 'rgba(32,166,106,0.05)' } : undefined}>
+                          <td style={{ fontWeight: '700' }}>{c.mesCierre}{i === 0 && <span style={{ color: '#20a66a', fontSize: '10px', fontWeight: '800', marginLeft: 6 }}>· actual</span>}</td>
+                          <td style={{ fontWeight: 800, color: 'var(--ink-950)', fontFamily: "'IBM Plex Mono',monospace" }}>{fmtUsd(r?.actual)}</td>
+                          <td style={{ color: (r?.bridge || 0) >= 0 ? '#116642' : '#a61e2b', fontWeight: 700 }}>{fmtBridge(r?.bridge)}</td>
+                          <td style={{ fontWeight: 800, color: 'var(--ink-950)', fontFamily: "'IBM Plex Mono',monospace" }}>{fmtUsd(co?.actual)}</td>
+                          <td style={{ color: (co?.bridge || 0) <= 0 ? '#116642' : '#a61e2b', fontWeight: 700 }}>{fmtBridge(co?.bridge)}</td>
+                          <td style={{ color: 'var(--muted)' }}>{c.cargadoPor}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* MODAL EDITAR COMENTARIO PV */}
+      {editandoComentario && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(6,24,38,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 20 }}>
+          <div style={{ background: 'var(--paper-50)', border: '1px solid rgba(255,255,255,0.72)', borderRadius: '22px', padding: 22, width: 420 }}>
+            <p style={{ fontWeight: '800', margin: '0 0 10px', color: 'var(--ink-950)' }}>Comentario</p>
+            <textarea
+              value={editandoComentario.texto}
+              onChange={e => setEditandoComentario({ ...editandoComentario, texto: e.target.value })}
+              placeholder="Explicá la variación..."
+              style={{ width: '100%', minHeight: 90, border: '1px solid var(--line)', borderRadius: '12px', padding: '10px 12px', fontSize: '13px', fontFamily: 'inherit', marginBottom: 14 }}
+            />
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button onClick={guardarComentarioPv} disabled={guardandoComentario}
+                style={{ flex: 1, padding: '10px', background: guardandoComentario ? 'var(--muted)' : 'linear-gradient(135deg,var(--ink-900),var(--bank-blue))', color: '#fff', border: 'none', borderRadius: '999px', fontWeight: '800', fontSize: '12px', cursor: guardandoComentario ? 'not-allowed' : 'pointer' }}>
+                {guardandoComentario ? 'Guardando...' : 'Guardar'}
+              </button>
+              <button onClick={() => setEditandoComentario(null)}
+                style={{ flex: 1, padding: '10px', background: 'transparent', color: 'var(--muted)', border: '1px solid var(--line)', borderRadius: '999px', fontWeight: '800', fontSize: '12px', cursor: 'pointer' }}>
+                Cancelar
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
