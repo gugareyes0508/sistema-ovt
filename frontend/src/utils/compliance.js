@@ -25,6 +25,11 @@ export const ESTADOS_GESTION = ['Pendiente', 'En gestión', 'Escalado', 'Excepci
 export const FILTROS_CLAVES = ['tipo', 'cap', 'cap2', 'clas', 'hard', 'est', 'ubi'];
 // Definición de la mirada Kyndryl (mismo formato)
 export const KYNDRYL_CLAVES = ['adm1', 'adm2', 'ubi'];
+// Partes de la definición de Kyndryl que son FIJAS (solo lectura, siempre "Todos") en cada hoja.
+// En Banchile Kyndryl se define solo por Ubicación (el universo sin GCP); en Banco todo es editable.
+export const KYNDRYL_FIJOS = { banchile: ['adm1', 'adm2'] };
+export const kyndrylFijo = (entidad, clave) => (KYNDRYL_FIJOS[entidad] || []).includes(clave);
+
 export const NOMBRE_CAMPO = {
   tipo: 'Tipo de Infraestructura', cap: 'Capacidad Primaria', cap2: 'Capacidad Secundaria', clas: 'Clasificación',
   hard: 'Hardening', est: 'Estado Operativo', ubi: 'Ubicación', adm1: 'Administración principal', adm2: 'Administración secundaria'

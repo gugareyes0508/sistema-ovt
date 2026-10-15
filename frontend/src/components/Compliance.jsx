@@ -3,7 +3,7 @@ import axios from 'axios';
 import * as XLSX from 'xlsx';
 import {
   ESTADOS_GESTION, parsearInventario, decodificar, aplicarFiltros, calcularVista, listaGestion,
-  opcionesDe, claveHost, lunesDe, etiquetaSemana, aISO, esKyndryl, cargaCompleta, describirKyndryl, kyndrylDefinido, filtroActivo
+  opcionesDe, claveHost, lunesDe, etiquetaSemana, aISO, esKyndryl, cargaCompleta, describirKyndryl, kyndrylDefinido, filtroActivo, KYNDRYL_FIJOS, kyndrylFijo
 } from '../utils/compliance';
 
 // ============================================
@@ -32,6 +32,14 @@ const etq = (v) => (v === '' ? '(vacío)' : v);
 const colorGauge = (p) => (p >= 95 ? '#2b5fb0' : p >= 90 ? '#e0a800' : '#c8402f');
 const clonar = (x) => JSON.parse(JSON.stringify(x));
 // Cada hoja (Banco / Banchile) tiene sus propios filtros por defecto y su propia definición de Kyndryl
+// Lo fijo de la definición de Kyndryl (en Banchile: administración principal y secundaria = Todos) se impone siempre
+const normalizarConfig = (cfg) => {
+  const c = clonar(cfg);
+  Object.keys(KYNDRYL_FIJOS).forEach(ent => {
+    if (c.entidades && c.entidades[ent]) KYNDRYL_FIJOS[ent].forEach(k => { c.entidades[ent].kyndryl[k] = { inc: [], exc: [] }; });
+  });
+  return c;
+};
 const ajustesDesdeConfig = (cfg) => ({ banco: clonar(cfg.entidades.banco), banchile: clonar(cfg.entidades.banchile) });
 const fechaCorta = (iso) => (iso ? iso.slice(5).split('-').reverse().join('/') : '');
 const fechaHora = (iso) => (iso ? new Date(iso).toLocaleString('es-CL', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '');
@@ -73,17 +81,18 @@ function TarjetaGauge({ titulo, s }) {
   );
 }
 
-function ColumnaMirada({ nombre, detalle, v, controlExtra }) {
+// Las dos columnas (Global / Kyndryl) tienen un encabezado idéntico y de alto fijo, así sus gráficos
+// quedan a la misma altura aunque el texto de la definición sea largo (se recorta a 2 líneas).
+function ColumnaMirada({ nombre, detalle, v }) {
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 8, flexWrap: 'wrap', gap: 6 }}>
-        <div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10, marginBottom: 8, minHeight: 66 }}>
+        <div style={{ minWidth: 0, flex: 1 }}>
           <div style={{ fontSize: '15px', fontWeight: 800, color: 'var(--ink-950)' }}>{nombre}</div>
           <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--ink-800)' }}>Total máquinas: {v.total.total}</div>
-          <div style={{ fontSize: '10px', color: 'var(--muted)' }}>{detalle}</div>
-          {controlExtra && <div style={{ marginTop: 6 }}>{controlExtra}</div>}
+          <div title={detalle} style={{ fontSize: '10px', color: 'var(--muted)', lineHeight: '13px', height: 26, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>{detalle}</div>
         </div>
-        <div style={{ textAlign: 'right' }}>
+        <div style={{ textAlign: 'right', flexShrink: 0 }}>
           <div style={{ fontSize: '12px', fontWeight: 800, color: 'var(--ink-950)' }}>SCORE: {v.total.score !== null ? `${fmt(v.total.score)} %` : '—'}</div>
           <div style={{ fontSize: '10px', color: 'var(--muted)' }}>promedio adherencia{v.total.sinDato ? ` · ${v.total.sinDato} sin dato = 0` : ''}</div>
         </div>
@@ -115,7 +124,7 @@ function Chip({ activo, onClick, children }) {
   );
 }
 
-function FiltroSelect({ etiqueta, opciones, valor, onChange }) {
+function FiltroSelect({ etiqueta, opciones, valor, onChange, bloqueado, motivo }) {
   const [abierto, setAbierto] = useState(false);
   const [modoLocal, setModoLocal] = useState('inc');
   const mixto = valor.inc.length > 0 && valor.exc.length > 0;
@@ -137,12 +146,13 @@ function FiltroSelect({ etiqueta, opciones, valor, onChange }) {
   return (
     <div style={{ position: 'relative' }}>
       <label style={labelStyle}>{etiqueta}</label>
-      <button type="button" onClick={() => setAbierto(a => !a)}
-        style={{ ...inputStyle, minWidth: 150, maxWidth: 230, textAlign: 'left', cursor: 'pointer', fontWeight: 700, fontSize: '11px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-          borderColor: lista.length > 0 || mixto ? 'var(--bank-blue)' : 'var(--line)' }}>
-        {resumen} <span style={{ float: 'right', marginLeft: 8, color: 'var(--muted)' }}>▾</span>
+      <button type="button" disabled={!!bloqueado} title={bloqueado ? motivo : undefined} onClick={() => { if (!bloqueado) setAbierto(a => !a); }}
+        style={{ ...inputStyle, minWidth: 150, maxWidth: 230, textAlign: 'left', cursor: bloqueado ? 'not-allowed' : 'pointer', fontWeight: 700, fontSize: '11px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+          background: bloqueado ? '#f3f6f8' : '#fff', color: bloqueado ? 'var(--muted)' : 'var(--ink-950)',
+          borderColor: !bloqueado && (lista.length > 0 || mixto) ? 'var(--bank-blue)' : 'var(--line)' }}>
+        {resumen} <span style={{ float: 'right', marginLeft: 8, color: 'var(--muted)' }}>{bloqueado ? '🔒' : '▾'}</span>
       </button>
-      {abierto && (
+      {abierto && !bloqueado && (
         <>
           <div onClick={() => setAbierto(false)} style={{ position: 'fixed', inset: 0, zIndex: 40 }} />
           <div style={{ position: 'absolute', top: '100%', left: 0, zIndex: 41, marginTop: 4, minWidth: 250, maxHeight: 320, overflowY: 'auto', background: '#fff', border: '1px solid var(--line)', borderRadius: '12px', boxShadow: 'var(--shadow-soft)', padding: 8 }}>
@@ -224,8 +234,9 @@ export default function Compliance({ token, apiUrl, clienteActivo, usuario }) {
           axios.get(`${apiUrl}/api/compliance/cargas`, { headers })
         ]);
         if (cancelado) return;
-        setConfig(cfg.data);
-        setAjustes(ajustesDesdeConfig(cfg.data));
+        const cfgOk = normalizarConfig(cfg.data);
+        setConfig(cfgOk);
+        setAjustes(ajustesDesdeConfig(cfgOk));
         setUmbral(cfg.data.umbral);
         setCargas(lista.data);
         setSemana(prev => prev || (lista.data[0] ? lista.data[0].semana : ''));
@@ -352,6 +363,7 @@ export default function Compliance({ token, apiUrl, clienteActivo, usuario }) {
     setPagina(0);
   };
   const cambiarKyndryl = (campo, valor) => {
+    if (kyndrylFijo(entidad, campo)) return;
     setAjustes(prev => ({ ...prev, [entidad]: { ...prev[entidad], kyndryl: { ...prev[entidad].kyndryl, [campo]: valor } } }));
     setPagina(0);
   };
@@ -555,6 +567,23 @@ export default function Compliance({ token, apiUrl, clienteActivo, usuario }) {
                       style={{ width: '100%', accentColor: '#003b71' }} aria-label="Umbral de cumplimiento" />
                   </div>
                 </div>
+
+                {/* Definición de Kyndryl: fila aparte y siempre visible (no empuja los gráficos) */}
+                <div style={{ borderTop: '1px solid var(--line)', marginTop: 12, paddingTop: 10 }}>
+                  <div style={{ display: 'flex', alignItems: 'flex-end', gap: 12, flexWrap: 'wrap' }}>
+                    <div style={{ alignSelf: 'center', minWidth: 150 }}>
+                      <div style={{ fontSize: '10px', fontWeight: 800, color: 'var(--ink-950)', letterSpacing: '.03em' }}>DEFINICIÓN DE KYNDRYL</div>
+                      <div style={{ fontSize: '10px', color: 'var(--muted)', lineHeight: 1.4 }}>Servidores del universo que cumplen esto · <b>{vista.kyndryl.total.total}</b></div>
+                      {kyndrylFijo(entidad, 'adm2') && <div style={{ fontSize: '10px', color: '#8a5a06', lineHeight: 1.4 }}>🔒 En Banchile la administración es fija (Todos)</div>}
+                    </div>
+                    <FiltroSelect etiqueta="ADMINISTRACIÓN PRINCIPAL" opciones={opciones.adm1} valor={kyndril.adm1} onChange={v => cambiarKyndryl('adm1', v)}
+                      bloqueado={kyndrylFijo(entidad, 'adm1')} motivo="Fija en Banchile: Kyndryl se define solo por Ubicación" />
+                    <FiltroSelect etiqueta="ADMINISTRACIÓN SECUNDARIA" opciones={opciones.adm2} valor={kyndril.adm2} onChange={v => cambiarKyndryl('adm2', v)}
+                      bloqueado={kyndrylFijo(entidad, 'adm2')} motivo="Fija en Banchile: Kyndryl se define solo por Ubicación" />
+                    <FiltroSelect etiqueta="UBICACIÓN (KYNDRYL)" opciones={opciones.ubi} valor={kyndril.ubi} onChange={v => cambiarKyndryl('ubi', v)} />
+                  </div>
+                </div>
+
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginTop: 10 }}>
                   <div style={{ fontSize: '10px', color: 'var(--muted)', lineHeight: 1.5, flex: 1, minWidth: 260 }}>
                     <b>Cumple</b> = Adherencia de Hardening ≥ {umbral}% · vacío cuenta como 0 · Gauge: <span style={{ color: '#2b5fb0' }}>●</span> ≥95% <span style={{ color: '#e0a800' }}>●</span> 90–95% <span style={{ color: '#c8402f' }}>●</span> &lt;90%
@@ -576,18 +605,7 @@ export default function Compliance({ token, apiUrl, clienteActivo, usuario }) {
               ) : (
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 14 }}>
                   <ColumnaMirada nombre="Global" detalle="Universo según los filtros" v={vista.global} />
-                  <ColumnaMirada nombre="Kyndryl"
-                    detalle={describirKyndryl(kyndril)} v={vista.kyndryl}
-                    controlExtra={(
-                      <details>
-                        <summary style={{ fontSize: '11px', fontWeight: 800, color: 'var(--bank-blue)', cursor: 'pointer' }}>Definir qué es Kyndryl</summary>
-                        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 8 }}>
-                          <FiltroSelect etiqueta="ADMINISTRACIÓN PRINCIPAL" opciones={opciones.adm1} valor={kyndril.adm1} onChange={v => cambiarKyndryl('adm1', v)} />
-                          <FiltroSelect etiqueta="ADMINISTRACIÓN SECUNDARIA" opciones={opciones.adm2} valor={kyndril.adm2} onChange={v => cambiarKyndryl('adm2', v)} />
-                          <FiltroSelect etiqueta="UBICACIÓN" opciones={opciones.ubi} valor={kyndril.ubi} onChange={v => cambiarKyndryl('ubi', v)} />
-                        </div>
-                      </details>
-                    )} />
+                  <ColumnaMirada nombre="Kyndryl" detalle={describirKyndryl(kyndril)} v={vista.kyndryl} />
                 </div>
               )}
 

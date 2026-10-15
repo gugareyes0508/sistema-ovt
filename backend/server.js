@@ -2826,6 +2826,13 @@ const COMPLIANCE_DEFAULTS = {
   }
 };
 const COMPLIANCE_UMBRAL_DEFAULT = 90;
+// Partes de la definición de Kyndryl que son fijas (siempre "Todos") en cada hoja: en Banchile Kyndryl se
+// define solo por Ubicación. Se imponen al leer y al guardar, aunque en Firestore quede otro valor.
+const COMPLIANCE_KYNDRYL_FIJOS = { banchile: ['adm1', 'adm2'] };
+const complianceImponerFijos = (ent, kyndryl) => {
+  (COMPLIANCE_KYNDRYL_FIJOS[ent] || []).forEach(k => { kyndryl[k] = { inc: [], exc: [] }; });
+  return kyndryl;
+};
 const complianceListaTextos = (a) => Array.isArray(a) && a.length <= 100 && a.every(v => typeof v === 'string' && v.length <= 100);
 // Mezcla lo guardado con los defaults: todo filtro queda siempre completo
 const complianceMezclarFiltros = (base, guardado, claves) => {
@@ -2990,7 +2997,7 @@ app.get('/api/compliance/config', verificarToken, async (req, res) => {
       const guardada = g.entidades && g.entidades[ent];
       salida.entidades[ent] = {
         filtros: complianceMezclarFiltros(base.filtros, guardada && guardada.filtros, COMPLIANCE_FILTROS_CLAVES),
-        kyndryl: complianceMezclarFiltros(base.kyndryl, guardada && guardada.kyndryl, COMPLIANCE_KYNDRYL_CLAVES)
+        kyndryl: complianceImponerFijos(ent, complianceMezclarFiltros(base.kyndryl, guardada && guardada.kyndryl, COMPLIANCE_KYNDRYL_CLAVES))
       };
     });
     res.json(salida);
@@ -3018,7 +3025,7 @@ app.put('/api/compliance/config', verificarToken, async (req, res) => {
     const completar = (obj, claves) => complianceMezclarFiltros(complianceFiltros(claves), obj, claves);
     await db.collection('compliance_config').doc(clienteId).set({
       umbral,
-      entidades: { [entidad]: { filtros: completar(filtros, COMPLIANCE_FILTROS_CLAVES), kyndryl: completar(kyndryl, COMPLIANCE_KYNDRYL_CLAVES) } },
+      entidades: { [entidad]: { filtros: completar(filtros, COMPLIANCE_FILTROS_CLAVES), kyndryl: complianceImponerFijos(entidad, completar(kyndryl, COMPLIANCE_KYNDRYL_CLAVES)) } },
       actualizadoPor: req.usuario.nombre, actualizadoEn: new Date()
     }, { merge: true });
     await db.collection('auditoria').add({
