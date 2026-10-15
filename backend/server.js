@@ -2789,16 +2789,52 @@ app.put('/api/gobierno/pv/:id/comentario', verificarToken, async (req, res) => {
 const COMPLIANCE_ENTIDADES = ['banco', 'banchile'];
 const COMPLIANCE_ROLES_CARGA = ['admin', 'dpe'];
 const COMPLIANCE_ESTADOS = ['Pendiente', 'En gestión', 'Escalado', 'Excepción', 'Resuelto'];
-const COMPLIANCE_COLS_FILA = 11;
+// Fila = [host, tipo, cap, hard, ubi, clas, amb, est, so, svc, adh, cap2, adm1, adm2].
+// Las cargas hechas antes de agregar Capacidad Secundaria / Administración tienen 11 columnas
+// y se siguen leyendo; las nuevas traen 14.
+const COMPLIANCE_ANCHOS_FILA = [11, 14];
 const COMPLIANCE_DICT_KEYS = ['tipo', 'cap', 'hard', 'ubi', 'clas', 'amb', 'est', 'so', 'svc'];
+const COMPLIANCE_DICT_KEYS_EXTRA = ['cap2', 'adm1', 'adm2'];
+const COMPLIANCE_FILTROS_CLAVES = ['tipo', 'cap', 'cap2', 'clas', 'hard', 'est', 'ubi'];
+const COMPLIANCE_KYNDRYL_CLAVES = ['adm1', 'adm2', 'ubi'];
 const COMPLIANCE_FILAS_POR_BLOQUE = 1500;
 const COMPLIANCE_MAX_FILAS = 60000;
 const COMPLIANCE_MAX_HOSTS_GESTION = 400;
-const COMPLIANCE_CONFIG_DEFAULT = {
-  umbral: 90,
-  filtros: { tipo: ['CLOUD'], cap: ['SERVIDOR', 'APPLIANCE'], hard: ['SI'], ubi: [] },
-  kyndrylExcluye: ['GCP'],
-  excluirBajas: false
+// Cada filtro es { inc: [valores permitidos], exc: [valores descartados] }; lista vacía = sin restricción.
+const complianceFiltroVacio = () => ({ inc: [], exc: [] });
+const complianceFiltros = (claves, parcial) => {
+  const o = {};
+  claves.forEach(k => { o[k] = { inc: [], exc: [], ...((parcial && parcial[k]) || {}) }; });
+  return o;
+};
+// Valores por defecto de cada hoja: Banchile y Banco tienen filtros y definición de Kyndryl distintos.
+const COMPLIANCE_DEFAULTS = {
+  banchile: {
+    filtros: complianceFiltros(COMPLIANCE_FILTROS_CLAVES, {
+      tipo: { inc: ['CLOUD'] }, cap: { inc: ['SERVIDOR', 'APPLIANCE'] }, hard: { inc: ['SI'] }
+    }),
+    // Kyndryl = el mismo universo sin las máquinas de GCP
+    kyndryl: complianceFiltros(COMPLIANCE_KYNDRYL_CLAVES, { ubi: { exc: ['GCP'] } })
+  },
+  banco: {
+    filtros: complianceFiltros(COMPLIANCE_FILTROS_CLAVES, {
+      tipo: { inc: ['CLOUD'] }, cap: { inc: ['HYPERVISOR', 'SERVIDOR'] }, cap2: { exc: ['EXACS'] },
+      clas: { inc: ['PRODUCCION'] }, hard: { inc: ['SI'] }, est: { exc: ['DE BAJA'] }
+    }),
+    // Kyndryl = máquinas con Administración secundaria KYNDRYL
+    kyndryl: complianceFiltros(COMPLIANCE_KYNDRYL_CLAVES, { adm2: { inc: ['KYNDRYL'] } })
+  }
+};
+const COMPLIANCE_UMBRAL_DEFAULT = 90;
+const complianceListaTextos = (a) => Array.isArray(a) && a.length <= 100 && a.every(v => typeof v === 'string' && v.length <= 100);
+// Mezcla lo guardado con los defaults: todo filtro queda siempre completo
+const complianceMezclarFiltros = (base, guardado, claves) => {
+  const out = {};
+  claves.forEach(k => {
+    const g = guardado && guardado[k];
+    out[k] = (g && complianceListaTextos(g.inc) && complianceListaTextos(g.exc)) ? { inc: g.inc, exc: g.exc } : base[k];
+  });
+  return out;
 };
 
 const complianceCliente = (req) => req.headers['x-cliente-activo'] || 'bcochile';
@@ -2818,15 +2854,29 @@ function complianceValidarEntidad(datos) {
   }
   if (!Array.isArray(rows) || rows.length === 0) return 'no trae filas';
   if (rows.length > COMPLIANCE_MAX_FILAS) return `demasiadas filas (máximo ${COMPLIANCE_MAX_FILAS})`;
+  const ancho = Array.isArray(rows[0]) ? rows[0].length : 0;
+  if (!COMPLIANCE_ANCHOS_FILA.includes(ancho)) return `las filas deben tener ${COMPLIANCE_ANCHOS_FILA.join(' o ')} columnas`;
+  const conExtras = ancho === 14;
+  if (conExtras) {
+    for (const k of COMPLIANCE_DICT_KEYS_EXTRA) {
+      if (!Array.isArray(dict[k]) || dict[k].some(v => typeof v !== 'string')) return `diccionario "${k}" inválido`;
+    }
+  }
   for (let i = 0; i < rows.length; i++) {
     const r = rows[i];
-    if (!Array.isArray(r) || r.length !== COMPLIANCE_COLS_FILA) return `la fila ${i + 1} no tiene ${COMPLIANCE_COLS_FILA} columnas`;
+    if (!Array.isArray(r) || r.length !== ancho) return `la fila ${i + 1} no tiene ${ancho} columnas`;
     if (typeof r[0] !== 'string' || r[0] === '') return `la fila ${i + 1} no tiene hostname`;
     for (let c = 1; c <= 9; c++) {
       const k = COMPLIANCE_DICT_KEYS[c - 1];
       if (!Number.isInteger(r[c]) || r[c] < 0 || r[c] >= dict[k].length) return `la fila ${i + 1} tiene un valor inválido en "${k}"`;
     }
     if (!Number.isInteger(r[10]) || r[10] < -1 || r[10] > 100) return `la fila ${i + 1} tiene una adherencia inválida`;
+    if (conExtras) {
+      for (let c = 11; c <= 13; c++) {
+        const k = COMPLIANCE_DICT_KEYS_EXTRA[c - 11];
+        if (!Number.isInteger(r[c]) || r[c] < 0 || r[c] >= dict[k].length) return `la fila ${i + 1} tiene un valor inválido en "${k}"`;
+      }
+    }
   }
   return null;
 }
@@ -2928,43 +2978,52 @@ app.get('/api/compliance/cargas/:semana/:entidad', verificarToken, async (req, r
   }
 });
 
-// GET /api/compliance/config — umbral y filtros por defecto del módulo
+// GET /api/compliance/config — umbral (único del módulo) y, por hoja, filtros y definición de Kyndryl.
+// Lo que no se haya guardado para una hoja cae a los valores por defecto de esa hoja.
 app.get('/api/compliance/config', verificarToken, async (req, res) => {
   try {
     const doc = await db.collection('compliance_config').doc(complianceCliente(req)).get();
     const g = doc.exists ? doc.data() : {};
-    res.json({
-      umbral: Number.isInteger(g.umbral) ? g.umbral : COMPLIANCE_CONFIG_DEFAULT.umbral,
-      filtros: { ...COMPLIANCE_CONFIG_DEFAULT.filtros, ...(g.filtros || {}) },
-      kyndrylExcluye: Array.isArray(g.kyndrylExcluye) ? g.kyndrylExcluye : COMPLIANCE_CONFIG_DEFAULT.kyndrylExcluye,
-      excluirBajas: typeof g.excluirBajas === 'boolean' ? g.excluirBajas : COMPLIANCE_CONFIG_DEFAULT.excluirBajas
+    const salida = { umbral: Number.isInteger(g.umbral) ? g.umbral : COMPLIANCE_UMBRAL_DEFAULT, entidades: {} };
+    COMPLIANCE_ENTIDADES.forEach(ent => {
+      const base = COMPLIANCE_DEFAULTS[ent];
+      const guardada = g.entidades && g.entidades[ent];
+      salida.entidades[ent] = {
+        filtros: complianceMezclarFiltros(base.filtros, guardada && guardada.filtros, COMPLIANCE_FILTROS_CLAVES),
+        kyndryl: complianceMezclarFiltros(base.kyndryl, guardada && guardada.kyndryl, COMPLIANCE_KYNDRYL_CLAVES)
+      };
     });
+    res.json(salida);
   } catch (err) {
     console.error('Error GET /api/compliance/config:', err);
     res.status(500).json({ error: err.message });
   }
 });
 
-// PUT /api/compliance/config — fija el umbral y los filtros por defecto (admin / dpe)
+// PUT /api/compliance/config — fija como predeterminados el umbral y los filtros de UNA hoja (admin / dpe)
 app.put('/api/compliance/config', verificarToken, async (req, res) => {
   try {
     if (!COMPLIANCE_ROLES_CARGA.includes(req.usuario.rol)) return res.status(403).json({ error: 'Solo admin o DPE pueden cambiar la configuración' });
-    const { umbral, filtros, kyndrylExcluye, excluirBajas } = req.body || {};
-    const lista = (a) => Array.isArray(a) && a.length <= 50 && a.every(v => typeof v === 'string');
+    const { umbral, entidad, filtros, kyndryl } = req.body || {};
     // Cumple = adherencia >= umbral
     if (!Number.isInteger(umbral) || umbral < 50 || umbral > 100) return res.status(400).json({ error: 'El umbral debe ser un entero entre 50 y 100' });
-    const ubi = filtros && filtros.ubi !== undefined ? filtros.ubi : [];
-    if (!filtros || !lista(filtros.tipo) || !lista(filtros.cap) || !lista(filtros.hard) || !lista(ubi) || !lista(kyndrylExcluye) || typeof excluirBajas !== 'boolean') {
-      return res.status(400).json({ error: 'Configuración inválida' });
-    }
-    const clienteId = complianceCliente(req);
-    await db.collection('compliance_config').doc(clienteId).set({
-      umbral, filtros: { tipo: filtros.tipo, cap: filtros.cap, hard: filtros.hard, ubi }, kyndrylExcluye, excluirBajas,
-      actualizadoPor: req.usuario.nombre, actualizadoEn: new Date()
+    if (!COMPLIANCE_ENTIDADES.includes(entidad)) return res.status(400).json({ error: 'Entidad inválida' });
+    const valido = (obj, claves) => !!obj && typeof obj === 'object' && claves.every(k => {
+      const f = obj[k] === undefined ? complianceFiltroVacio() : obj[k];
+      return f && complianceListaTextos(f.inc) && complianceListaTextos(f.exc);
     });
+    if (!valido(filtros, COMPLIANCE_FILTROS_CLAVES) || !valido(kyndryl, COMPLIANCE_KYNDRYL_CLAVES)) return res.status(400).json({ error: 'Configuración inválida' });
+
+    const clienteId = complianceCliente(req);
+    const completar = (obj, claves) => complianceMezclarFiltros(complianceFiltros(claves), obj, claves);
+    await db.collection('compliance_config').doc(clienteId).set({
+      umbral,
+      entidades: { [entidad]: { filtros: completar(filtros, COMPLIANCE_FILTROS_CLAVES), kyndryl: completar(kyndryl, COMPLIANCE_KYNDRYL_CLAVES) } },
+      actualizadoPor: req.usuario.nombre, actualizadoEn: new Date()
+    }, { merge: true });
     await db.collection('auditoria').add({
       accion: 'COMPLIANCE_CONFIG', usuarioNombre: req.usuario.nombre, clienteId, timestamp: new Date(),
-      detalles: `Umbral ≥ ${umbral}%, excluye bajas: ${excluirBajas ? 'sí' : 'no'}`
+      detalles: `${entidad}: umbral ≥ ${umbral}%, filtros y definición de Kyndryl actualizados`
     });
     res.json({ success: true });
   } catch (err) {

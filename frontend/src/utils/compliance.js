@@ -7,17 +7,32 @@ export const ENTIDADES = [
   { id: 'banchile', label: 'Banchile', hoja: 'CMDB Banchile' }
 ];
 
+// Columnas obligatorias del Excel
 export const COLUMNAS_REQUERIDAS = [
   'Hostname', 'Tipo de Infraestructura', 'Capacidad Primaria', 'Hardening', 'Ubicación',
   'Clasificación', 'Ambiente', 'Estado Operativo', 'Adherencia de Hardening (%)',
   'Sistema operativo', 'Servicio de Negocio'
 ];
+// Columnas opcionales (si faltan se avisa y el filtro correspondiente no tiene efecto).
+// El CMDB trae "Capacidad Secundaría" con tilde: por eso las columnas se buscan sin tildes.
+export const COLUMNAS_OPCIONALES = [
+  ['cap2', 'Capacidad Secundaria'], ['adm1', 'Administración principal'], ['adm2', 'Administración secundaria']
+];
 
 export const ESTADOS_GESTION = ['Pendiente', 'En gestión', 'Escalado', 'Excepción', 'Resuelto'];
-export const ESTADOS_BAJA = ['DE BAJA', 'DECOMISADA', 'PROCESO DE BAJA', 'TERMINATED'];
+
+// Filtros de la vista (cada uno: { inc:[valores permitidos], exc:[valores descartados] })
+export const FILTROS_CLAVES = ['tipo', 'cap', 'cap2', 'clas', 'hard', 'est', 'ubi'];
+// Definición de la mirada Kyndryl (mismo formato)
+export const KYNDRYL_CLAVES = ['adm1', 'adm2', 'ubi'];
+export const NOMBRE_CAMPO = {
+  tipo: 'Tipo de Infraestructura', cap: 'Capacidad Primaria', cap2: 'Capacidad Secundaria', clas: 'Clasificación',
+  hard: 'Hardening', est: 'Estado Operativo', ubi: 'Ubicación', adm1: 'Administración principal', adm2: 'Administración secundaria'
+};
 
 const txt = (v) => String(v === undefined || v === null ? '' : v).trim();
 export const norm = (v) => txt(v).toUpperCase();
+const sinTildes = (s) => txt(s).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase();
 
 // "0,98" → 98 · 0.98 → 98 · 98 → 98 · vacío → null
 export function parsePct(v) {
@@ -39,8 +54,8 @@ export function claveHost(h) {
 }
 
 // Lee el workbook (SheetJS) y lo deja compacto: cada hoja → { dict, rows }.
-// Fila = [host, tipo, cap, hard, ubi, clas, amb, est, so, svc, adh] donde los
-// textos repetidos van como índices a `dict` y adh es 0-100 (-1 = vacío).
+// Fila = [host, tipo, cap, hard, ubi, clas, amb, est, so, svc, adh, cap2, adm1, adm2]
+// donde los textos repetidos van como índices a `dict` y adh es 0-100 (-1 = vacío).
 export function parsearInventario(XLSX, buffer) {
   // Siempre como Uint8Array: SheetJS no detecta bien un ArrayBuffer que venga de otro contexto
   const datos = buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer);
@@ -63,10 +78,16 @@ export function parsearInventario(XLSX, buffer) {
     const cols = Object.keys(filas[0]);
     const faltan = COLUMNAS_REQUERIDAS.filter(c => !cols.includes(c));
     if (faltan.length > 0) throw new Error(`En la hoja "${nombreHoja}" faltan las columnas: ${faltan.join(', ')}`);
+    // columnas opcionales, buscadas sin importar tildes ni mayúsculas
+    const colDe = {};
+    COLUMNAS_OPCIONALES.forEach(([k, nombre]) => {
+      colDe[k] = cols.find(c => sinTildes(c) === sinTildes(nombre)) || null;
+      if (!colDe[k]) advertencias.push(`La hoja "${nombreHoja}" no tiene la columna "${nombre}": ese filtro no tendrá efecto`);
+    });
 
     const dict = {};
     const indice = {};
-    campos.forEach(([k]) => { dict[k] = []; indice[k] = new Map(); });
+    [...campos.map(c => c[0]), ...COLUMNAS_OPCIONALES.map(c => c[0])].forEach(k => { dict[k] = []; indice[k] = new Map(); });
     const idxDe = (k, valor) => {
       if (!indice[k].has(valor)) { indice[k].set(valor, dict[k].length); dict[k].push(valor); }
       return indice[k].get(valor);
@@ -77,7 +98,10 @@ export function parsearInventario(XLSX, buffer) {
       const host = txt(f['Hostname']);
       if (!host) return; // sin hostname no se puede gestionar ni contar
       const adh = parsePct(f['Adherencia de Hardening (%)']);
-      rows.push([host, ...campos.map(([k, col, fn]) => idxDe(k, fn(f[col]))), adh === null ? -1 : adh]);
+      rows.push([
+        host, ...campos.map(([k, col, fn]) => idxDe(k, fn(f[col]))), adh === null ? -1 : adh,
+        ...COLUMNAS_OPCIONALES.map(([k]) => idxDe(k, colDe[k] ? norm(f[colDe[k]]) : ''))
+      ]);
     });
     entidades[ent.id] = { dict, rows };
     resumen[ent.id] = { filas: rows.length, sinHostname: filas.length - rows.length };
@@ -89,23 +113,46 @@ export function parsearInventario(XLSX, buffer) {
   return { entidades, resumen, advertencias };
 }
 
-// {dict, rows} → filas como objetos fáciles de filtrar
+// {dict, rows} → filas como objetos fáciles de filtrar. Las cargas antiguas (11 columnas,
+// sin Capacidad Secundaria ni Administración) se leen igual, con esos campos vacíos.
 export function decodificar({ dict, rows }) {
+  const d = (k, i) => (dict[k] && i !== undefined && dict[k][i] !== undefined ? dict[k][i] : '');
   return rows.map(r => ({
     host: r[0], tipo: dict.tipo[r[1]], cap: dict.cap[r[2]], hard: dict.hard[r[3]],
     ubi: dict.ubi[r[4]], clas: dict.clas[r[5]], amb: dict.amb[r[6]], est: dict.est[r[7]],
-    so: dict.so[r[8]], svc: dict.svc[r[9]], adh: r[10] < 0 ? null : r[10]
+    so: dict.so[r[8]], svc: dict.svc[r[9]], adh: r[10] < 0 ? null : r[10],
+    cap2: d('cap2', r[11]), adm1: d('adm1', r[12]), adm2: d('adm2', r[13])
   }));
 }
+// ¿esta carga trae las columnas agregadas después (Capacidad Secundaria / Administración)?
+export const cargaCompleta = (dict) => !!(dict && dict.cap2 && dict.adm1 && dict.adm2);
 
-const coincide = (lista, valor) => !lista || lista.length === 0 || lista.includes(valor);
+// Un filtro { inc, exc } deja pasar un valor si está en `inc` (cuando hay lista) y no está en `exc`
+const pasa = (f, v) => {
+  if (!f) return true;
+  const inc = f.inc || [];
+  const exc = f.exc || [];
+  return (inc.length === 0 || inc.includes(v)) && !exc.includes(v);
+};
+export const filtroActivo = (f) => !!f && ((f.inc && f.inc.length > 0) || (f.exc && f.exc.length > 0));
+export const filtroVacio = () => ({ inc: [], exc: [] });
 
-// filtros: { tipo:[], cap:[], hard:[], ubi:[], excluirBajas:bool } — lista vacía = todos
 export function aplicarFiltros(rows, filtros) {
-  return rows.filter(r =>
-    coincide(filtros.tipo, r.tipo) && coincide(filtros.cap, r.cap) && coincide(filtros.hard, r.hard) && coincide(filtros.ubi, r.ubi) &&
-    (!filtros.excluirBajas || !ESTADOS_BAJA.includes(r.est))
-  );
+  return rows.filter(r => FILTROS_CLAVES.every(k => pasa(filtros[k], r[k])));
+}
+
+// Kyndryl = el universo restringido por su definición (ej. Administración secundaria = KYNDRYL,
+// o Ubicación sin GCP). Una definición vacía deja pasar todo.
+export const esKyndryl = (r, kyndril) => KYNDRYL_CLAVES.every(k => pasa(kyndril && kyndril[k], r[k]));
+export const kyndrylDefinido = (kyndril) => KYNDRYL_CLAVES.some(k => filtroActivo(kyndril && kyndril[k]));
+export function describirKyndryl(kyndril) {
+  const partes = [];
+  KYNDRYL_CLAVES.forEach(k => {
+    const f = kyndril && kyndril[k];
+    if (f && f.inc && f.inc.length) partes.push(`${NOMBRE_CAMPO[k]}: ${f.inc.join(', ')}`);
+    if (f && f.exc && f.exc.length) partes.push(`${NOMBRE_CAMPO[k]} sin ${f.exc.join(', ')}`);
+  });
+  return partes.length ? partes.join(' · ') : 'Global (sin definición de Kyndryl)';
 }
 
 const acum = () => ({ total: 0, cumple: 0, suma: 0, sinDato: 0 });
@@ -118,15 +165,14 @@ const cerrar = (a) => ({
   score: a.total ? a.suma / a.total : null // vacío cuenta como 0
 });
 
-// Cumple = adherencia >= umbral. Kyndryl = el mismo universo sin las ubicaciones excluidas.
-export function calcularVista(rows, umbral, kyndrylExcluye) {
+// Cumple = adherencia >= umbral. Kyndryl = el universo que cumple la definición de Kyndryl.
+export function calcularVista(rows, umbral, kyndril) {
   const g = { t: acum(), p: acum(), n: acum() };
   const k = { t: acum(), p: acum(), n: acum() };
-  const excl = kyndrylExcluye || [];
   rows.forEach(r => {
     const esProd = r.clas === 'PRODUCCION';
     sumar(g.t, r, umbral); sumar(esProd ? g.p : g.n, r, umbral);
-    if (!excl.includes(r.ubi)) { sumar(k.t, r, umbral); sumar(esProd ? k.p : k.n, r, umbral); }
+    if (esKyndryl(r, kyndril)) { sumar(k.t, r, umbral); sumar(esProd ? k.p : k.n, r, umbral); }
   });
   const fin = (x) => ({ total: cerrar(x.t), prod: cerrar(x.p), noProd: cerrar(x.n) });
   return { global: fin(g), kyndryl: fin(k) };
@@ -138,9 +184,6 @@ export function listaGestion(rows, umbral) {
     .filter(r => r.adh === null || r.adh < umbral)
     .sort((a, b) => ((a.adh === null ? -1 : a.adh) - (b.adh === null ? -1 : b.adh)) || a.host.localeCompare(b.host));
 }
-
-// Kyndryl = el universo sin las ubicaciones excluidas (GCP por defecto)
-export const esKyndryl = (r, kyndrylExcluye) => !(kyndrylExcluye || []).includes(r.ubi);
 
 export function opcionesDe(rows, campo) {
   const conteo = new Map();

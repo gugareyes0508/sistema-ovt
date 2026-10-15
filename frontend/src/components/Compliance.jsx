@@ -3,7 +3,7 @@ import axios from 'axios';
 import * as XLSX from 'xlsx';
 import {
   ESTADOS_GESTION, parsearInventario, decodificar, aplicarFiltros, calcularVista, listaGestion,
-  opcionesDe, claveHost, lunesDe, etiquetaSemana, aISO, esKyndryl
+  opcionesDe, claveHost, lunesDe, etiquetaSemana, aISO, esKyndryl, cargaCompleta, describirKyndryl, kyndrylDefinido, filtroActivo
 } from '../utils/compliance';
 
 // ============================================
@@ -30,10 +30,9 @@ const inputStyle = { fontFamily: 'inherit', fontSize: '12px', border: '1px solid
 const fmt = (n, d = 1) => n.toLocaleString('es-CL', { minimumFractionDigits: d, maximumFractionDigits: d });
 const etq = (v) => (v === '' ? '(vacío)' : v);
 const colorGauge = (p) => (p >= 95 ? '#2b5fb0' : p >= 90 ? '#e0a800' : '#c8402f');
-const filtrosDesdeConfig = (cfg) => ({
-  tipo: cfg.filtros.tipo, cap: cfg.filtros.cap, hard: cfg.filtros.hard, ubi: cfg.filtros.ubi || [],
-  kyndrylExcluye: cfg.kyndrylExcluye, excluirBajas: cfg.excluirBajas
-});
+const clonar = (x) => JSON.parse(JSON.stringify(x));
+// Cada hoja (Banco / Banchile) tiene sus propios filtros por defecto y su propia definición de Kyndryl
+const ajustesDesdeConfig = (cfg) => ({ banco: clonar(cfg.entidades.banco), banchile: clonar(cfg.entidades.banchile) });
 const fechaCorta = (iso) => (iso ? iso.slice(5).split('-').reverse().join('/') : '');
 const fechaHora = (iso) => (iso ? new Date(iso).toLocaleString('es-CL', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '');
 
@@ -116,29 +115,49 @@ function Chip({ activo, onClick, children }) {
   );
 }
 
-function MultiSelect({ etiqueta, opciones, valor, onChange }) {
+function FiltroSelect({ etiqueta, opciones, valor, onChange }) {
   const [abierto, setAbierto] = useState(false);
-  const resumen = valor.length === 0 ? 'Todos' : valor.length <= 2 ? valor.map(etq).join(' + ') : `${valor.length} seleccionados`;
-  const alternar = (v) => onChange(valor.includes(v) ? valor.filter(x => x !== v) : [...valor, v]);
+  const [modoLocal, setModoLocal] = useState('inc');
+  const mixto = valor.inc.length > 0 && valor.exc.length > 0;
+  const modo = valor.inc.length > 0 ? 'inc' : valor.exc.length > 0 ? 'exc' : modoLocal;
+  const lista = modo === 'inc' ? valor.inc : valor.exc;
+  const nuevo = (l, m) => (m === 'inc' ? { inc: l, exc: [] } : { inc: [], exc: l });
+  const alternar = (v) => onChange(nuevo(lista.includes(v) ? lista.filter(x => x !== v) : [...lista, v], modo));
+  const cambiarModo = (m) => { setModoLocal(m); onChange(nuevo(lista, m)); };
+  const nombres = (l) => `${l.slice(0, 2).map(etq).join(', ')}${l.length > 2 ? ` +${l.length - 2}` : ''}`;
+  const resumen = mixto ? `${valor.inc.length} incl. · ${valor.exc.length} excl.`
+    : lista.length === 0 ? 'Todos'
+      : modo === 'exc' ? `Todos menos ${nombres(lista)}` : nombres(lista);
+  const todas = [...opciones, ...lista.filter(v => !opciones.some(o => o.valor === v)).map(v => ({ valor: v, n: 0 }))];
+  const modoBtn = (m, texto) => (
+    <button type="button" onClick={() => cambiarModo(m)} aria-pressed={modo === m}
+      style={{ flex: 1, padding: '5px 8px', borderRadius: '999px', border: 'none', fontSize: '10px', fontWeight: 800, cursor: 'pointer',
+        background: modo === m ? 'linear-gradient(135deg,var(--ink-900),var(--bank-blue))' : 'transparent', color: modo === m ? '#fff' : 'var(--muted)' }}>{texto}</button>
+  );
   return (
     <div style={{ position: 'relative' }}>
       <label style={labelStyle}>{etiqueta}</label>
       <button type="button" onClick={() => setAbierto(a => !a)}
-        style={{ ...inputStyle, minWidth: 150, textAlign: 'left', cursor: 'pointer', fontWeight: 700, fontSize: '11px' }}>
+        style={{ ...inputStyle, minWidth: 150, maxWidth: 230, textAlign: 'left', cursor: 'pointer', fontWeight: 700, fontSize: '11px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+          borderColor: lista.length > 0 || mixto ? 'var(--bank-blue)' : 'var(--line)' }}>
         {resumen} <span style={{ float: 'right', marginLeft: 8, color: 'var(--muted)' }}>▾</span>
       </button>
       {abierto && (
         <>
           <div onClick={() => setAbierto(false)} style={{ position: 'fixed', inset: 0, zIndex: 40 }} />
-          <div style={{ position: 'absolute', top: '100%', left: 0, zIndex: 41, marginTop: 4, minWidth: 230, maxHeight: 260, overflowY: 'auto', background: '#fff', border: '1px solid var(--line)', borderRadius: '12px', boxShadow: 'var(--shadow-soft)', padding: 8 }}>
-            {opciones.map(o => (
+          <div style={{ position: 'absolute', top: '100%', left: 0, zIndex: 41, marginTop: 4, minWidth: 250, maxHeight: 320, overflowY: 'auto', background: '#fff', border: '1px solid var(--line)', borderRadius: '12px', boxShadow: 'var(--shadow-soft)', padding: 8 }}>
+            <div style={{ display: 'flex', gap: 2, padding: 3, marginBottom: 6, border: '1px solid var(--line)', borderRadius: '999px' }}>
+              {modoBtn('inc', 'Solo estos')}
+              {modoBtn('exc', 'Todos menos estos')}
+            </div>
+            {todas.map(o => (
               <label key={o.valor} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 6px', fontSize: '12px', cursor: 'pointer', color: 'var(--ink-800)' }}>
-                <input type="checkbox" checked={valor.includes(o.valor)} onChange={() => alternar(o.valor)} />
+                <input type="checkbox" checked={lista.includes(o.valor)} onChange={() => alternar(o.valor)} />
                 <span style={{ flex: 1 }}>{etq(o.valor)}</span>
                 <span style={{ color: 'var(--muted)', fontSize: '10px' }}>{o.n}</span>
               </label>
             ))}
-            <button type="button" onClick={() => onChange([])}
+            <button type="button" onClick={() => onChange({ inc: [], exc: [] })}
               style={{ marginTop: 6, width: '100%', padding: '6px', border: '1px solid var(--line)', borderRadius: '8px', background: 'transparent', fontSize: '11px', fontWeight: 700, color: 'var(--muted)', cursor: 'pointer' }}>
               Sin filtrar (todos)
             </button>
@@ -150,12 +169,11 @@ function MultiSelect({ etiqueta, opciones, valor, onChange }) {
 }
 
 function Aviso({ tipo, children }) {
-  const error = tipo === 'error';
+  const [bg, borde, color] = tipo === 'error' ? ['rgba(215,59,71,0.08)', 'rgba(215,59,71,0.24)', '#a61e2b']
+    : tipo === 'aviso' ? ['rgba(240,161,26,0.1)', 'rgba(240,161,26,0.35)', '#8a5a06']
+      : ['rgba(32,166,106,0.1)', 'rgba(32,166,106,0.24)', '#116642'];
   return (
-    <div style={{
-      background: error ? 'rgba(215,59,71,0.08)' : 'rgba(32,166,106,0.1)', border: `1px solid ${error ? 'rgba(215,59,71,0.24)' : 'rgba(32,166,106,0.24)'}`,
-      borderRadius: '14px', padding: '10px 16px', fontSize: '13px', fontWeight: 600, marginBottom: 14, color: error ? '#a61e2b' : '#116642'
-    }}>{children}</div>
+    <div style={{ background: bg, border: `1px solid ${borde}`, borderRadius: '14px', padding: '10px 16px', fontSize: '13px', fontWeight: 600, marginBottom: 14, color }}>{children}</div>
   );
 }
 
@@ -173,7 +191,7 @@ export default function Compliance({ token, apiUrl, clienteActivo, usuario }) {
   const [cargas, setCargas] = useState([]);
   const [semana, setSemana] = useState('');
   const [config, setConfig] = useState(null);
-  const [filtros, setFiltros] = useState(null);
+  const [ajustes, setAjustes] = useState(null); // { banco: {filtros, kyndryl}, banchile: {filtros, kyndryl} }
   const [umbral, setUmbral] = useState(90);
   const [cargandoBase, setCargandoBase] = useState(true);
   const [filas, setFilas] = useState(null);
@@ -207,7 +225,7 @@ export default function Compliance({ token, apiUrl, clienteActivo, usuario }) {
         ]);
         if (cancelado) return;
         setConfig(cfg.data);
-        setFiltros(filtrosDesdeConfig(cfg.data));
+        setAjustes(ajustesDesdeConfig(cfg.data));
         setUmbral(cfg.data.umbral);
         setCargas(lista.data);
         setSemana(prev => prev || (lista.data[0] ? lista.data[0].semana : ''));
@@ -231,7 +249,7 @@ export default function Compliance({ token, apiUrl, clienteActivo, usuario }) {
     axios.get(`${apiUrl}/api/compliance/cargas/${semana}/${entidad}`, { headers })
       .then(res => {
         if (cancelado) return;
-        const dec = { rows: decodificar(res.data), cargadoPor: res.data.cargadoPor, cargadoEn: res.data.cargadoEn };
+        const dec = { rows: decodificar(res.data), completa: cargaCompleta(res.data.dict), cargadoPor: res.data.cargadoPor, cargadoEn: res.data.cargadoEn };
         cacheRef.current[key] = dec;
         setFilas(dec);
       })
@@ -255,22 +273,25 @@ export default function Compliance({ token, apiUrl, clienteActivo, usuario }) {
 
   // ---------- derivados ----------
   const rows = filas ? filas.rows : null;
+  const filtros = ajustes ? ajustes[entidad].filtros : null;
+  const kyndril = ajustes ? ajustes[entidad].kyndryl : null;
   const universo = useMemo(() => (rows && filtros ? aplicarFiltros(rows, filtros) : []), [rows, filtros]);
-  const vista = useMemo(() => calcularVista(universo, umbral, filtros ? filtros.kyndrylExcluye : []), [universo, umbral, filtros]);
+  const vista = useMemo(() => calcularVista(universo, umbral, kyndril), [universo, umbral, kyndril]);
   const aGestionar = useMemo(() => listaGestion(universo, umbral), [universo, umbral]);
   const aGestionarMirada = useMemo(
-    () => (mirada === 'kyndryl' && filtros ? aGestionar.filter(r => esKyndryl(r, filtros.kyndrylExcluye)) : aGestionar),
-    [aGestionar, mirada, filtros]
+    () => (mirada === 'kyndryl' && kyndril ? aGestionar.filter(r => esKyndryl(r, kyndril)) : aGestionar),
+    [aGestionar, mirada, kyndril]
   );
-  const nKyndryl = useMemo(() => (filtros ? aGestionar.filter(r => esKyndryl(r, filtros.kyndrylExcluye)).length : 0), [aGestionar, filtros]);
+  const nKyndryl = useMemo(() => (kyndril ? aGestionar.filter(r => esKyndryl(r, kyndril)).length : 0), [aGestionar, kyndril]);
   const aGestionar90 = useMemo(
-    () => universo.filter(r => (r.adh === null || r.adh < 90) && (mirada === 'global' || (filtros && esKyndryl(r, filtros.kyndrylExcluye)))).length,
-    [universo, mirada, filtros]
+    () => universo.filter(r => (r.adh === null || r.adh < 90) && (mirada === 'global' || (kyndril && esKyndryl(r, kyndril)))).length,
+    [universo, mirada, kyndril]
   );
-  const opciones = useMemo(() => ({
-    tipo: rows ? opcionesDe(rows, 'tipo') : [], cap: rows ? opcionesDe(rows, 'cap') : [],
-    hard: rows ? opcionesDe(rows, 'hard') : [], ubi: rows ? opcionesDe(rows, 'ubi') : []
-  }), [rows]);
+  const opciones = useMemo(() => {
+    const o = {};
+    ['tipo', 'cap', 'cap2', 'clas', 'hard', 'est', 'ubi', 'adm1', 'adm2'].forEach(k => { o[k] = rows ? opcionesDe(rows, k) : []; });
+    return o;
+  }, [rows]);
 
   const gestEnt = useMemo(() => gestion[entidad] || {}, [gestion, entidad]);
   const regDe = (r) => gestEnt[claveHost(r.host)];
@@ -319,25 +340,34 @@ export default function Compliance({ token, apiUrl, clienteActivo, usuario }) {
   const seleccionValida = seleccion.filter(k => filaPorClave.has(k));
 
   const semanaInfo = cargas.find(c => c.semana === semana);
-  const vistaModificada = !!config && !!filtros && (
-    umbral !== config.umbral || JSON.stringify(filtrosDesdeConfig(config)) !== JSON.stringify(filtros)
+  const vistaModificada = !!config && !!ajustes && (
+    umbral !== config.umbral || JSON.stringify(config.entidades[entidad]) !== JSON.stringify(ajustes[entidad])
   );
+  // Las cargas anteriores a Capacidad Secundaria / Administración no traen esas columnas: sus filtros no tendrían efecto
+  const usaColumnasNuevas = !!filtros && !!kyndril && (filtroActivo(filtros.cap2) || filtroActivo(kyndril.adm1) || filtroActivo(kyndril.adm2));
 
   // ---------- acciones ----------
-  const cambiarFiltro = (campo, valor) => { setFiltros(prev => ({ ...prev, [campo]: valor })); setPagina(0); };
-  const restablecer = () => { setFiltros(filtrosDesdeConfig(config)); setUmbral(config.umbral); setPagina(0); };
+  const cambiarFiltro = (campo, valor) => {
+    setAjustes(prev => ({ ...prev, [entidad]: { ...prev[entidad], filtros: { ...prev[entidad].filtros, [campo]: valor } } }));
+    setPagina(0);
+  };
+  const cambiarKyndryl = (campo, valor) => {
+    setAjustes(prev => ({ ...prev, [entidad]: { ...prev[entidad], kyndryl: { ...prev[entidad].kyndryl, [campo]: valor } } }));
+    setPagina(0);
+  };
+  const restablecer = () => {
+    setAjustes(prev => ({ ...prev, [entidad]: clonar(config.entidades[entidad]) }));
+    setUmbral(config.umbral);
+    setPagina(0);
+  };
 
   const guardarConfig = async () => {
     setGuardandoConfig(true);
     setMensaje(null);
     try {
-      const cuerpo = {
-        umbral, filtros: { tipo: filtros.tipo, cap: filtros.cap, hard: filtros.hard, ubi: filtros.ubi },
-        kyndrylExcluye: filtros.kyndrylExcluye, excluirBajas: filtros.excluirBajas
-      };
-      await axios.put(`${apiUrl}/api/compliance/config`, cuerpo, { headers });
-      setConfig({ umbral, filtros: cuerpo.filtros, kyndrylExcluye: filtros.kyndrylExcluye, excluirBajas: filtros.excluirBajas });
-      setMensaje({ tipo: 'success', texto: 'Umbral y filtros guardados como predeterminados del módulo.' });
+      await axios.put(`${apiUrl}/api/compliance/config`, { umbral, entidad, filtros, kyndryl: kyndril }, { headers });
+      setConfig(prev => ({ ...prev, umbral, entidades: { ...prev.entidades, [entidad]: clonar(ajustes[entidad]) } }));
+      setMensaje({ tipo: 'success', texto: `Umbral y filtros de ${entidad === 'banco' ? 'Banco' : 'Banchile'} guardados como predeterminados.` });
     } catch (err) {
       setMensaje({ tipo: 'error', texto: 'No se pudo guardar: ' + (err.response?.data?.error || err.message) });
     } finally {
@@ -502,16 +532,23 @@ export default function Compliance({ token, apiUrl, clienteActivo, usuario }) {
                 {semanaInfo ? ` · cargado por ${filas.cargadoPor || semanaInfo.cargadoPor} (${fechaHora(filas.cargadoEn || semanaInfo.cargadoEn)})` : ''}
               </div>
 
+              {usaColumnasNuevas && !filas.completa && (
+                <Aviso tipo="aviso">
+                  Esta carga es anterior a las columnas Capacidad Secundaria y Administración, así que esos filtros (y la definición de Kyndryl por administración) no tienen efecto y las cifras no son las definitivas.
+                  {puedeCargar ? ' Vuelve a subir el inventario de esta semana para aplicarlos.' : ' Pide a un administrador o DPE que vuelva a subir el inventario de esta semana.'}
+                </Aviso>
+              )}
+
               {/* Filtros y umbral */}
               <div style={{ ...cardStyle, marginBottom: 14 }}>
                 <div style={{ display: 'flex', alignItems: 'flex-end', gap: 12, flexWrap: 'wrap' }}>
-                  <MultiSelect etiqueta="TIPO DE INFRAESTRUCTURA" opciones={opciones.tipo} valor={filtros.tipo} onChange={v => cambiarFiltro('tipo', v)} />
-                  <MultiSelect etiqueta="CAPACIDAD PRIMARIA" opciones={opciones.cap} valor={filtros.cap} onChange={v => cambiarFiltro('cap', v)} />
-                  <MultiSelect etiqueta="HARDENING" opciones={opciones.hard} valor={filtros.hard} onChange={v => cambiarFiltro('hard', v)} />
-                  <MultiSelect etiqueta="UBICACIÓN" opciones={opciones.ubi} valor={filtros.ubi} onChange={v => cambiarFiltro('ubi', v)} />
-                  <Chip activo={filtros.excluirBajas} onClick={() => cambiarFiltro('excluirBajas', !filtros.excluirBajas)}>
-                    {filtros.excluirBajas ? '✓' : '○'} Excluir en baja / terminadas
-                  </Chip>
+                  <FiltroSelect etiqueta="TIPO DE INFRAESTRUCTURA" opciones={opciones.tipo} valor={filtros.tipo} onChange={v => cambiarFiltro('tipo', v)} />
+                  <FiltroSelect etiqueta="CAPACIDAD PRIMARIA" opciones={opciones.cap} valor={filtros.cap} onChange={v => cambiarFiltro('cap', v)} />
+                  <FiltroSelect etiqueta="CAPACIDAD SECUNDARIA" opciones={opciones.cap2} valor={filtros.cap2} onChange={v => cambiarFiltro('cap2', v)} />
+                  <FiltroSelect etiqueta="CLASIFICACIÓN" opciones={opciones.clas} valor={filtros.clas} onChange={v => cambiarFiltro('clas', v)} />
+                  <FiltroSelect etiqueta="HARDENING" opciones={opciones.hard} valor={filtros.hard} onChange={v => cambiarFiltro('hard', v)} />
+                  <FiltroSelect etiqueta="ESTADO OPERATIVO" opciones={opciones.est} valor={filtros.est} onChange={v => cambiarFiltro('est', v)} />
+                  <FiltroSelect etiqueta="UBICACIÓN" opciones={opciones.ubi} valor={filtros.ubi} onChange={v => cambiarFiltro('ubi', v)} />
                   <div style={{ minWidth: 200, flex: 1, maxWidth: 300 }}>
                     <label style={labelStyle}>UMBRAL DE CUMPLIMIENTO: <span style={{ color: 'var(--bank-blue)', fontSize: '12px' }}>≥ {umbral}%</span></label>
                     <input type="range" min="50" max="100" step="1" value={umbral} onChange={e => { setUmbral(Number(e.target.value)); setPagina(0); }}
@@ -540,8 +577,17 @@ export default function Compliance({ token, apiUrl, clienteActivo, usuario }) {
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 14 }}>
                   <ColumnaMirada nombre="Global" detalle="Universo según los filtros" v={vista.global} />
                   <ColumnaMirada nombre="Kyndryl"
-                    detalle={filtros.kyndrylExcluye.length ? `Global sin Ubicación ${filtros.kyndrylExcluye.join(', ')}` : 'Global (sin exclusión de ubicación)'} v={vista.kyndryl}
-                    controlExtra={<MultiSelect etiqueta="EXCLUIR UBICACIÓN EN KYNDRYL" opciones={opciones.ubi} valor={filtros.kyndrylExcluye} onChange={v => cambiarFiltro('kyndrylExcluye', v)} />} />
+                    detalle={describirKyndryl(kyndril)} v={vista.kyndryl}
+                    controlExtra={(
+                      <details>
+                        <summary style={{ fontSize: '11px', fontWeight: 800, color: 'var(--bank-blue)', cursor: 'pointer' }}>Definir qué es Kyndryl</summary>
+                        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 8 }}>
+                          <FiltroSelect etiqueta="ADMINISTRACIÓN PRINCIPAL" opciones={opciones.adm1} valor={kyndril.adm1} onChange={v => cambiarKyndryl('adm1', v)} />
+                          <FiltroSelect etiqueta="ADMINISTRACIÓN SECUNDARIA" opciones={opciones.adm2} valor={kyndril.adm2} onChange={v => cambiarKyndryl('adm2', v)} />
+                          <FiltroSelect etiqueta="UBICACIÓN" opciones={opciones.ubi} valor={kyndril.ubi} onChange={v => cambiarKyndryl('ubi', v)} />
+                        </div>
+                      </details>
+                    )} />
                 </div>
               )}
 
@@ -613,7 +659,7 @@ export default function Compliance({ token, apiUrl, clienteActivo, usuario }) {
                       ) : filasPagina.map((r, i) => {
                         const clave = claveHost(r.host);
                         const reg = gestEnt[clave];
-                        const esKyn = esKyndryl(r, filtros.kyndrylExcluye);
+                        const esKyn = esKyndryl(r, kyndril);
                         const celda = { padding: '7px 8px', fontSize: '11px', borderTop: '1px solid rgba(18,52,78,0.06)', color: 'var(--ink-800)' };
                         return (
                           <tr key={`${clave}-${pag}-${i}`}>
@@ -627,7 +673,7 @@ export default function Compliance({ token, apiUrl, clienteActivo, usuario }) {
                                 ? <span style={{ fontSize: '10px', fontWeight: 800, padding: '3px 9px', borderRadius: '999px', background: 'rgba(215,59,71,.12)', color: '#a61e2b', whiteSpace: 'nowrap' }}>Sin dato (0)</span>
                                 : <b style={{ color: '#a61e2b', fontFamily: "'IBM Plex Mono',monospace" }}>{r.adh}%</b>}
                             </td>
-                            <td style={celda}>{r.ubi || '—'}{esKyn && filtros.kyndrylExcluye.length > 0 && <span style={{ marginLeft: 6, fontSize: '10px', fontWeight: 800, padding: '3px 9px', borderRadius: '999px', background: 'rgba(0,59,113,.1)', color: '#003b71' }}>Kyndryl</span>}</td>
+                            <td style={celda}>{r.ubi || '—'}{esKyn && kyndrylDefinido(kyndril) && <span style={{ marginLeft: 6, fontSize: '10px', fontWeight: 800, padding: '3px 9px', borderRadius: '999px', background: 'rgba(0,59,113,.1)', color: '#003b71' }}>Kyndryl</span>}</td>
                             <td style={celda}>
                               <PildoraEstado estado={reg ? reg.estado : 'Pendiente'} />
                               {reg && reg.fechaCompromiso && (
