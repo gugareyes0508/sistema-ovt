@@ -100,10 +100,10 @@ export function decodificar({ dict, rows }) {
 
 const coincide = (lista, valor) => !lista || lista.length === 0 || lista.includes(valor);
 
-// filtros: { tipo:[], cap:[], hard:[], excluirBajas:bool } — lista vacía = todos
+// filtros: { tipo:[], cap:[], hard:[], ubi:[], excluirBajas:bool } — lista vacía = todos
 export function aplicarFiltros(rows, filtros) {
   return rows.filter(r =>
-    coincide(filtros.tipo, r.tipo) && coincide(filtros.cap, r.cap) && coincide(filtros.hard, r.hard) &&
+    coincide(filtros.tipo, r.tipo) && coincide(filtros.cap, r.cap) && coincide(filtros.hard, r.hard) && coincide(filtros.ubi, r.ubi) &&
     (!filtros.excluirBajas || !ESTADOS_BAJA.includes(r.est))
   );
 }
@@ -111,14 +111,14 @@ export function aplicarFiltros(rows, filtros) {
 const acum = () => ({ total: 0, cumple: 0, suma: 0, sinDato: 0 });
 const sumar = (a, r, umbral) => {
   a.total += 1;
-  if (r.adh === null) a.sinDato += 1; else { a.suma += r.adh; if (r.adh > umbral) a.cumple += 1; }
+  if (r.adh === null) a.sinDato += 1; else { a.suma += r.adh; if (r.adh >= umbral) a.cumple += 1; }
 };
 const cerrar = (a) => ({
   total: a.total, cumple: a.cumple, noCumple: a.total - a.cumple, sinDato: a.sinDato,
   score: a.total ? a.suma / a.total : null // vacío cuenta como 0
 });
 
-// Cumple = adherencia > umbral. Kyndryl = el mismo universo sin las ubicaciones excluidas.
+// Cumple = adherencia >= umbral. Kyndryl = el mismo universo sin las ubicaciones excluidas.
 export function calcularVista(rows, umbral, kyndrylExcluye) {
   const g = { t: acum(), p: acum(), n: acum() };
   const k = { t: acum(), p: acum(), n: acum() };
@@ -132,12 +132,15 @@ export function calcularVista(rows, umbral, kyndrylExcluye) {
   return { global: fin(g), kyndryl: fin(k) };
 }
 
-// Servidores a gestionar: bajo el umbral o sin adherencia (sin dato primero, luego menor adherencia)
+// Servidores a gestionar: sin adherencia o por debajo del umbral (sin dato primero, luego menor adherencia)
 export function listaGestion(rows, umbral) {
   return rows
-    .filter(r => r.adh === null || r.adh <= umbral)
+    .filter(r => r.adh === null || r.adh < umbral)
     .sort((a, b) => ((a.adh === null ? -1 : a.adh) - (b.adh === null ? -1 : b.adh)) || a.host.localeCompare(b.host));
 }
+
+// Kyndryl = el universo sin las ubicaciones excluidas (GCP por defecto)
+export const esKyndryl = (r, kyndrylExcluye) => !(kyndrylExcluye || []).includes(r.ubi);
 
 export function opcionesDe(rows, campo) {
   const conteo = new Map();

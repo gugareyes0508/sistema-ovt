@@ -2796,7 +2796,7 @@ const COMPLIANCE_MAX_FILAS = 60000;
 const COMPLIANCE_MAX_HOSTS_GESTION = 400;
 const COMPLIANCE_CONFIG_DEFAULT = {
   umbral: 90,
-  filtros: { tipo: ['CLOUD'], cap: ['SERVIDOR', 'APPLIANCE'], hard: ['SI'] },
+  filtros: { tipo: ['CLOUD'], cap: ['SERVIDOR', 'APPLIANCE'], hard: ['SI'], ubi: [] },
   kyndrylExcluye: ['GCP'],
   excluirBajas: false
 };
@@ -2951,18 +2951,20 @@ app.put('/api/compliance/config', verificarToken, async (req, res) => {
     if (!COMPLIANCE_ROLES_CARGA.includes(req.usuario.rol)) return res.status(403).json({ error: 'Solo admin o DPE pueden cambiar la configuración' });
     const { umbral, filtros, kyndrylExcluye, excluirBajas } = req.body || {};
     const lista = (a) => Array.isArray(a) && a.length <= 50 && a.every(v => typeof v === 'string');
-    if (!Number.isInteger(umbral) || umbral < 50 || umbral > 99) return res.status(400).json({ error: 'El umbral debe ser un entero entre 50 y 99' });
-    if (!filtros || !lista(filtros.tipo) || !lista(filtros.cap) || !lista(filtros.hard) || !lista(kyndrylExcluye) || typeof excluirBajas !== 'boolean') {
+    // Cumple = adherencia >= umbral
+    if (!Number.isInteger(umbral) || umbral < 50 || umbral > 100) return res.status(400).json({ error: 'El umbral debe ser un entero entre 50 y 100' });
+    const ubi = filtros && filtros.ubi !== undefined ? filtros.ubi : [];
+    if (!filtros || !lista(filtros.tipo) || !lista(filtros.cap) || !lista(filtros.hard) || !lista(ubi) || !lista(kyndrylExcluye) || typeof excluirBajas !== 'boolean') {
       return res.status(400).json({ error: 'Configuración inválida' });
     }
     const clienteId = complianceCliente(req);
     await db.collection('compliance_config').doc(clienteId).set({
-      umbral, filtros: { tipo: filtros.tipo, cap: filtros.cap, hard: filtros.hard }, kyndrylExcluye, excluirBajas,
+      umbral, filtros: { tipo: filtros.tipo, cap: filtros.cap, hard: filtros.hard, ubi }, kyndrylExcluye, excluirBajas,
       actualizadoPor: req.usuario.nombre, actualizadoEn: new Date()
     });
     await db.collection('auditoria').add({
       accion: 'COMPLIANCE_CONFIG', usuarioNombre: req.usuario.nombre, clienteId, timestamp: new Date(),
-      detalles: `Umbral ${umbral}%, excluye bajas: ${excluirBajas ? 'sí' : 'no'}`
+      detalles: `Umbral ≥ ${umbral}%, excluye bajas: ${excluirBajas ? 'sí' : 'no'}`
     });
     res.json({ success: true });
   } catch (err) {

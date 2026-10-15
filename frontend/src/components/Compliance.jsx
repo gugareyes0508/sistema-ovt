@@ -3,7 +3,7 @@ import axios from 'axios';
 import * as XLSX from 'xlsx';
 import {
   ESTADOS_GESTION, parsearInventario, decodificar, aplicarFiltros, calcularVista, listaGestion,
-  opcionesDe, claveHost, lunesDe, etiquetaSemana, aISO
+  opcionesDe, claveHost, lunesDe, etiquetaSemana, aISO, esKyndryl
 } from '../utils/compliance';
 
 // ============================================
@@ -31,7 +31,7 @@ const fmt = (n, d = 1) => n.toLocaleString('es-CL', { minimumFractionDigits: d, 
 const etq = (v) => (v === '' ? '(vacío)' : v);
 const colorGauge = (p) => (p >= 95 ? '#2b5fb0' : p >= 90 ? '#e0a800' : '#c8402f');
 const filtrosDesdeConfig = (cfg) => ({
-  tipo: cfg.filtros.tipo, cap: cfg.filtros.cap, hard: cfg.filtros.hard,
+  tipo: cfg.filtros.tipo, cap: cfg.filtros.cap, hard: cfg.filtros.hard, ubi: cfg.filtros.ubi || [],
   kyndrylExcluye: cfg.kyndrylExcluye, excluirBajas: cfg.excluirBajas
 });
 const fechaCorta = (iso) => (iso ? iso.slice(5).split('-').reverse().join('/') : '');
@@ -74,7 +74,7 @@ function TarjetaGauge({ titulo, s }) {
   );
 }
 
-function ColumnaMirada({ nombre, detalle, v }) {
+function ColumnaMirada({ nombre, detalle, v, controlExtra }) {
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 8, flexWrap: 'wrap', gap: 6 }}>
@@ -82,6 +82,7 @@ function ColumnaMirada({ nombre, detalle, v }) {
           <div style={{ fontSize: '15px', fontWeight: 800, color: 'var(--ink-950)' }}>{nombre}</div>
           <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--ink-800)' }}>Total máquinas: {v.total.total}</div>
           <div style={{ fontSize: '10px', color: 'var(--muted)' }}>{detalle}</div>
+          {controlExtra && <div style={{ marginTop: 6 }}>{controlExtra}</div>}
         </div>
         <div style={{ textAlign: 'right' }}>
           <div style={{ fontSize: '12px', fontWeight: 800, color: 'var(--ink-950)' }}>SCORE: {v.total.score !== null ? `${fmt(v.total.score)} %` : '—'}</div>
@@ -187,7 +188,7 @@ export default function Compliance({ token, apiUrl, clienteActivo, usuario }) {
   const [gestion, setGestion] = useState({});
   const [versionGestion, setVersionGestion] = useState(0);
   const [ffLista, setFfLista] = useState('todos');
-  const [soloKyn, setSoloKyn] = useState(false);
+  const [mirada, setMirada] = useState('global'); // mirada de la lista de gestión: global | kyndryl
   const [estadoFiltro, setEstadoFiltro] = useState('todos');
   const [busqueda, setBusqueda] = useState('');
   const [pagina, setPagina] = useState(0);
@@ -257,7 +258,15 @@ export default function Compliance({ token, apiUrl, clienteActivo, usuario }) {
   const universo = useMemo(() => (rows && filtros ? aplicarFiltros(rows, filtros) : []), [rows, filtros]);
   const vista = useMemo(() => calcularVista(universo, umbral, filtros ? filtros.kyndrylExcluye : []), [universo, umbral, filtros]);
   const aGestionar = useMemo(() => listaGestion(universo, umbral), [universo, umbral]);
-  const aGestionar90 = useMemo(() => universo.filter(r => r.adh === null || r.adh <= 90).length, [universo]);
+  const aGestionarMirada = useMemo(
+    () => (mirada === 'kyndryl' && filtros ? aGestionar.filter(r => esKyndryl(r, filtros.kyndrylExcluye)) : aGestionar),
+    [aGestionar, mirada, filtros]
+  );
+  const nKyndryl = useMemo(() => (filtros ? aGestionar.filter(r => esKyndryl(r, filtros.kyndrylExcluye)).length : 0), [aGestionar, filtros]);
+  const aGestionar90 = useMemo(
+    () => universo.filter(r => (r.adh === null || r.adh < 90) && (mirada === 'global' || (filtros && esKyndryl(r, filtros.kyndrylExcluye)))).length,
+    [universo, mirada, filtros]
+  );
   const opciones = useMemo(() => ({
     tipo: rows ? opcionesDe(rows, 'tipo') : [], cap: rows ? opcionesDe(rows, 'cap') : [],
     hard: rows ? opcionesDe(rows, 'hard') : [], ubi: rows ? opcionesDe(rows, 'ubi') : []
@@ -275,39 +284,38 @@ export default function Compliance({ token, apiUrl, clienteActivo, usuario }) {
     const c = {};
     ESTADOS_GESTION.forEach(e => { c[e] = 0; });
     let vencidos = 0;
-    aGestionar.forEach(r => {
+    aGestionarMirada.forEach(r => {
       const g = gestEnt[claveHost(r.host)];
       c[g ? g.estado : 'Pendiente'] += 1;
       if (g && g.fechaCompromiso && g.fechaCompromiso < hoy && g.estado !== 'Resuelto' && g.estado !== 'Excepción') vencidos += 1;
     });
     return { c, vencidos };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [aGestionar, gestEnt, hoy]);
+  }, [aGestionarMirada, gestEnt, hoy]);
 
   const listaVista = useMemo(() => {
     const q = busqueda.trim().toLowerCase();
-    return aGestionar.filter(r => {
+    return aGestionarMirada.filter(r => {
       if (ffLista === 'P' && r.clas !== 'PRODUCCION') return false;
       if (ffLista === 'N' && r.clas === 'PRODUCCION') return false;
       if (ffLista === 'bajo' && r.adh === null) return false;
       if (ffLista === 'sin' && r.adh !== null) return false;
-      if (soloKyn && filtros.kyndrylExcluye.includes(r.ubi)) return false;
       if (q && !r.host.toLowerCase().includes(q)) return false;
       if (estadoFiltro === 'vencidos') return vencidoDe(r);
       if (estadoFiltro !== 'todos' && estadoDe(r) !== estadoFiltro) return false;
       return true;
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [aGestionar, ffLista, soloKyn, estadoFiltro, busqueda, gestEnt, filtros, hoy]);
+  }, [aGestionarMirada, ffLista, estadoFiltro, busqueda, gestEnt, hoy]);
 
   const maxPag = Math.max(0, Math.ceil(listaVista.length / TAM_PAGINA) - 1);
   const pag = Math.min(pagina, maxPag);
   const filasPagina = listaVista.slice(pag * TAM_PAGINA, (pag + 1) * TAM_PAGINA);
   const filaPorClave = useMemo(() => {
     const m = new Map();
-    aGestionar.forEach(r => { const k = claveHost(r.host); if (!m.has(k)) m.set(k, r); });
+    aGestionarMirada.forEach(r => { const k = claveHost(r.host); if (!m.has(k)) m.set(k, r); });
     return m;
-  }, [aGestionar]);
+  }, [aGestionarMirada]);
   const seleccionValida = seleccion.filter(k => filaPorClave.has(k));
 
   const semanaInfo = cargas.find(c => c.semana === semana);
@@ -324,7 +332,7 @@ export default function Compliance({ token, apiUrl, clienteActivo, usuario }) {
     setMensaje(null);
     try {
       const cuerpo = {
-        umbral, filtros: { tipo: filtros.tipo, cap: filtros.cap, hard: filtros.hard },
+        umbral, filtros: { tipo: filtros.tipo, cap: filtros.cap, hard: filtros.hard, ubi: filtros.ubi },
         kyndrylExcluye: filtros.kyndrylExcluye, excluirBajas: filtros.excluirBajas
       };
       await axios.put(`${apiUrl}/api/compliance/config`, cuerpo, { headers });
@@ -500,19 +508,19 @@ export default function Compliance({ token, apiUrl, clienteActivo, usuario }) {
                   <MultiSelect etiqueta="TIPO DE INFRAESTRUCTURA" opciones={opciones.tipo} valor={filtros.tipo} onChange={v => cambiarFiltro('tipo', v)} />
                   <MultiSelect etiqueta="CAPACIDAD PRIMARIA" opciones={opciones.cap} valor={filtros.cap} onChange={v => cambiarFiltro('cap', v)} />
                   <MultiSelect etiqueta="HARDENING" opciones={opciones.hard} valor={filtros.hard} onChange={v => cambiarFiltro('hard', v)} />
-                  <MultiSelect etiqueta="KYNDRYL EXCLUYE UBICACIÓN" opciones={opciones.ubi} valor={filtros.kyndrylExcluye} onChange={v => cambiarFiltro('kyndrylExcluye', v)} />
+                  <MultiSelect etiqueta="UBICACIÓN" opciones={opciones.ubi} valor={filtros.ubi} onChange={v => cambiarFiltro('ubi', v)} />
                   <Chip activo={filtros.excluirBajas} onClick={() => cambiarFiltro('excluirBajas', !filtros.excluirBajas)}>
                     {filtros.excluirBajas ? '✓' : '○'} Excluir en baja / terminadas
                   </Chip>
                   <div style={{ minWidth: 200, flex: 1, maxWidth: 300 }}>
-                    <label style={labelStyle}>UMBRAL DE CUMPLIMIENTO: <span style={{ color: 'var(--bank-blue)', fontSize: '12px' }}>&gt; {umbral}%</span></label>
-                    <input type="range" min="50" max="99" step="1" value={umbral} onChange={e => { setUmbral(Number(e.target.value)); setPagina(0); }}
+                    <label style={labelStyle}>UMBRAL DE CUMPLIMIENTO: <span style={{ color: 'var(--bank-blue)', fontSize: '12px' }}>≥ {umbral}%</span></label>
+                    <input type="range" min="50" max="100" step="1" value={umbral} onChange={e => { setUmbral(Number(e.target.value)); setPagina(0); }}
                       style={{ width: '100%', accentColor: '#003b71' }} aria-label="Umbral de cumplimiento" />
                   </div>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginTop: 10 }}>
                   <div style={{ fontSize: '10px', color: 'var(--muted)', lineHeight: 1.5, flex: 1, minWidth: 260 }}>
-                    <b>Cumple</b> = Adherencia de Hardening &gt; {umbral}% · vacío cuenta como 0 · Gauge: <span style={{ color: '#2b5fb0' }}>●</span> ≥95% <span style={{ color: '#e0a800' }}>●</span> 90–95% <span style={{ color: '#c8402f' }}>●</span> &lt;90%
+                    <b>Cumple</b> = Adherencia de Hardening ≥ {umbral}% · vacío cuenta como 0 · Gauge: <span style={{ color: '#2b5fb0' }}>●</span> ≥95% <span style={{ color: '#e0a800' }}>●</span> 90–95% <span style={{ color: '#c8402f' }}>●</span> &lt;90%
                     {vistaModificada && <span style={{ color: '#8a5a06', fontWeight: 700 }}> · vista distinta a los valores predeterminados del módulo</span>}
                   </div>
                   {vistaModificada && <button onClick={restablecer} style={{ padding: '6px 12px', borderRadius: '999px', fontSize: '11px', fontWeight: 800, border: '1px solid var(--line)', background: 'transparent', color: 'var(--muted)', cursor: 'pointer' }}>Restablecer</button>}
@@ -532,7 +540,8 @@ export default function Compliance({ token, apiUrl, clienteActivo, usuario }) {
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 14 }}>
                   <ColumnaMirada nombre="Global" detalle="Universo según los filtros" v={vista.global} />
                   <ColumnaMirada nombre="Kyndryl"
-                    detalle={filtros.kyndrylExcluye.length ? `Global sin Ubicación ${filtros.kyndrylExcluye.join(', ')}` : 'Global (sin exclusión de ubicación)'} v={vista.kyndryl} />
+                    detalle={filtros.kyndrylExcluye.length ? `Global sin Ubicación ${filtros.kyndrylExcluye.join(', ')}` : 'Global (sin exclusión de ubicación)'} v={vista.kyndryl}
+                    controlExtra={<MultiSelect etiqueta="EXCLUIR UBICACIÓN EN KYNDRYL" opciones={opciones.ubi} valor={filtros.kyndrylExcluye} onChange={v => cambiarFiltro('kyndrylExcluye', v)} />} />
                 </div>
               )}
 
@@ -540,9 +549,22 @@ export default function Compliance({ token, apiUrl, clienteActivo, usuario }) {
               <div style={{ fontSize: '10px', fontWeight: 800, color: 'var(--muted)', letterSpacing: '.05em', textTransform: 'uppercase', margin: '20px 0 8px' }}>
                 Gestión de servidores bajo el umbral o sin adherencia
               </div>
-              <div style={{ fontSize: '12px', fontWeight: 700, marginBottom: 8, color: 'var(--ink-950)' }}>
-                Umbral actual: <b>&gt; {umbral}%</b> · <b>{aGestionar.length}</b> servidores a gestionar
-                {umbral !== 90 && <span style={{ color: '#8a5a06' }}> ({aGestionar.length - aGestionar90 >= 0 ? '+' : ''}{aGestionar.length - aGestionar90} vs. umbral 90%)</span>}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginBottom: 10 }}>
+                <div role="group" aria-label="Mirada de la gestión" style={{ display: 'inline-flex', gap: 4, background: 'rgba(255,255,255,0.72)', border: '1px solid var(--line)', borderRadius: '999px', padding: 4 }}>
+                  {[['global', 'Global', aGestionar.length], ['kyndryl', 'Kyndryl', nKyndryl]].map(([id, texto, n]) => (
+                    <span key={id} role="button" tabIndex={0} aria-pressed={mirada === id}
+                      onClick={() => { setMirada(id); setPagina(0); }}
+                      onKeyDown={(ev) => { if (ev.key === 'Enter') { setMirada(id); setPagina(0); } }}
+                      style={{
+                        padding: '6px 16px', borderRadius: '999px', fontSize: '11px', fontWeight: 800, cursor: 'pointer',
+                        background: mirada === id ? 'linear-gradient(135deg,var(--ink-900),var(--bank-blue))' : 'transparent', color: mirada === id ? '#fff' : 'var(--muted)'
+                      }}>{texto} · {n}</span>
+                  ))}
+                </div>
+                <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--ink-950)' }}>
+                  Umbral actual: <b>≥ {umbral}%</b> · <b>{aGestionarMirada.length}</b> servidores a gestionar ({mirada === 'kyndryl' ? 'Kyndryl' : 'Global'})
+                  {umbral !== 90 && <span style={{ color: '#8a5a06' }}> ({aGestionarMirada.length - aGestionar90 >= 0 ? '+' : ''}{aGestionarMirada.length - aGestionar90} vs. umbral 90%)</span>}
+                </div>
               </div>
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 10 }}>
                 {ESTADOS_GESTION.map(e => (
@@ -566,7 +588,6 @@ export default function Compliance({ token, apiUrl, clienteActivo, usuario }) {
                   {[['todos', 'Todos'], ['P', 'Producción'], ['N', 'No producción'], ['bajo', 'Bajo umbral'], ['sin', 'Sin dato']].map(([id, texto]) => (
                     <Chip key={id} activo={ffLista === id} onClick={() => { setFfLista(id); setPagina(0); }}>{texto}</Chip>
                   ))}
-                  <Chip activo={soloKyn} onClick={() => { setSoloKyn(!soloKyn); setPagina(0); }}>{soloKyn ? '✓' : '○'} Solo Kyndryl</Chip>
                   <input type="search" placeholder="Buscar hostname..." value={busqueda} onChange={e => { setBusqueda(e.target.value); setPagina(0); }}
                     aria-label="Buscar hostname" style={{ ...inputStyle, width: 180, fontSize: '11px' }} />
                   {estadoFiltro !== 'todos' && <Chip activo onClick={() => setEstadoFiltro('todos')}>Estado: {estadoFiltro === 'vencidos' ? 'vencidos' : estadoFiltro} ✕</Chip>}
@@ -592,7 +613,7 @@ export default function Compliance({ token, apiUrl, clienteActivo, usuario }) {
                       ) : filasPagina.map((r, i) => {
                         const clave = claveHost(r.host);
                         const reg = gestEnt[clave];
-                        const esKyn = !filtros.kyndrylExcluye.includes(r.ubi);
+                        const esKyn = esKyndryl(r, filtros.kyndrylExcluye);
                         const celda = { padding: '7px 8px', fontSize: '11px', borderTop: '1px solid rgba(18,52,78,0.06)', color: 'var(--ink-800)' };
                         return (
                           <tr key={`${clave}-${pag}-${i}`}>
