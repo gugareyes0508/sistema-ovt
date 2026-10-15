@@ -184,10 +184,12 @@ export function calcularVista(rows, umbral, kyndril) {
 }
 
 // Servidores a gestionar: sin adherencia o por debajo del umbral (sin dato primero, luego menor adherencia)
+// De menor a mayor adherencia (los sin dato primero) y luego por hostname
+export function ordenarPorAdherencia(rows) {
+  return [...rows].sort((a, b) => ((a.adh === null ? -1 : a.adh) - (b.adh === null ? -1 : b.adh)) || a.host.localeCompare(b.host));
+}
 export function listaGestion(rows, umbral) {
-  return rows
-    .filter(r => r.adh === null || r.adh < umbral)
-    .sort((a, b) => ((a.adh === null ? -1 : a.adh) - (b.adh === null ? -1 : b.adh)) || a.host.localeCompare(b.host));
+  return ordenarPorAdherencia(rows.filter(r => r.adh === null || r.adh < umbral));
 }
 
 export function opcionesDe(rows, campo) {

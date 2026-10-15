@@ -207,7 +207,7 @@ export function BuscadorEquipo({ rows, estadoDe, onElegir }) {
             <button key={claveHost(r.host)} type="button" onClick={() => { onElegir(claveHost(r.host)); setQ(''); }}
               style={{ display: 'flex', gap: 10, alignItems: 'center', textAlign: 'left', padding: '7px 10px', border: '1px solid var(--line)', borderRadius: '10px', background: '#fff', cursor: 'pointer', fontSize: '11px', color: 'var(--ink-800)' }}>
               <b style={{ minWidth: 180 }}>{r.host}</b>
-              <span>{r.adh === null ? 'sin adherencia' : `adherencia ${r.adh}%`}</span>
+              <span>{r.adh === null ? 'adherencia 0% (sin dato)' : `adherencia ${r.adh}%`}</span>
               <span style={{ color: 'var(--muted)' }}>{r.amb || '—'} · {r.ubi || '—'}</span>
               <span style={{ marginLeft: 'auto', fontWeight: 800, color: 'var(--bank-blue)' }}>{estadoDe(r)}</span>
             </button>

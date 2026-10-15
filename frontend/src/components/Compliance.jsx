@@ -3,7 +3,7 @@ import axios from 'axios';
 import * as XLSX from 'xlsx';
 import {
   ESTADOS_GESTION, parsearInventario, decodificar, aplicarFiltros, calcularVista, listaGestion,
-  opcionesDe, claveHost, lunesDe, etiquetaSemana, aISO, esKyndryl, cargaCompleta, describirKyndryl, kyndrylDefinido, filtroActivo, KYNDRYL_FIJOS, kyndrylFijo, soloTotal, fechaLarga
+  opcionesDe, claveHost, lunesDe, etiquetaSemana, aISO, esKyndryl, ordenarPorAdherencia, cargaCompleta, describirKyndryl, kyndrylDefinido, filtroActivo, KYNDRYL_FIJOS, kyndrylFijo, soloTotal, fechaLarga
 } from '../utils/compliance';
 import { ModalGestion, BuscadorEquipo } from './ComplianceGestion';
 
@@ -133,6 +133,20 @@ function Recortado({ texto, ancho }) {
   return <div title={texto} style={{ maxWidth: ancho, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{texto}</div>;
 }
 
+// Adherencia siempre como porcentaje: sin dato = 0% (así cuenta en el score) con su etiqueta; verde si cumple, rojo si no
+function CeldaAdherencia({ adh, umbral }) {
+  const mono = { fontFamily: "'IBM Plex Mono',monospace", fontSize: '12px' };
+  if (adh === null) {
+    return (
+      <span style={{ whiteSpace: 'nowrap' }}>
+        <b style={{ color: '#a61e2b', ...mono }}>0%</b>{' '}
+        <span title="El inventario no trae adherencia para este equipo: cuenta como 0" style={{ fontSize: '10px', fontWeight: 800, padding: '2px 6px', borderRadius: '999px', background: 'rgba(215,59,71,.12)', color: '#a61e2b' }}>sin dato</span>
+      </span>
+    );
+  }
+  return <b style={{ color: adh >= umbral ? '#116642' : '#a61e2b', ...mono }}>{adh}%</b>;
+}
+
 function PildoraEstado({ estado }) {
   const [bg, fg] = COLOR_ESTADO[estado] || COLOR_ESTADO['Pendiente'];
   return <span style={{ fontSize: '10px', fontWeight: 800, padding: '3px 9px', borderRadius: '999px', whiteSpace: 'nowrap', background: bg, color: fg }}>{estado}</span>;
@@ -244,6 +258,7 @@ export default function Compliance({ token, apiUrl, clienteActivo, usuario }) {
   const [versionGestion, setVersionGestion] = useState(0);
   const [ffLista, setFfLista] = useState('todos');
   const [mirada, setMirada] = useState('global'); // mirada de la lista de gestión: global | kyndryl
+  const [alcance, setAlcance] = useState('gestionar'); // detalle: 'gestionar' (bajo el umbral / sin dato) | 'todos' (todo el universo)
   const [estadoFiltro, setEstadoFiltro] = useState('todos');
   const [busqueda, setBusqueda] = useState('');
   const [pagina, setPagina] = useState(0);
@@ -345,6 +360,10 @@ export default function Compliance({ token, apiUrl, clienteActivo, usuario }) {
     () => (mirada === 'kyndryl' && kyndril ? aGestionar.filter(r => esKyndryl(r, kyndril)) : aGestionar),
     [aGestionar, mirada, kyndril]
   );
+  const universoMirada = useMemo(() => (mirada === 'kyndryl' && kyndril ? universo.filter(r => esKyndryl(r, kyndril)) : universo), [universo, mirada, kyndril]);
+  const nUniversoKyndryl = useMemo(() => (kyndril ? universo.filter(r => esKyndryl(r, kyndril)).length : 0), [universo, kyndril]);
+  // Lista que se muestra: solo lo que hay que gestionar, o TODOS los servidores del universo con su % de adherencia
+  const baseLista = useMemo(() => (alcance === 'todos' ? ordenarPorAdherencia(universoMirada) : aGestionarMirada), [alcance, universoMirada, aGestionarMirada]);
   const nKyndryl = useMemo(() => (kyndril ? aGestionar.filter(r => esKyndryl(r, kyndril)).length : 0), [aGestionar, kyndril]);
   const aGestionar90 = useMemo(
     () => universo.filter(r => (r.adh === null || r.adh < 90) && (mirada === 'global' || (kyndril && esKyndryl(r, kyndril)))).length,
@@ -358,7 +377,7 @@ export default function Compliance({ token, apiUrl, clienteActivo, usuario }) {
 
   const gestEnt = useMemo(() => gestion[entidad] || {}, [gestion, entidad]);
   const regDe = (r) => gestEnt[claveHost(r.host)];
-  const estadoDe = (r) => (regDe(r) ? regDe(r).estado : 'Pendiente');
+  const estadoDe = (r) => (regDe(r) ? regDe(r).estado : (r.adh !== null && r.adh >= umbral ? 'Sin gestión' : 'Pendiente'));
   const vencidoDe = (r) => {
     const g = regDe(r);
     return !!g && !!g.fechaResolucion && g.fechaResolucion < hoy && g.estado !== 'Resuelto' && g.estado !== 'Excepción';
@@ -380,10 +399,11 @@ export default function Compliance({ token, apiUrl, clienteActivo, usuario }) {
 
   const listaVista = useMemo(() => {
     const q = busqueda.trim().toLowerCase();
-    return aGestionarMirada.filter(r => {
+    return baseLista.filter(r => {
       if (ffLista === 'P' && r.clas !== 'PRODUCCION') return false;
       if (ffLista === 'N' && r.clas === 'PRODUCCION') return false;
-      if (ffLista === 'bajo' && r.adh === null) return false;
+      if (ffLista === 'bajo' && (r.adh === null || r.adh >= umbral)) return false;
+      if (ffLista === 'cumple' && (r.adh === null || r.adh < umbral)) return false;
       if (ffLista === 'sin' && r.adh !== null) return false;
       if (q && !r.host.toLowerCase().includes(q)) return false;
       if (asigFiltro === '__sin__' && asignatarioDe(r)) return false;
@@ -393,16 +413,16 @@ export default function Compliance({ token, apiUrl, clienteActivo, usuario }) {
       return true;
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [aGestionarMirada, ffLista, estadoFiltro, busqueda, asigFiltro, gestEnt, hoy]);
+  }, [baseLista, ffLista, estadoFiltro, busqueda, asigFiltro, gestEnt, hoy, umbral]);
 
   const maxPag = Math.max(0, Math.ceil(listaVista.length / TAM_PAGINA) - 1);
   const pag = Math.min(pagina, maxPag);
   const filasPagina = listaVista.slice(pag * TAM_PAGINA, (pag + 1) * TAM_PAGINA);
   const filaPorClave = useMemo(() => {
     const m = new Map();
-    aGestionarMirada.forEach(r => { const k = claveHost(r.host); if (!m.has(k)) m.set(k, r); });
+    baseLista.forEach(r => { const k = claveHost(r.host); if (!m.has(k)) m.set(k, r); });
     return m;
-  }, [aGestionarMirada]);
+  }, [baseLista]);
   const seleccionValida = seleccion.filter(k => filaPorClave.has(k));
   // Todos los equipos del inventario de la hoja (para consultar uno que hoy cumple o quedó fuera de los filtros)
   const todasPorClave = useMemo(() => {
@@ -413,9 +433,9 @@ export default function Compliance({ token, apiUrl, clienteActivo, usuario }) {
   const filaDe = (clave) => filaPorClave.get(clave) || todasPorClave.get(clave);
   const asignatariosEnLista = useMemo(() => {
     const nombres = new Set();
-    aGestionarMirada.forEach(r => { const g = gestEnt[claveHost(r.host)]; if (g && g.asignatario) nombres.add(g.asignatario); });
+    baseLista.forEach(r => { const g = gestEnt[claveHost(r.host)]; if (g && g.asignatario) nombres.add(g.asignatario); });
     return Array.from(nombres).sort((a, b) => a.localeCompare(b));
-  }, [aGestionarMirada, gestEnt]);
+  }, [baseLista, gestEnt]);
   const sugerencias = useMemo(() => {
     const rb = new Set();
     const ce = new Set();
@@ -482,7 +502,7 @@ export default function Compliance({ token, apiUrl, clienteActivo, usuario }) {
   };
 
   const cambiarEntidad = (id) => {
-    setEntidad(id); setSeleccion([]); setPagina(0); setFfLista('todos'); setAsigFiltro('todos'); setModal(null); setErrorModal(null);
+    setEntidad(id); setSeleccion([]); setPagina(0); setFfLista('todos'); setAsigFiltro('todos'); setAlcance('gestionar'); setModal(null); setErrorModal(null);
   };
   const abrirGestion = (clave) => { setErrorModal(null); setModal({ claves: [clave] }); };
   const abrirGestionMasiva = () => { setErrorModal(null); setModal({ claves: seleccionValida }); };
@@ -530,7 +550,7 @@ export default function Compliance({ token, apiUrl, clienteActivo, usuario }) {
   const filaModal = modal && modal.claves.length === 1 ? filaDe(modal.claves[0]) : null;
   const regModal = ficha && modal && ficha.clave === modal.claves[0] ? ficha : null;
   const chipsModal = filaModal ? [
-    { texto: filaModal.adh === null ? 'Sin adherencia (cuenta 0)' : `Adherencia ${filaModal.adh}%`, alerta: filaModal.adh === null || filaModal.adh < umbral },
+    { texto: filaModal.adh === null ? 'Adherencia 0% (sin dato)' : `Adherencia ${filaModal.adh}%`, alerta: filaModal.adh === null || filaModal.adh < umbral },
     { texto: `${filaModal.clas === 'PRODUCCION' ? 'Prod' : 'No prod'} · ${filaModal.amb || '—'}` },
     { texto: filaModal.svc || '—' }, { texto: filaModal.ubi || '—' }, { texto: filaModal.so || '—' }
   ] : [];
@@ -695,7 +715,7 @@ export default function Compliance({ token, apiUrl, clienteActivo, usuario }) {
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginBottom: 10 }}>
                 <div role="group" aria-label="Mirada de la gestión" style={{ display: 'inline-flex', gap: 4, background: 'rgba(255,255,255,0.72)', border: '1px solid var(--line)', borderRadius: '999px', padding: 4 }}>
-                  {[['global', 'Global', aGestionar.length], ['kyndryl', 'Kyndryl', nKyndryl]].map(([id, texto, n]) => (
+                  {[['global', 'Global', alcance === 'todos' ? universo.length : aGestionar.length], ['kyndryl', 'Kyndryl', alcance === 'todos' ? nUniversoKyndryl : nKyndryl]].map(([id, texto, n]) => (
                     <span key={id} role="button" tabIndex={0} aria-pressed={mirada === id}
                       onClick={() => { setMirada(id); setPagina(0); }}
                       onKeyDown={(ev) => { if (ev.key === 'Enter') { setMirada(id); setPagina(0); } }}
@@ -705,9 +725,24 @@ export default function Compliance({ token, apiUrl, clienteActivo, usuario }) {
                       }}>{texto} · {n}</span>
                   ))}
                 </div>
+                <div role="group" aria-label="Alcance del detalle" style={{ display: 'inline-flex', gap: 4, background: 'rgba(255,255,255,0.72)', border: '1px solid var(--line)', borderRadius: '999px', padding: 4 }}>
+                  {[['gestionar', `Por gestionar · ${aGestionarMirada.length}`], ['todos', `Todo el universo · ${universoMirada.length}`]].map(([id, texto]) => (
+                    <span key={id} role="button" tabIndex={0} aria-pressed={alcance === id}
+                      onClick={() => { setAlcance(id); setFfLista('todos'); setPagina(0); }}
+                      onKeyDown={(ev) => { if (ev.key === 'Enter') { setAlcance(id); setFfLista('todos'); setPagina(0); } }}
+                      style={{
+                        padding: '6px 16px', borderRadius: '999px', fontSize: '11px', fontWeight: 800, cursor: 'pointer',
+                        background: alcance === id ? 'linear-gradient(135deg,var(--ink-900),var(--bank-blue))' : 'transparent', color: alcance === id ? '#fff' : 'var(--muted)'
+                      }}>{texto}</span>
+                  ))}
+                </div>
                 <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--ink-950)' }}>
-                  Umbral actual: <b>≥ {umbral}%</b> · <b>{aGestionarMirada.length}</b> servidores a gestionar ({mirada === 'kyndryl' ? 'Kyndryl' : 'Global'})
-                  {umbral !== 90 && <span style={{ color: '#8a5a06' }}> ({aGestionarMirada.length - aGestionar90 >= 0 ? '+' : ''}{aGestionarMirada.length - aGestionar90} vs. umbral 90%)</span>}
+                  {alcance === 'todos' ? (
+                    <>Umbral actual: <b>≥ {umbral}%</b> · <b>{universoMirada.length}</b> servidores en el universo ({mirada === 'kyndryl' ? 'Kyndryl' : 'Global'}) · <b>{aGestionarMirada.length}</b> a gestionar</>
+                  ) : (
+                    <>Umbral actual: <b>≥ {umbral}%</b> · <b>{aGestionarMirada.length}</b> servidores a gestionar ({mirada === 'kyndryl' ? 'Kyndryl' : 'Global'})</>
+                  )}
+                  {alcance === 'gestionar' && umbral !== 90 && <span style={{ color: '#8a5a06' }}> ({aGestionarMirada.length - aGestionar90 >= 0 ? '+' : ''}{aGestionarMirada.length - aGestionar90} vs. umbral 90%)</span>}
                 </div>
               </div>
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 10 }}>
@@ -731,9 +766,10 @@ export default function Compliance({ token, apiUrl, clienteActivo, usuario }) {
 
               <div style={{ ...cardStyle, padding: 12 }}>
                 <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', marginBottom: 8 }}>
-                  {(soloTotal(entidad)
-                    ? [['todos', 'Todos'], ['bajo', 'Bajo umbral'], ['sin', 'Sin dato']]
-                    : [['todos', 'Todos'], ['P', 'Producción'], ['N', 'No producción'], ['bajo', 'Bajo umbral'], ['sin', 'Sin dato']]).map(([id, texto]) => (
+                  {[['todos', 'Todos'],
+                    ...(soloTotal(entidad) ? [] : [['P', 'Producción'], ['N', 'No producción']]),
+                    ['bajo', 'Bajo umbral'], ['sin', 'Sin dato'],
+                    ...(alcance === 'todos' ? [['cumple', 'Cumplen']] : [])].map(([id, texto]) => (
                     <Chip key={id} activo={ffLista === id} onClick={() => { setFfLista(id); setPagina(0); }}>{texto}</Chip>
                   ))}
                   <input type="search" placeholder="Buscar hostname..." value={busqueda} onChange={e => { setBusqueda(e.target.value); setPagina(0); }}
@@ -784,12 +820,10 @@ export default function Compliance({ token, apiUrl, clienteActivo, usuario }) {
                             <td style={{ ...celda, whiteSpace: 'nowrap' }}>{r.clas === 'PRODUCCION' ? 'Prod' : 'No prod'} · {r.amb || '—'}</td>
                             <td style={celda}><Recortado texto={r.svc} ancho={80} /></td>
                             <td style={celda}>
-                              {r.adh === null
-                                ? <span style={{ fontSize: '10px', fontWeight: 800, padding: '3px 9px', borderRadius: '999px', background: 'rgba(215,59,71,.12)', color: '#a61e2b', whiteSpace: 'nowrap' }}>Sin dato (0)</span>
-                                : <b style={{ color: '#a61e2b', fontFamily: "'IBM Plex Mono',monospace" }}>{r.adh}%</b>}
+                              <CeldaAdherencia adh={r.adh} umbral={umbral} />
                             </td>
                             <td style={{ ...celda, whiteSpace: 'nowrap' }}>{r.ubi || '—'}{esKyn && kyndrylDefinido(kyndril) && <span style={{ marginLeft: 6, fontSize: '10px', fontWeight: 800, padding: '2px 6px', borderRadius: '999px', background: 'rgba(0,59,113,.1)', color: '#003b71' }}>Kyndryl</span>}</td>
-                            <td style={celda}><PildoraEstado estado={reg ? reg.estado : 'Pendiente'} /></td>
+                            <td style={celda}>{estadoDe(r) === 'Sin gestión' ? '—' : <PildoraEstado estado={estadoDe(r)} />}</td>
                             <td style={celda}><Recortado texto={reg && reg.asignatario} ancho={120} /></td>
                             <td style={celda}><Recortado texto={reg && reg.responsableBanco} ancho={90} /></td>
                             <td style={celda}><Recortado texto={reg && reg.certificador} ancho={100} /></td>
