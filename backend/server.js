@@ -3039,7 +3039,52 @@ app.put('/api/compliance/config', verificarToken, async (req, res) => {
   }
 });
 
-// GET /api/compliance/gestion?entidad=banco — gestión registrada, por hostname
+// ---------- Gestión de servidores (por hostname, se conserva entre cargas semanales) ----------
+// Cada equipo guarda: estado, asignatario (persona asociada al cliente a quien se deriva), responsable
+// Banco, certificador, fecha de resolución e historial (cada cambio queda como una foto completa
+// de esos campos, con quién y cuándo). Los registros antiguos usaban "responsable" y "fechaCompromiso":
+// se leen como asignatario y fecha de resolución.
+const COMPLIANCE_RE_CLAVE = /^[a-z0-9-]{1,150}$/;
+const complianceTexto = (v, max) => String(v === undefined || v === null ? '' : v).trim().slice(0, max);
+
+const complianceNormalizarEntrada = (e) => ({
+  fecha: e.fecha || '', usuario: e.usuario || '', estado: e.estado || '',
+  asignatarioId: e.asignatarioId || '',
+  asignatario: e.asignatario !== undefined ? e.asignatario : (e.responsable || ''),
+  responsableBanco: e.responsableBanco || '', certificador: e.certificador || '',
+  fechaResolucion: e.fechaResolucion !== undefined ? e.fechaResolucion : (e.fechaCompromiso || ''),
+  comentario: e.comentario || ''
+});
+const complianceNormalizarRegistro = (d, conHistorial) => ({
+  hostname: d.hostname || '', estado: d.estado || 'Pendiente',
+  asignatarioId: d.asignatarioId || '',
+  asignatario: d.asignatario !== undefined ? d.asignatario : (d.responsable || ''),
+  responsableBanco: d.responsableBanco || '', certificador: d.certificador || '',
+  fechaResolucion: d.fechaResolucion !== undefined ? d.fechaResolucion : (d.fechaCompromiso || ''),
+  nHistorial: (d.historial || []).length,
+  ...(conHistorial ? { historial: (d.historial || []).map(complianceNormalizarEntrada) } : {}),
+  actualizadoPor: d.actualizadoPor || '', actualizadoEn: complianceFechaISO(d.actualizadoEn)
+});
+
+// GET /api/compliance/asignables — personas asociadas al cliente activo, a quienes se puede derivar una gestión.
+// Endpoint liviano (sin contraseñas ni datos sensibles), accesible a cualquier usuario autenticado.
+app.get('/api/compliance/asignables', verificarToken, async (req, res) => {
+  try {
+    const snap = await db.collection('usuarios').where('clientesIds', 'array-contains', complianceCliente(req)).get();
+    const personas = [];
+    snap.forEach(doc => {
+      const d = doc.data();
+      personas.push({ usuario: doc.id, nombre: d.nombre || doc.id, rol: d.rol || '', grupo: d.departamento || '' });
+    });
+    personas.sort((a, b) => a.nombre.localeCompare(b.nombre));
+    res.json(personas);
+  } catch (err) {
+    console.error('Error GET /api/compliance/asignables:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/compliance/gestion?entidad=banco — gestión registrada de la hoja, por hostname (sin historial: va aparte, es liviano)
 app.get('/api/compliance/gestion', verificarToken, async (req, res) => {
   try {
     const entidad = req.query.entidad;
@@ -3047,13 +3092,7 @@ app.get('/api/compliance/gestion', verificarToken, async (req, res) => {
     const snap = await db.collection('compliance_gestion')
       .where('clienteId', '==', complianceCliente(req)).where('entidad', '==', entidad).get();
     const out = {};
-    snap.forEach(doc => {
-      const d = doc.data();
-      out[d.clave] = {
-        hostname: d.hostname, estado: d.estado, responsable: d.responsable || '', fechaCompromiso: d.fechaCompromiso || '',
-        historial: d.historial || [], actualizadoPor: d.actualizadoPor || '', actualizadoEn: complianceFechaISO(d.actualizadoEn)
-      };
-    });
+    snap.forEach(doc => { const d = doc.data(); out[d.clave] = complianceNormalizarRegistro(d, false); });
     res.json(out);
   } catch (err) {
     console.error('Error GET /api/compliance/gestion:', err);
@@ -3061,50 +3100,82 @@ app.get('/api/compliance/gestion', verificarToken, async (req, res) => {
   }
 });
 
-// PUT /api/compliance/gestion — registra una gestión sobre uno o varios hosts
-// (cualquier usuario autenticado). Cada cambio queda en el historial del host.
+// GET /api/compliance/gestion/:entidad/:clave — ficha completa de UN equipo, con todo su historial
+// ({ registro: null } si nunca se gestionó). Sirve para consultar cualquier equipo del inventario.
+app.get('/api/compliance/gestion/:entidad/:clave', verificarToken, async (req, res) => {
+  try {
+    const { entidad, clave } = req.params;
+    if (!COMPLIANCE_ENTIDADES.includes(entidad) || !COMPLIANCE_RE_CLAVE.test(clave)) return res.status(400).json({ error: 'Parámetros inválidos' });
+    const doc = await db.collection('compliance_gestion').doc(`${complianceCliente(req)}_${entidad}_${clave}`).get();
+    res.json({ registro: doc.exists ? complianceNormalizarRegistro(doc.data(), true) : null });
+  } catch (err) {
+    console.error('Error GET /api/compliance/gestion/:entidad/:clave:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// PUT /api/compliance/gestion — registra una gestión sobre uno o varios hosts (cualquier usuario autenticado).
+// reemplazar:true (edición de un equipo) deja los campos EXACTAMENTE como se envían, incluso vacíos;
+// reemplazar:false (gestión masiva) solo cambia los campos que vengan con valor y respeta el resto.
 app.put('/api/compliance/gestion', verificarToken, async (req, res) => {
   try {
-    const { entidad, hosts, estado, responsable, fechaCompromiso, comentario } = req.body || {};
+    const b = req.body || {};
+    const { entidad, hosts } = b;
+    const reemplazar = b.reemplazar === true;
     if (!COMPLIANCE_ENTIDADES.includes(entidad)) return res.status(400).json({ error: 'Entidad inválida' });
-    if (!COMPLIANCE_ESTADOS.includes(estado)) return res.status(400).json({ error: 'Estado inválido' });
+    const estado = typeof b.estado === 'string' ? b.estado : '';
+    if (!COMPLIANCE_ESTADOS.includes(estado) && !(estado === '' && !reemplazar)) return res.status(400).json({ error: 'Estado inválido' });
     if (!Array.isArray(hosts) || hosts.length === 0 || hosts.length > COMPLIANCE_MAX_HOSTS_GESTION) {
       return res.status(400).json({ error: `Indica entre 1 y ${COMPLIANCE_MAX_HOSTS_GESTION} servidores por vez` });
     }
-    if (fechaCompromiso && !/^\d{4}-\d{2}-\d{2}$/.test(fechaCompromiso)) return res.status(400).json({ error: 'Fecha de compromiso inválida' });
+    const fechaResolucion = b.fechaResolucion !== undefined ? b.fechaResolucion : (b.fechaCompromiso !== undefined ? b.fechaCompromiso : '');
+    if (fechaResolucion && !/^\d{4}-\d{2}-\d{2}$/.test(fechaResolucion)) return res.status(400).json({ error: 'Fecha de resolución inválida' });
+    const form = {
+      asignatarioId: complianceTexto(b.asignatarioId, 60),
+      asignatario: complianceTexto(b.asignatario !== undefined ? b.asignatario : b.responsable, 120),
+      responsableBanco: complianceTexto(b.responsableBanco, 120),
+      certificador: complianceTexto(b.certificador, 120),
+      fechaResolucion: fechaResolucion || ''
+    };
+    const comentario = complianceTexto(b.comentario, 1000);
 
     const clienteId = complianceCliente(req);
     const ahora = new Date();
-    const entrada = {
-      fecha: ahora.toISOString(), usuario: req.usuario.nombre, estado,
-      responsable: String(responsable || '').trim().slice(0, 120),
-      fechaCompromiso: fechaCompromiso || '',
-      comentario: String(comentario || '').trim().slice(0, 1000)
-    };
+    const unicos = new Map();
+    hosts.forEach(h => { const clave = complianceClaveHost(h); if (clave && !unicos.has(clave)) unicos.set(clave, String(h).trim()); });
+    if (unicos.size === 0) return res.status(400).json({ error: 'Ningún hostname válido' });
 
-    const vistos = new Set();
+    const claves = Array.from(unicos.keys());
+    const refs = claves.map(clave => db.collection('compliance_gestion').doc(`${clienteId}_${entidad}_${clave}`));
+    const previos = await Promise.all(refs.map(r => r.get()));
+
     const batch = db.batch();
-    for (const h of hosts) {
-      const clave = complianceClaveHost(h);
-      if (!clave || vistos.has(clave)) continue;
-      vistos.add(clave);
-      const campos = {
-        clienteId, entidad, clave, hostname: String(h).trim(), estado,
+    claves.forEach((clave, i) => {
+      const prev = previos[i].exists ? complianceNormalizarRegistro(previos[i].data(), false) : null;
+      const base = prev || { estado: 'Pendiente', asignatarioId: '', asignatario: '', responsableBanco: '', certificador: '', fechaResolucion: '' };
+      const cambiaAsignatario = reemplazar || form.asignatarioId !== '' || form.asignatario !== '';
+      const resultado = {
+        estado: reemplazar ? estado : (estado || base.estado),
+        asignatarioId: cambiaAsignatario ? form.asignatarioId : base.asignatarioId,
+        asignatario: cambiaAsignatario ? form.asignatario : base.asignatario,
+        responsableBanco: reemplazar || form.responsableBanco !== '' ? form.responsableBanco : base.responsableBanco,
+        certificador: reemplazar || form.certificador !== '' ? form.certificador : base.certificador,
+        fechaResolucion: reemplazar || form.fechaResolucion !== '' ? form.fechaResolucion : base.fechaResolucion
+      };
+      const entrada = { fecha: ahora.toISOString(), usuario: req.usuario.nombre, ...resultado, comentario };
+      batch.set(refs[i], {
+        clienteId, entidad, clave, hostname: unicos.get(clave), ...resultado,
         actualizadoPor: req.usuario.nombre, actualizadoEn: ahora,
         historial: admin.firestore.FieldValue.arrayUnion(entrada)
-      };
-      if (entrada.responsable) campos.responsable = entrada.responsable;
-      if (entrada.fechaCompromiso) campos.fechaCompromiso = entrada.fechaCompromiso;
-      batch.set(db.collection('compliance_gestion').doc(`${clienteId}_${entidad}_${clave}`), campos, { merge: true });
-    }
-    if (vistos.size === 0) return res.status(400).json({ error: 'Ningún hostname válido' });
+      }, { merge: true });
+    });
     await batch.commit();
 
     await db.collection('auditoria').add({
       accion: 'COMPLIANCE_GESTION', usuarioNombre: req.usuario.nombre, clienteId, timestamp: new Date(),
-      detalles: `${entidad}: ${vistos.size} servidor(es) → ${estado}`
+      detalles: `${entidad}: ${claves.length} servidor(es)${estado ? ' → ' + estado : ''}${form.asignatario ? ' · asignado a ' + form.asignatario : ''}`
     });
-    res.json({ success: true, actualizados: vistos.size });
+    res.json({ success: true, actualizados: claves.length });
   } catch (err) {
     console.error('Error PUT /api/compliance/gestion:', err);
     res.status(500).json({ error: err.message });

@@ -197,6 +197,48 @@ export function opcionesDe(rows, campo) {
 }
 
 const MESES = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+
+// En Banco todo es producción: se muestra un único gráfico (Total) por mirada. Banchile muestra Total, Producción y No producción.
+export const ENTIDADES_SOLO_TOTAL = ['banco'];
+export const soloTotal = (entidad) => ENTIDADES_SOLO_TOTAL.includes(entidad);
+
+// ---------- historial de gestión ----------
+export const CAMPOS_GESTION = [
+  ['estado', 'Estado'], ['asignatario', 'Asignatario'], ['responsableBanco', 'Responsable Banco'],
+  ['certificador', 'Certificador'], ['fechaResolucion', 'Fecha de resolución']
+];
+// Qué cambió entre dos entradas consecutivas (cada entrada es una foto completa de los campos).
+// prev = null para la primera entrada: lo que viene con valor aparece como "nuevo".
+export function cambiosEntre(prev, act) {
+  const out = [];
+  CAMPOS_GESTION.forEach(([k, nombre]) => {
+    const antes = prev ? (prev[k] || '') : '';
+    const ahora = act[k] || '';
+    if (antes !== ahora) out.push({ campo: nombre, de: antes, a: ahora });
+  });
+  return out;
+}
+// Entradas con sus cambios calculados, de la más reciente a la más antigua
+export function historialOrdenado(entradas) {
+  const cron = [...(entradas || [])].sort((a, b) => (a.fecha || '').localeCompare(b.fecha || ''));
+  return cron.map((e, i) => ({ ...e, cambios: cambiosEntre(i > 0 ? cron[i - 1] : null, e) })).reverse();
+}
+export const fechaLarga = (iso) => (iso ? iso.split('-').reverse().join('/') : '');
+export const etiquetaMes = (fechaISO) => {
+  const d = new Date(fechaISO);
+  return isNaN(d.getTime()) ? 'Sin fecha' : `${MESES[d.getMonth()]} ${d.getFullYear()}`;
+};
+// [{ mes: 'Oct 2026', entradas: [...] }, ...] conservando el orden (más reciente primero)
+export function agruparPorMes(entradas) {
+  const grupos = [];
+  (entradas || []).forEach(e => {
+    const mes = etiquetaMes(e.fecha);
+    const ultimo = grupos[grupos.length - 1];
+    if (ultimo && ultimo.mes === mes) ultimo.entradas.push(e); else grupos.push({ mes, entradas: [e] });
+  });
+  return grupos;
+}
+
 export const aISO = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 export function lunesDe(fecha = new Date()) {
   const d = new Date(fecha.getFullYear(), fecha.getMonth(), fecha.getDate());

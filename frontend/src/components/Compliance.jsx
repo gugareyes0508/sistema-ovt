@@ -3,8 +3,9 @@ import axios from 'axios';
 import * as XLSX from 'xlsx';
 import {
   ESTADOS_GESTION, parsearInventario, decodificar, aplicarFiltros, calcularVista, listaGestion,
-  opcionesDe, claveHost, lunesDe, etiquetaSemana, aISO, esKyndryl, cargaCompleta, describirKyndryl, kyndrylDefinido, filtroActivo, KYNDRYL_FIJOS, kyndrylFijo
+  opcionesDe, claveHost, lunesDe, etiquetaSemana, aISO, esKyndryl, cargaCompleta, describirKyndryl, kyndrylDefinido, filtroActivo, KYNDRYL_FIJOS, kyndrylFijo, soloTotal, fechaLarga
 } from '../utils/compliance';
+import { ModalGestion, BuscadorEquipo } from './ComplianceGestion';
 
 // ============================================
 // Módulo Compliance — pestaña Hardening (Vulnerabilidades y Parchado: próximamente)
@@ -41,7 +42,6 @@ const normalizarConfig = (cfg) => {
   return c;
 };
 const ajustesDesdeConfig = (cfg) => ({ banco: clonar(cfg.entidades.banco), banchile: clonar(cfg.entidades.banchile) });
-const fechaCorta = (iso) => (iso ? iso.slice(5).split('-').reverse().join('/') : '');
 const fechaHora = (iso) => (iso ? new Date(iso).toLocaleString('es-CL', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '');
 
 // ---------- componentes de presentación (definidos a nivel de módulo) ----------
@@ -81,29 +81,56 @@ function TarjetaGauge({ titulo, s }) {
   );
 }
 
-// Las dos columnas (Global / Kyndryl) tienen un encabezado idéntico y de alto fijo, así sus gráficos
-// quedan a la misma altura aunque el texto de la definición sea largo (se recorta a 2 líneas).
-function ColumnaMirada({ nombre, detalle, v }) {
+// Encabezado idéntico para Global y Kyndryl: alto fijo y detalle limitado a 2 líneas
+function EncabezadoMirada({ nombre, detalle, v }) {
   return (
-    <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10, marginBottom: 8, minHeight: 66 }}>
-        <div style={{ minWidth: 0, flex: 1 }}>
-          <div style={{ fontSize: '15px', fontWeight: 800, color: 'var(--ink-950)' }}>{nombre}</div>
-          <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--ink-800)' }}>Total máquinas: {v.total.total}</div>
-          <div title={detalle} style={{ fontSize: '10px', color: 'var(--muted)', lineHeight: '13px', height: 26, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>{detalle}</div>
-        </div>
-        <div style={{ textAlign: 'right', flexShrink: 0 }}>
-          <div style={{ fontSize: '12px', fontWeight: 800, color: 'var(--ink-950)' }}>SCORE: {v.total.score !== null ? `${fmt(v.total.score)} %` : '—'}</div>
-          <div style={{ fontSize: '10px', color: 'var(--muted)' }}>promedio adherencia{v.total.sinDato ? ` · ${v.total.sinDato} sin dato = 0` : ''}</div>
-        </div>
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10, minHeight: 66 }}>
+      <div style={{ minWidth: 0, flex: 1 }}>
+        <div style={{ fontSize: '15px', fontWeight: 800, color: 'var(--ink-950)' }}>{nombre}</div>
+        <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--ink-800)' }}>Total máquinas: {v.total.total}</div>
+        <div title={detalle} style={{ fontSize: '10px', color: 'var(--muted)', lineHeight: '13px', height: 26, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>{detalle}</div>
       </div>
-      <div style={{ display: 'grid', gap: 8 }}>
-        <TarjetaGauge titulo="Total" s={v.total} />
-        <TarjetaGauge titulo="Producción" s={v.prod} />
-        <TarjetaGauge titulo="No producción" s={v.noProd} />
+      <div style={{ textAlign: 'right', flexShrink: 0 }}>
+        <div style={{ fontSize: '12px', fontWeight: 800, color: 'var(--ink-950)' }}>SCORE: {v.total.score !== null ? `${fmt(v.total.score)} %` : '—'}</div>
+        <div style={{ fontSize: '10px', color: 'var(--muted)' }}>promedio adherencia{v.total.sinDato ? ` · ${v.total.sinDato} sin dato = 0` : ''}</div>
       </div>
     </div>
   );
+}
+
+function useAnchoAmplio(minimo = 820) {
+  const [amplio, setAmplio] = useState(() => (typeof window === 'undefined' ? true : window.innerWidth >= minimo));
+  useEffect(() => {
+    const ajustar = () => setAmplio(window.innerWidth >= minimo);
+    window.addEventListener('resize', ajustar);
+    return () => window.removeEventListener('resize', ajustar);
+  }, [minimo]);
+  return amplio;
+}
+
+// Global y Kyndryl lado a lado dentro de UNA sola cuadrícula de 2 columnas: cada fila (encabezado, Total,
+// Producción, ...) toma la altura de la más alta, así los gráficos quedan siempre a la misma altura.
+// En pantallas angostas se apilan (primero Global, luego Kyndryl). Banco: un único gráfico (Total) por mirada.
+function MiradasHardening({ vistaGlobal, vistaKyndryl, detalleKyndryl, unico }) {
+  const amplio = useAnchoAmplio();
+  const tarjetas = unico ? [['Total', 'total']] : [['Total', 'total'], ['Producción', 'prod'], ['No producción', 'noProd']];
+  const encG = <EncabezadoMirada key="enc-g" nombre="Global" detalle="Universo según los filtros" v={vistaGlobal} />;
+  const encK = <EncabezadoMirada key="enc-k" nombre="Kyndryl" detalle={detalleKyndryl} v={vistaKyndryl} />;
+  if (!amplio) {
+    const apiladas = (v, pref) => tarjetas.map(([t, k]) => <TarjetaGauge key={pref + k} titulo={t} s={v[k]} />);
+    return <div style={{ display: 'grid', gap: 8 }}>{[encG, ...apiladas(vistaGlobal, 'g'), encK, ...apiladas(vistaKyndryl, 'k')]}</div>;
+  }
+  const hijos = [encG, encK];
+  tarjetas.forEach(([t, k]) => {
+    hijos.push(<TarjetaGauge key={`g-${k}`} titulo={t} s={vistaGlobal[k]} />, <TarjetaGauge key={`k-${k}`} titulo={t} s={vistaKyndryl[k]} />);
+  });
+  return <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(0,1fr)', columnGap: 14, rowGap: 8, alignItems: 'stretch' }}>{hijos}</div>;
+}
+
+// Texto en una sola línea, recortado con "…" (el texto completo se ve al pasar el mouse)
+function Recortado({ texto, ancho }) {
+  if (!texto) return <span>—</span>;
+  return <div title={texto} style={{ maxWidth: ancho, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{texto}</div>;
 }
 
 function PildoraEstado({ estado }) {
@@ -221,8 +248,12 @@ export default function Compliance({ token, apiUrl, clienteActivo, usuario }) {
   const [busqueda, setBusqueda] = useState('');
   const [pagina, setPagina] = useState(0);
   const [seleccion, setSeleccion] = useState([]);
-  const [form, setForm] = useState({ estado: 'En gestión', responsable: '', fecha: '', comentario: '' });
   const [guardandoGestion, setGuardandoGestion] = useState(false);
+  const [asignables, setAsignables] = useState([]);   // personas asociadas al cliente a quienes se puede derivar
+  const [asigFiltro, setAsigFiltro] = useState('todos');
+  const [modal, setModal] = useState(null);           // { claves: [clave, ...] } — ventana emergente de gestión
+  const [ficha, setFicha] = useState(null);           // ficha (con historial) del equipo abierto en la ventana
+  const [errorModal, setErrorModal] = useState(null);
 
   // Config + semanas cargadas (al entrar y al cambiar de cliente)
   useEffect(() => {
@@ -273,6 +304,27 @@ export default function Compliance({ token, apiUrl, clienteActivo, usuario }) {
     return () => { cancelado = true; };
   }, [semana, entidad, apiUrl, headers, versionDatos]);
 
+  // Personas asociadas al cliente (para asignar / derivar)
+  useEffect(() => {
+    let cancelado = false;
+    axios.get(`${apiUrl}/api/compliance/asignables`, { headers })
+      .then(res => { if (!cancelado) setAsignables(res.data || []); })
+      .catch(() => { if (!cancelado) setAsignables([]); });
+    return () => { cancelado = true; };
+  }, [apiUrl, headers]);
+
+  // Ficha completa (con todo el historial) del equipo abierto en la ventana
+  const claveFicha = modal && modal.claves.length === 1 ? modal.claves[0] : null;
+  useEffect(() => {
+    if (!claveFicha) { setFicha(null); return undefined; }
+    let cancelado = false;
+    setFicha({ clave: claveFicha, cargando: true, registro: null });
+    axios.get(`${apiUrl}/api/compliance/gestion/${entidad}/${claveFicha}`, { headers })
+      .then(res => { if (!cancelado) setFicha({ clave: claveFicha, cargando: false, registro: res.data.registro }); })
+      .catch(() => { if (!cancelado) setFicha({ clave: claveFicha, cargando: false, registro: null, error: true }); });
+    return () => { cancelado = true; };
+  }, [claveFicha, entidad, apiUrl, headers]);
+
   // Gestión registrada de la hoja activa
   useEffect(() => {
     let cancelado = false;
@@ -309,8 +361,9 @@ export default function Compliance({ token, apiUrl, clienteActivo, usuario }) {
   const estadoDe = (r) => (regDe(r) ? regDe(r).estado : 'Pendiente');
   const vencidoDe = (r) => {
     const g = regDe(r);
-    return !!g && !!g.fechaCompromiso && g.fechaCompromiso < hoy && g.estado !== 'Resuelto' && g.estado !== 'Excepción';
+    return !!g && !!g.fechaResolucion && g.fechaResolucion < hoy && g.estado !== 'Resuelto' && g.estado !== 'Excepción';
   };
+  const asignatarioDe = (r) => (regDe(r) ? regDe(r).asignatario : '');
 
   const conteos = useMemo(() => {
     const c = {};
@@ -319,7 +372,7 @@ export default function Compliance({ token, apiUrl, clienteActivo, usuario }) {
     aGestionarMirada.forEach(r => {
       const g = gestEnt[claveHost(r.host)];
       c[g ? g.estado : 'Pendiente'] += 1;
-      if (g && g.fechaCompromiso && g.fechaCompromiso < hoy && g.estado !== 'Resuelto' && g.estado !== 'Excepción') vencidos += 1;
+      if (g && g.fechaResolucion && g.fechaResolucion < hoy && g.estado !== 'Resuelto' && g.estado !== 'Excepción') vencidos += 1;
     });
     return { c, vencidos };
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -333,12 +386,14 @@ export default function Compliance({ token, apiUrl, clienteActivo, usuario }) {
       if (ffLista === 'bajo' && r.adh === null) return false;
       if (ffLista === 'sin' && r.adh !== null) return false;
       if (q && !r.host.toLowerCase().includes(q)) return false;
+      if (asigFiltro === '__sin__' && asignatarioDe(r)) return false;
+      if (asigFiltro !== 'todos' && asigFiltro !== '__sin__' && asignatarioDe(r) !== asigFiltro) return false;
       if (estadoFiltro === 'vencidos') return vencidoDe(r);
       if (estadoFiltro !== 'todos' && estadoDe(r) !== estadoFiltro) return false;
       return true;
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [aGestionarMirada, ffLista, estadoFiltro, busqueda, gestEnt, hoy]);
+  }, [aGestionarMirada, ffLista, estadoFiltro, busqueda, asigFiltro, gestEnt, hoy]);
 
   const maxPag = Math.max(0, Math.ceil(listaVista.length / TAM_PAGINA) - 1);
   const pag = Math.min(pagina, maxPag);
@@ -349,6 +404,24 @@ export default function Compliance({ token, apiUrl, clienteActivo, usuario }) {
     return m;
   }, [aGestionarMirada]);
   const seleccionValida = seleccion.filter(k => filaPorClave.has(k));
+  // Todos los equipos del inventario de la hoja (para consultar uno que hoy cumple o quedó fuera de los filtros)
+  const todasPorClave = useMemo(() => {
+    const m = new Map();
+    (rows || []).forEach(r => { const k = claveHost(r.host); if (!m.has(k)) m.set(k, r); });
+    return m;
+  }, [rows]);
+  const filaDe = (clave) => filaPorClave.get(clave) || todasPorClave.get(clave);
+  const asignatariosEnLista = useMemo(() => {
+    const nombres = new Set();
+    aGestionarMirada.forEach(r => { const g = gestEnt[claveHost(r.host)]; if (g && g.asignatario) nombres.add(g.asignatario); });
+    return Array.from(nombres).sort((a, b) => a.localeCompare(b));
+  }, [aGestionarMirada, gestEnt]);
+  const sugerencias = useMemo(() => {
+    const rb = new Set();
+    const ce = new Set();
+    Object.values(gestEnt).forEach(g => { if (g.responsableBanco) rb.add(g.responsableBanco); if (g.certificador) ce.add(g.certificador); });
+    return { responsablesBanco: Array.from(rb).sort(), certificadores: Array.from(ce).sort() };
+  }, [gestEnt]);
 
   const semanaInfo = cargas.find(c => c.semana === semana);
   const vistaModificada = !!config && !!ajustes && (
@@ -408,49 +481,59 @@ export default function Compliance({ token, apiUrl, clienteActivo, usuario }) {
     }
   };
 
-  const abrirGestion = (clave) => {
-    const g = gestEnt[clave];
-    setSeleccion([clave]);
-    setForm({ estado: g ? g.estado : 'En gestión', responsable: g ? g.responsable : '', fecha: g ? g.fechaCompromiso : '', comentario: '' });
+  const cambiarEntidad = (id) => {
+    setEntidad(id); setSeleccion([]); setPagina(0); setFfLista('todos'); setAsigFiltro('todos'); setModal(null); setErrorModal(null);
   };
+  const abrirGestion = (clave) => { setErrorModal(null); setModal({ claves: [clave] }); };
+  const abrirGestionMasiva = () => { setErrorModal(null); setModal({ claves: seleccionValida }); };
+  const cerrarModal = () => { setModal(null); setErrorModal(null); };
   const alternarSeleccion = (clave) => {
-    const nueva = seleccionValida.includes(clave) ? seleccionValida.filter(k => k !== clave) : [...seleccionValida, clave];
-    setSeleccion(nueva);
-    if (nueva.length === 1) abrirGestion(nueva[0]);
-    else if (nueva.length > 1) setForm({ estado: 'En gestión', responsable: '', fecha: '', comentario: '' });
+    setSeleccion(seleccionValida.includes(clave) ? seleccionValida.filter(k => k !== clave) : [...seleccionValida, clave]);
   };
-  const seleccionar = (lista) => {
-    const claves = Array.from(new Set(lista.map(r => claveHost(r.host))));
-    setSeleccion(claves);
-    setForm({ estado: 'En gestión', responsable: '', fecha: '', comentario: '' });
+  const seleccionar = (lista) => setSeleccion(Array.from(new Set(lista.map(r => claveHost(r.host)))));
+
+  // Valores iniciales de la ventana: un equipo → lo que ya tiene guardado; varios → todo en blanco ("sin cambio")
+  const construirInicial = (claves) => {
+    if (claves.length > 1) return { estado: '', asignatario: '', asignatarioNombre: '', responsableBanco: '', certificador: '', fecha: '', comentario: '' };
+    const g = gestEnt[claves[0]];
+    return {
+      estado: g ? g.estado : 'En gestión',
+      asignatario: g ? (g.asignatarioId || (g.asignatario ? `texto:${g.asignatario}` : '')) : '',
+      asignatarioNombre: g ? g.asignatario : '',
+      responsableBanco: g ? g.responsableBanco : '', certificador: g ? g.certificador : '',
+      fecha: g ? g.fechaResolucion : '', comentario: ''
+    };
   };
 
-  const guardarGestion = async () => {
-    const hosts = seleccionValida.map(k => filaPorClave.get(k).host);
+  // Un equipo: se guarda tal cual está el formulario (incluso vacíos). Varios: solo cambian los campos con valor.
+  const guardarDesdeModal = async (datos) => {
+    const hosts = modal.claves.map(k => (filaDe(k) || {}).host).filter(Boolean);
     if (hosts.length === 0) return;
     setGuardandoGestion(true);
-    setMensaje(null);
+    setErrorModal(null);
     try {
       for (let i = 0; i < hosts.length; i += 400) {
-        await axios.put(`${apiUrl}/api/compliance/gestion`, {
-          entidad, hosts: hosts.slice(i, i + 400), estado: form.estado, responsable: form.responsable,
-          fechaCompromiso: form.fecha, comentario: form.comentario
-        }, { headers });
+        await axios.put(`${apiUrl}/api/compliance/gestion`, { entidad, hosts: hosts.slice(i, i + 400), reemplazar: hosts.length === 1, ...datos }, { headers });
       }
       setVersionGestion(v => v + 1);
-      setForm(f => ({ ...f, comentario: '' }));
-      if (hosts.length > 1) setSeleccion([]);
+      setModal(null);
+      setSeleccion([]);
       setMensaje({ tipo: 'success', texto: `Gestión guardada para ${hosts.length} servidor${hosts.length > 1 ? 'es' : ''}.` });
     } catch (err) {
-      setMensaje({ tipo: 'error', texto: 'No se pudo guardar la gestión: ' + (err.response?.data?.error || err.message) });
+      setErrorModal('No se pudo guardar la gestión: ' + (err.response?.data?.error || err.message));
     } finally {
       setGuardandoGestion(false);
     }
   };
 
   // ---------- render ----------
-  const unico = seleccionValida.length === 1 ? filaPorClave.get(seleccionValida[0]) : null;
-  const regUnico = unico ? regDe(unico) : null;
+  const filaModal = modal && modal.claves.length === 1 ? filaDe(modal.claves[0]) : null;
+  const regModal = ficha && modal && ficha.clave === modal.claves[0] ? ficha : null;
+  const chipsModal = filaModal ? [
+    { texto: filaModal.adh === null ? 'Sin adherencia (cuenta 0)' : `Adherencia ${filaModal.adh}%`, alerta: filaModal.adh === null || filaModal.adh < umbral },
+    { texto: `${filaModal.clas === 'PRODUCCION' ? 'Prod' : 'No prod'} · ${filaModal.amb || '—'}` },
+    { texto: filaModal.svc || '—' }, { texto: filaModal.ubi || '—' }, { texto: filaModal.so || '—' }
+  ] : [];
   const hayCarga = !!semana && !!filas;
 
   const tabBtn = (id, texto, habilitado) => (
@@ -477,8 +560,8 @@ export default function Compliance({ token, apiUrl, clienteActivo, usuario }) {
         <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
           <div style={{ display: 'inline-flex', gap: 4, background: 'rgba(255,255,255,0.72)', border: '1px solid var(--line)', borderRadius: '999px', padding: 4 }}>
             {ENTIDADES_UI.map(e => (
-              <span key={e.id} role="button" tabIndex={0} onClick={() => { setEntidad(e.id); setSeleccion([]); setPagina(0); }}
-                onKeyDown={(ev) => { if (ev.key === 'Enter') { setEntidad(e.id); setSeleccion([]); setPagina(0); } }}
+              <span key={e.id} role="button" tabIndex={0} onClick={() => cambiarEntidad(e.id)}
+                onKeyDown={(ev) => { if (ev.key === 'Enter') cambiarEntidad(e.id); }}
                 style={{
                   padding: '6px 16px', borderRadius: '999px', fontSize: '11px', fontWeight: 800, cursor: 'pointer',
                   background: entidad === e.id ? 'linear-gradient(135deg,var(--ink-900),var(--bank-blue))' : 'transparent', color: entidad === e.id ? '#fff' : 'var(--muted)'
@@ -497,7 +580,7 @@ export default function Compliance({ token, apiUrl, clienteActivo, usuario }) {
       </div>
 
       {errorGlobal && <Aviso tipo="error">{errorGlobal}</Aviso>}
-      {mensaje && <Aviso tipo={mensaje.tipo}>{mensaje.texto}</Aviso>}
+      {mensaje && <div style={{ position: 'sticky', top: 8, zIndex: 20 }}><Aviso tipo={mensaje.tipo}>{mensaje.texto}</Aviso></div>}
 
       {tab === 'hardening' && (
         <>
@@ -603,10 +686,7 @@ export default function Compliance({ token, apiUrl, clienteActivo, usuario }) {
               {universo.length === 0 ? (
                 <div style={{ ...cardStyle, textAlign: 'center', color: 'var(--muted)', fontSize: '13px', padding: 24 }}>Ningún servidor cumple estos filtros.</div>
               ) : (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 14 }}>
-                  <ColumnaMirada nombre="Global" detalle="Universo según los filtros" v={vista.global} />
-                  <ColumnaMirada nombre="Kyndryl" detalle={describirKyndryl(kyndril)} v={vista.kyndryl} />
-                </div>
+                <MiradasHardening vistaGlobal={vista.global} vistaKyndryl={vista.kyndryl} detalleKyndryl={describirKyndryl(kyndril)} unico={soloTotal(entidad)} />
               )}
 
               {/* Gestión */}
@@ -647,60 +727,77 @@ export default function Compliance({ token, apiUrl, clienteActivo, usuario }) {
                 </span>
               </div>
 
+              <BuscadorEquipo rows={rows} estadoDe={estadoDe} onElegir={abrirGestion} />
+
               <div style={{ ...cardStyle, padding: 12 }}>
                 <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', marginBottom: 8 }}>
-                  {[['todos', 'Todos'], ['P', 'Producción'], ['N', 'No producción'], ['bajo', 'Bajo umbral'], ['sin', 'Sin dato']].map(([id, texto]) => (
+                  {(soloTotal(entidad)
+                    ? [['todos', 'Todos'], ['bajo', 'Bajo umbral'], ['sin', 'Sin dato']]
+                    : [['todos', 'Todos'], ['P', 'Producción'], ['N', 'No producción'], ['bajo', 'Bajo umbral'], ['sin', 'Sin dato']]).map(([id, texto]) => (
                     <Chip key={id} activo={ffLista === id} onClick={() => { setFfLista(id); setPagina(0); }}>{texto}</Chip>
                   ))}
                   <input type="search" placeholder="Buscar hostname..." value={busqueda} onChange={e => { setBusqueda(e.target.value); setPagina(0); }}
                     aria-label="Buscar hostname" style={{ ...inputStyle, width: 180, fontSize: '11px' }} />
+                  <select value={asigFiltro} onChange={e => { setAsigFiltro(e.target.value); setPagina(0); }} aria-label="Filtrar por asignatario"
+                    style={{ ...inputStyle, fontSize: '11px', width: 'auto' }}>
+                    <option value="todos">Asignatario: todos</option>
+                    <option value="__sin__">Sin asignar</option>
+                    {asignatariosEnLista.map(n => <option key={n} value={n}>{n}</option>)}
+                  </select>
                   {estadoFiltro !== 'todos' && <Chip activo onClick={() => setEstadoFiltro('todos')}>Estado: {estadoFiltro === 'vencidos' ? 'vencidos' : estadoFiltro} ✕</Chip>}
                 </div>
                 <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginBottom: 6, fontSize: '11px', color: 'var(--muted)' }}>
                   <span>{listaVista.length} servidores en la lista</span>
                   {listaVista.length > 0 && <button onClick={() => seleccionar(filasPagina)} style={{ border: 'none', background: 'transparent', color: 'var(--bank-blue)', fontWeight: 800, fontSize: '11px', cursor: 'pointer', padding: 0 }}>Seleccionar esta página</button>}
                   {listaVista.length > filasPagina.length && <button onClick={() => seleccionar(listaVista)} style={{ border: 'none', background: 'transparent', color: 'var(--bank-blue)', fontWeight: 800, fontSize: '11px', cursor: 'pointer', padding: 0 }}>Seleccionar los {listaVista.length}</button>}
-                  {seleccionValida.length > 0 && <button onClick={() => setSeleccion([])} style={{ border: 'none', background: 'transparent', color: 'var(--muted)', fontWeight: 800, fontSize: '11px', cursor: 'pointer', padding: 0 }}>Quitar selección ({seleccionValida.length})</button>}
+                  {seleccionValida.length > 0 && (
+                    <>
+                      <button onClick={abrirGestionMasiva} style={{ padding: '5px 12px', borderRadius: '999px', border: 'none', background: 'var(--bank-blue)', color: '#fff', fontWeight: 800, fontSize: '11px', cursor: 'pointer' }}>Gestionar seleccionados ({seleccionValida.length})</button>
+                      <button onClick={() => setSeleccion([])} style={{ border: 'none', background: 'transparent', color: 'var(--muted)', fontWeight: 800, fontSize: '11px', cursor: 'pointer', padding: 0 }}>Quitar selección</button>
+                    </>
+                  )}
                 </div>
                 <div style={{ overflowX: 'auto' }}>
                   <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                     <thead>
                       <tr>
-                        {['', 'Hostname', 'Ambiente', 'SO', 'Servicio', 'Adherencia', 'Ubicación', 'Gestión', ''].map((h, i) => (
-                          <th key={i} style={{ textAlign: 'left', fontSize: '10px', color: 'var(--muted)', fontWeight: 800, padding: '6px 8px', whiteSpace: 'nowrap' }}>{h}</th>
+                        {['', 'Hostname', 'Ambiente', 'Servicio', 'Adherencia', 'Ubicación', 'Estado', 'Asignatario', 'Resp. Banco', 'Certificador', 'F. resolución', ''].map((h, i, todos) => (
+                          <th key={i} style={{
+                            textAlign: 'left', fontSize: '10px', color: 'var(--muted)', fontWeight: 800, padding: '6px 6px', whiteSpace: 'nowrap',
+                            ...(i === todos.length - 1 ? { position: 'sticky', right: 0, background: '#fff' } : {})
+                          }}>{h}</th>
                         ))}
                       </tr>
                     </thead>
                     <tbody>
                       {filasPagina.length === 0 ? (
-                        <tr><td colSpan={9} style={{ textAlign: 'center', color: 'var(--muted)', padding: 18, fontSize: '12px' }}>Sin servidores con estos filtros.</td></tr>
+                        <tr><td colSpan={12} style={{ textAlign: 'center', color: 'var(--muted)', padding: 18, fontSize: '12px' }}>Sin servidores con estos filtros.</td></tr>
                       ) : filasPagina.map((r, i) => {
                         const clave = claveHost(r.host);
                         const reg = gestEnt[clave];
                         const esKyn = esKyndryl(r, kyndril);
-                        const celda = { padding: '7px 8px', fontSize: '11px', borderTop: '1px solid rgba(18,52,78,0.06)', color: 'var(--ink-800)' };
+                        const celda = { padding: '7px 6px', fontSize: '11px', borderTop: '1px solid rgba(18,52,78,0.06)', color: 'var(--ink-800)' };
                         return (
                           <tr key={`${clave}-${pag}-${i}`}>
                             <td style={celda}><input type="checkbox" checked={seleccionValida.includes(clave)} onChange={() => alternarSeleccion(clave)} aria-label={`Seleccionar ${r.host}`} /></td>
-                            <td style={{ ...celda, fontWeight: 700 }}>{r.host}</td>
-                            <td style={celda}>{r.clas === 'PRODUCCION' ? 'Prod' : 'No prod'} · {r.amb || '—'}</td>
-                            <td style={celda}>{r.so || '—'}</td>
-                            <td style={celda}>{r.svc || '—'}</td>
+                            <td style={{ ...celda, fontWeight: 700, whiteSpace: 'nowrap' }}>{r.host}</td>
+                            <td style={{ ...celda, whiteSpace: 'nowrap' }}>{r.clas === 'PRODUCCION' ? 'Prod' : 'No prod'} · {r.amb || '—'}</td>
+                            <td style={celda}><Recortado texto={r.svc} ancho={80} /></td>
                             <td style={celda}>
                               {r.adh === null
                                 ? <span style={{ fontSize: '10px', fontWeight: 800, padding: '3px 9px', borderRadius: '999px', background: 'rgba(215,59,71,.12)', color: '#a61e2b', whiteSpace: 'nowrap' }}>Sin dato (0)</span>
                                 : <b style={{ color: '#a61e2b', fontFamily: "'IBM Plex Mono',monospace" }}>{r.adh}%</b>}
                             </td>
-                            <td style={celda}>{r.ubi || '—'}{esKyn && kyndrylDefinido(kyndril) && <span style={{ marginLeft: 6, fontSize: '10px', fontWeight: 800, padding: '3px 9px', borderRadius: '999px', background: 'rgba(0,59,113,.1)', color: '#003b71' }}>Kyndryl</span>}</td>
-                            <td style={celda}>
-                              <PildoraEstado estado={reg ? reg.estado : 'Pendiente'} />
-                              {reg && reg.fechaCompromiso && (
-                                <div style={{ fontSize: '10px', color: vencidoDe(r) ? '#a61e2b' : 'var(--muted)', fontWeight: vencidoDe(r) ? 800 : 400 }}>
-                                  compromiso {fechaCorta(reg.fechaCompromiso)}{vencidoDe(r) ? ' · vencido' : ''}
-                                </div>
-                              )}
+                            <td style={{ ...celda, whiteSpace: 'nowrap' }}>{r.ubi || '—'}{esKyn && kyndrylDefinido(kyndril) && <span style={{ marginLeft: 6, fontSize: '10px', fontWeight: 800, padding: '2px 6px', borderRadius: '999px', background: 'rgba(0,59,113,.1)', color: '#003b71' }}>Kyndryl</span>}</td>
+                            <td style={celda}><PildoraEstado estado={reg ? reg.estado : 'Pendiente'} /></td>
+                            <td style={celda}><Recortado texto={reg && reg.asignatario} ancho={120} /></td>
+                            <td style={celda}><Recortado texto={reg && reg.responsableBanco} ancho={90} /></td>
+                            <td style={celda}><Recortado texto={reg && reg.certificador} ancho={100} /></td>
+                            <td style={{ ...celda, whiteSpace: 'nowrap', color: vencidoDe(r) ? '#a61e2b' : 'var(--ink-800)', fontWeight: vencidoDe(r) ? 800 : 400 }}>
+                              {reg && reg.fechaResolucion ? fechaLarga(reg.fechaResolucion) : '—'}
+                              {vencidoDe(r) && <div style={{ fontSize: '10px', fontWeight: 800 }}>vencido</div>}
                             </td>
-                            <td style={celda}>
+                            <td style={{ ...celda, position: 'sticky', right: 0, background: '#fff', boxShadow: '-8px 0 8px -8px rgba(18,52,78,.25)' }}>
                               <button onClick={() => abrirGestion(clave)}
                                 style={{ padding: '6px 12px', borderRadius: '999px', fontSize: '10px', fontWeight: 800, border: 'none', background: 'var(--bank-blue)', color: '#fff', cursor: 'pointer' }}>Gestionar</button>
                             </td>
@@ -719,71 +816,23 @@ export default function Compliance({ token, apiUrl, clienteActivo, usuario }) {
                 )}
               </div>
 
-              {/* Panel de gestión */}
-              {seleccionValida.length > 0 && (
-                <div style={{ ...cardStyle, marginTop: 12, border: '1px solid rgba(0,59,113,.35)' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                    <div style={{ fontSize: '13px', fontWeight: 800, color: 'var(--ink-950)' }}>
-                      {unico ? `Gestión · ${unico.host}` : `Gestión masiva · ${seleccionValida.length} servidores`}
-                    </div>
-                    <button onClick={() => setSeleccion([])} style={{ padding: '6px 12px', borderRadius: '999px', fontSize: '10px', fontWeight: 800, border: '1px solid var(--line)', background: 'transparent', color: 'var(--muted)', cursor: 'pointer' }}>Cerrar</button>
-                  </div>
-                  {unico && (
-                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 10 }}>
-                      {[unico.adh === null ? 'Sin adherencia (cuenta 0)' : `Adherencia ${unico.adh}%`, unico.amb || '—', unico.svc || '—', unico.ubi || '—'].map((t, i) => (
-                        <span key={i} style={{ fontSize: '10px', fontWeight: 800, padding: '3px 9px', borderRadius: '999px', background: i === 0 ? 'rgba(215,59,71,.12)' : 'rgba(18,52,78,.06)', color: i === 0 ? '#a61e2b' : 'var(--muted)' }}>{t}</span>
-                      ))}
-                    </div>
-                  )}
-                  <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
-                    <div style={{ flex: 2, minWidth: 260, display: 'grid', gap: 8 }}>
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 8 }}>
-                        <div>
-                          <label style={labelStyle}>ESTADO</label>
-                          <select value={form.estado} onChange={e => setForm({ ...form, estado: e.target.value })} style={{ ...inputStyle, width: '100%' }}>
-                            {ESTADOS_GESTION.map(e => <option key={e} value={e}>{e}</option>)}
-                          </select>
-                        </div>
-                        <div>
-                          <label style={labelStyle}>RESPONSABLE</label>
-                          <input value={form.responsable} onChange={e => setForm({ ...form, responsable: e.target.value })} placeholder="Equipo o persona" style={{ ...inputStyle, width: '100%' }} />
-                        </div>
-                        <div>
-                          <label style={labelStyle}>FECHA COMPROMISO</label>
-                          <input type="date" value={form.fecha} onChange={e => setForm({ ...form, fecha: e.target.value })} style={{ ...inputStyle, width: '100%' }} />
-                        </div>
-                      </div>
-                      <div>
-                        <label style={labelStyle}>COMENTARIO / ACCIÓN</label>
-                        <textarea rows={3} value={form.comentario} onChange={e => setForm({ ...form, comentario: e.target.value })}
-                          placeholder="Ej: se agenda escaneo de hardening para el viernes; pendiente de ventana con el cliente"
-                          style={{ ...inputStyle, width: '100%', resize: 'vertical' }} />
-                      </div>
-                      <div>
-                        <button onClick={guardarGestion} disabled={guardandoGestion}
-                          style={{ padding: '9px 18px', borderRadius: '999px', fontSize: '11px', fontWeight: 800, border: 'none', background: guardandoGestion ? 'var(--muted)' : 'var(--bank-blue)', color: '#fff', cursor: guardandoGestion ? 'not-allowed' : 'pointer' }}>
-                          {guardandoGestion ? 'Guardando...' : 'Guardar gestión'}
-                        </button>
-                      </div>
-                    </div>
-                    {unico && (
-                      <div style={{ flex: 1, minWidth: 220, maxHeight: 240, overflowY: 'auto' }}>
-                        <div style={{ fontSize: '10px', fontWeight: 800, color: 'var(--muted)', marginBottom: 6 }}>HISTORIAL</div>
-                        {!regUnico || regUnico.historial.length === 0 ? (
-                          <div style={{ fontSize: '11px', color: 'var(--muted)' }}>Sin gestión registrada todavía.</div>
-                        ) : regUnico.historial.slice().reverse().map((h, i) => (
-                          <div key={i} style={{ borderLeft: '2px solid rgba(18,52,78,.15)', padding: '0 0 8px 10px', fontSize: '11px', color: 'var(--ink-800)' }}>
-                            <b>{h.usuario}</b> <span style={{ fontSize: '10px', color: 'var(--muted)' }}>{fechaHora(h.fecha)}</span>
-                            <div>
-                              {h.estado}{h.responsable ? ` · ${h.responsable}` : ''}{h.fechaCompromiso ? ` · compromiso ${fechaCorta(h.fechaCompromiso)}` : ''}
-                              {h.comentario ? ` — ${h.comentario}` : ''}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </div>
+              {/* Ventana emergente de gestión (un equipo o varios) */}
+              {modal && (
+                <ModalGestion
+                  key={modal.claves.join('|')}
+                  titulo={modal.claves.length === 1 ? `Gestión · ${(filaModal || {}).host || modal.claves[0]}` : `Gestión masiva · ${modal.claves.length} servidores`}
+                  chips={chipsModal}
+                  esMasivo={modal.claves.length > 1}
+                  inicial={construirInicial(modal.claves)}
+                  asignables={asignables}
+                  sugerencias={sugerencias}
+                  historial={modal.claves.length > 1 ? null : (regModal && !regModal.cargando ? (regModal.registro ? regModal.registro.historial : []) : null)}
+                  actualizado={regModal && regModal.registro && regModal.registro.actualizadoPor ? `${regModal.registro.actualizadoPor} · ${fechaHora(regModal.registro.actualizadoEn)}` : ''}
+                  onGuardar={guardarDesdeModal}
+                  onCerrar={cerrarModal}
+                  guardando={guardandoGestion}
+                  error={errorModal || (regModal && regModal.error ? 'No se pudo cargar el historial de este equipo.' : null)}
+                />
               )}
 
               <div style={{ fontSize: '10px', color: 'var(--muted)', marginTop: 12, lineHeight: 1.5 }}>
